@@ -1,0 +1,95 @@
+:root {
+  font-family: "Poppins", "Segoe UI", sans-serif;
+  color-scheme: light;
+  --bg-a: #101427;
+  --bg-b: #1a2b5d;
+  --bg-c: #0c7f78;
+  --card-bg: rgba(255, 255, 255, 0.12);
+  --card-border: rgba(255, 255, 255, 0.35);
+  --text-main: #f8fbff;
+  --text-soft: #d9ebff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 20% 20%, var(--bg-c), transparent 45%),
+    radial-gradient(circle at 80% 25%, #e95b5b, transparent 35%),
+    linear-gradient(120deg, var(--bg-a), var(--bg-b));
+  color: var(--text-main);
+}
+
+.page-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.hero-card {
+  width: min(680px, 100%);
+  border: 1px solid var(--card-border);
+  border-radius: 24px;
+  padding: clamp(24px, 5vw, 48px);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+  animation: drift 5.5s ease-in-out infinite;
+}
+
+.hero-kicker {
+  margin: 0 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.hero-title {
+  margin: 0;
+  font-size: clamp(2rem, 10vw, 5rem);
+  line-height: 1.05;
+  font-weight: 800;
+  text-wrap: balance;
+}
+
+.hero-char {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(18px) scale(0.94);
+  animation:
+    pop-in 700ms cubic-bezier(0.2, 0.9, 0.2, 1) forwards,
+    glow 2.2s ease-in-out infinite;
+}
+
+@keyframes pop-in {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes glow {
+  0%,
+  100% {
+    text-shadow: 0 0 0 rgba(255, 255, 255, 0.1);
+  }
+  50% {
+    text-shadow: 0 0 22px rgba(255, 255, 255, 0.65);
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
