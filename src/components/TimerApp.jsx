@@ -166,8 +166,14 @@ export default function TimerApp() {
   }
 
   function addTask(taskData) {
-    const safeMinutes = clampMinutes(taskData.estimatedMinutes, settings.defaultTaskDuration)
-    setActiveTasks((prev) => [...prev, createTask({ ...taskData, estimatedMinutes: safeMinutes })])
+    const toAdd = Array.isArray(taskData) ? taskData : [taskData]
+    setActiveTasks((prev) => [
+      ...prev,
+      ...toAdd.map((data) => {
+        const safeMinutes = clampMinutes(data.estimatedMinutes, settings.defaultTaskDuration)
+        return createTask({ ...data, estimatedMinutes: safeMinutes })
+      }),
+    ])
   }
 
   function adjustTime(seconds) {

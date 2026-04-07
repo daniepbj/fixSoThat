@@ -1,6 +1,17 @@
 import { useState } from "react"
 import { EMOJIS, COLORS } from "../data/seedData"
 
+/** Parse a single line: "Task title 30" → { title, estimatedMinutes: 30 } */
+function parseLine(raw, defaultMinutes) {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  const match = trimmed.match(/^(.*\S)\s+(\d+)$/)
+  if (match) {
+    return { title: match[1].trim(), estimatedMinutes: Number(match[2]) }
+  }
+  return { title: trimmed, estimatedMinutes: defaultMinutes }
+}
+
 export default function AddTaskForm({ onAdd, onClose, defaultDuration }) {
   const [title, setTitle] = useState("")
   const [minutes, setMinutes] = useState(defaultDuration ?? 25)
@@ -19,6 +30,20 @@ export default function AddTaskForm({ onAdd, onClose, defaultDuration }) {
     onClose()
   }
 
+  function handleTitlePaste(e) {
+    const pasted = e.clipboardData.getData("text")
+    const lines = pasted.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    if (lines.length <= 1) return // let browser handle single-line paste normally
+    e.preventDefault()
+    const tasks = lines
+      .map((l) => parseLine(l, defaultDuration ?? 25))
+      .filter(Boolean)
+      .map((t) => ({ ...t, emoji, color }))
+    if (!tasks.length) return
+    onAdd(tasks)
+    onClose()
+  }
+
   return (
     <div
       className="modal-overlay"
@@ -33,7 +58,8 @@ export default function AddTaskForm({ onAdd, onClose, defaultDuration }) {
             className="form-input"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="What are you working on?"
+            onPaste={handleTitlePaste}
+            placeholder="What are you working on? (paste multiple lines to bulk-add)"
             autoFocus
           />
         </label>
