@@ -124,7 +124,9 @@ body {
   color: var(--text-main);
   text-decoration: none;
   font-weight: 600;
-  transition: background 0.2s, transform 0.2s;
+  transition:
+    background 0.2s,
+    transform 0.2s;
 }
 
 .app-link:hover,
