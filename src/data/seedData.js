@@ -11,7 +11,20 @@ function clampMinutes(value, fallback = 25) {
 /** Build a task object, merging any overrides. */
 export function createTask(overrides = {}) {
   const estimatedMinutes = clampMinutes(overrides.estimatedMinutes, 25);
-  const { id: _discard, ...rest } = overrides; // always generate a fresh id
+  const {
+    id: _discard,
+    adhdFlags: overrideFlags,
+    ...rest
+  } = overrides; // always generate a fresh id
+
+  const adhdFlags = {
+    needsSteps: false,
+    needsTime: false,
+    needsProof: false,
+    priority: false,
+    ...(overrideFlags || {}),
+  };
+
   return {
     id: uid(),
     title: 'New Task',
@@ -23,6 +36,7 @@ export function createTask(overrides = {}) {
     createdAt: new Date().toISOString(),
     startedAt: null,
     completedAt: null,
+    adhdFlags,
     ...rest,
   };
 }

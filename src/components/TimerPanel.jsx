@@ -11,8 +11,9 @@ export default function TimerPanel({ currentTask, timerRunning, setTimerRunning,
 
   // SVG ring
   const r = 88;
-  const circ = 2 * Math.PI * r;
-  const offset = circ * (1 - progress);
+  // Keep zero at top and fill left side as time increases:
+  // 15m => top->left, 30m => top->left->bottom.
+  const offset = 0;
 
   function toggle() {
     if (!currentTask) return;
@@ -20,20 +21,25 @@ export default function TimerPanel({ currentTask, timerRunning, setTimerRunning,
   }
 
   return (
-    <section className="timer-panel">
+    <section
+      className={`timer-panel ${timerRunning ? 'timer-panel--running' : ''}`}
+      style={{ '--timer-glow-color': currentTask?.color ?? '#6c63ff' }}
+    >
       <div className="timer-ring-wrapper">
         <svg className="timer-ring" viewBox="0 0 200 200" aria-hidden="true"
-          style={{ transform: 'rotate(-90deg) scaleX(-1)', transformOrigin: 'center' }}
+          style={{ transform: 'rotate(90deg) scaleX(-1)', transformOrigin: 'center' }}
         >
           <circle className="timer-ring__track" cx="100" cy="100" r={r} />
           <circle
             className="timer-ring__progress"
             cx="100" cy="100" r={r}
-            strokeDasharray={circ}
+            pathLength={1}
+            strokeDasharray={`${progress} 1`}
             strokeDashoffset={offset}
             style={{ stroke: currentTask?.color ?? '#6c63ff' }}
           />
         </svg>
+        <div className="timer-zero-marker" aria-hidden="true">00</div>
         <div className="timer-ring__center">
           <div className="timer-display">{fmtDisplay(remaining)}</div>
           {currentTask && (

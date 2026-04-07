@@ -12,8 +12,17 @@ function fmtTime(iso) {
 export default function TaskCard({
   task, isFirst, index, totalTasks,
   completeTask, deleteTask, resetTask, deferTask, moveUp, moveDown, moveToTop, moveToBottom,
+  playTask, toggleTaskFlag, currentTaskId, timerRunning,
 }) {
   const projectedEnd = new Date(Date.now() + task.remainingSeconds * 1000);
+  const flags = {
+    needsSteps: false,
+    needsTime: false,
+    needsProof: false,
+    priority: false,
+    ...(task.adhdFlags || {}),
+  };
+  const isFocusedTask = currentTaskId === task.id;
 
   // Mini pie chart for the current task
   const PIE_R = 15;
@@ -61,6 +70,40 @@ export default function TaskCard({
             &nbsp;·&nbsp;→ {fmtTime(projectedEnd.toISOString())}
           </span>
         </div>
+        <div className="task-card__adhd" aria-label="Task accessibility helpers">
+          <button
+            className={`task-card__tag ${flags.needsSteps ? 'active' : ''}`}
+            onClick={() => toggleTaskFlag(task.id, 'needsSteps')}
+            aria-pressed={flags.needsSteps}
+            title="Needs steps"
+          >
+            Steps
+          </button>
+          <button
+            className={`task-card__tag ${flags.needsTime ? 'active' : ''}`}
+            onClick={() => toggleTaskFlag(task.id, 'needsTime')}
+            aria-pressed={flags.needsTime}
+            title="Needs time"
+          >
+            Time
+          </button>
+          <button
+            className={`task-card__tag ${flags.needsProof ? 'active' : ''}`}
+            onClick={() => toggleTaskFlag(task.id, 'needsProof')}
+            aria-pressed={flags.needsProof}
+            title="Needs proof"
+          >
+            Proof
+          </button>
+          <button
+            className={`task-card__tag ${flags.priority ? 'active' : ''}`}
+            onClick={() => toggleTaskFlag(task.id, 'priority')}
+            aria-pressed={flags.priority}
+            title="Priority"
+          >
+            Priority
+          </button>
+        </div>
         <div className="task-card__order">
           <button
             className="task-card__icon-btn"
@@ -90,6 +133,13 @@ export default function TaskCard({
       </div>
 
       <div className="task-card__actions">
+        <button
+          className="task-card__btn task-card__btn--playtask"
+          onClick={() => playTask(task.id)}
+          title="Focus and play this task"
+        >
+          {isFocusedTask && timerRunning ? '▶ Focused' : '▶ Focus'}
+        </button>
         <button className="task-card__btn task-card__btn--complete" onClick={() => completeTask(task.id)}>✓ Done</button>
         <button className="task-card__btn task-card__btn--reset" onClick={() => resetTask(task.id)}>↺ Reset</button>
         <button className="task-card__btn task-card__btn--defer" onClick={() => deferTask(task.id)}>⏭ Not now</button>

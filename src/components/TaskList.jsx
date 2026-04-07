@@ -4,6 +4,7 @@ import TaskCard from './TaskCard';
 export default function TaskList({
   activeTasks, completedTasks, settings,
   completeTask, deleteTask, resetTask, deferTask, moveUp, moveDown, moveToTop, moveToBottom,
+  playTask, toggleTaskFlag, currentTaskId, timerRunning,
   emojiMe, colorMe, randomTask, addOvertime, clearActiveTasks,
   showAddForm, setShowAddForm,
 }) {
@@ -41,6 +42,10 @@ export default function TaskList({
             moveDown={moveDown}
             moveToTop={moveToTop}
             moveToBottom={moveToBottom}
+            playTask={playTask}
+            toggleTaskFlag={toggleTaskFlag}
+            currentTaskId={currentTaskId}
+            timerRunning={timerRunning}
           />
         ))}
       </div>

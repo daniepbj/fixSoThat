@@ -29,7 +29,6 @@ This repo uses GitHub Actions for deployment.
 1. Push or merge your changes to `main`.
 
 2. GitHub Actions will automatically:
-
    - install dependencies
    - run `pnpm build`
    - deploy the generated `dist` folder to Pages
@@ -40,6 +39,6 @@ This repo uses GitHub Actions for deployment.
 
 Run this locally before pushing:
 
-   ```powershell
-   corepack pnpm build
-   ```
+```powershell
+corepack pnpm build
+```

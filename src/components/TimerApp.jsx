@@ -29,6 +29,16 @@ function clampSeconds(value) {
   return Math.max(0, Math.min(MAX_TASK_SECONDS, Math.round(num)))
 }
 
+function normalizeAdhdFlags(flags) {
+  return {
+    needsSteps: false,
+    needsTime: false,
+    needsProof: false,
+    priority: false,
+    ...(flags || {}),
+  }
+}
+
 function normalizeTask(task) {
   const estimatedMinutes = clampMinutes(task.estimatedMinutes, 25)
   const fallbackRemaining = estimatedMinutes * 60
@@ -37,6 +47,7 @@ function normalizeTask(task) {
     estimatedMinutes,
     remainingSeconds: clampSeconds(task.remainingSeconds ?? fallbackRemaining),
     spentSeconds: Math.max(0, Number(task.spentSeconds) || 0),
+    adhdFlags: normalizeAdhdFlags(task.adhdFlags),
   }
 }
 
@@ -215,6 +226,35 @@ export default function TimerApp() {
     })
   }
 
+  function playTask(id) {
+    setActiveTasks((prev) => {
+      const idx = prev.findIndex((t) => t.id === id)
+      if (idx < 0) return prev
+      if (idx === 0) return prev
+      const copy = [...prev]
+      const [item] = copy.splice(idx, 1)
+      return [item, ...copy]
+    })
+    setCurrentView("timer")
+    setTimerRunning(true)
+  }
+
+  function toggleTaskFlag(id, flagKey) {
+    setActiveTasks((prev) =>
+      prev.map((task) =>
+        task.id === id
+          ? {
+              ...task,
+              adhdFlags: {
+                ...normalizeAdhdFlags(task.adhdFlags),
+                [flagKey]: !normalizeAdhdFlags(task.adhdFlags)[flagKey],
+              },
+            }
+          : task,
+      ),
+    )
+  }
+
   // ── Quick actions ────────────────────────────────────────────────────────
 
   function emojiMe() {
@@ -323,6 +363,10 @@ export default function TimerApp() {
     moveDown,
     moveToTop,
     moveToBottom,
+    playTask,
+    toggleTaskFlag,
+    currentTaskId: currentTask?.id,
+    timerRunning,
     emojiMe,
     colorMe,
     randomTask,
