@@ -24,16 +24,12 @@ React front page with a single animated feature component that says "Hellow worl
 
 ## Deploy to GitHub Pages
 
-1. Install dependencies (includes deploy tooling):
+1. Build GitHub Pages output into `docs` on main:
 
    ```powershell
-   corepack pnpm install
+   corepack pnpm build:pages
    ```
 
-2. Publish the built `dist` folder to `gh-pages` branch:
+2. Commit and push the generated `docs` folder on `main`.
 
-   ```powershell
-   corepack pnpm deploy
-   ```
-
-3. In GitHub repo settings, set Pages source to `gh-pages` branch.
+3. In GitHub repo settings, set Pages source to `main` branch and `/docs` folder.
