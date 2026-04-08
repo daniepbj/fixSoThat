@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from "react"
+import { useState, useRef } from "react"
 
 const MAX_CHUNK_SIZE = 250
 
@@ -23,7 +23,7 @@ function buildFormattedTask({ goal, steps, proof }) {
 
   validSteps.forEach((step, index) => {
     const time =
-      step.timeMinutes && step.timeMinutes > 0 ? ` (${step.timeMinutes}m)` : ""
+      step.timeMinutes && step.timeMinutes > 0 ? ` ${step.timeMinutes}` : ""
     lines.push(`${index + 1}. ${step.text}${time}`)
   })
 
@@ -69,49 +69,60 @@ function buildLlamaFormat({ goal, steps, proof }) {
   return lines.join("\n")
 }
 
-function findLineBreakSplit(text, maxSize) {
-  for (let i = maxSize; i > 0; i -= 1) {
-    if (text[i - 1] === "\n") return i
-  }
-  return -1
-}
+function buildToDoChunks({ goal, steps, proof }, maxSize = MAX_CHUNK_SIZE) {
+  const trimmedGoal = normalizeInput(goal)
+  const trimmedProof = normalizeInput(proof)
+  const validSteps = steps
+    .filter((s) => normalizeInput(s.text).length > 0)
+    .map((s) => ({ ...s, text: normalizeInput(s.text) }))
 
-function findSentenceSplit(text, maxSize) {
-  const segment = text.slice(0, maxSize)
-  const pattern = /[.!?](\s|$)/g
-  let match = pattern.exec(segment)
-  let split = -1
+  const goalPart = trimmedGoal
+    ? `Fixa så att jag ${trimmedGoal}`
+    : "Fixa så att jag"
 
-  while (match) {
-    split = match.index + 1
-    match = pattern.exec(segment)
-  }
-
-  return split
-}
-
-function splitIntoChunks(text, maxSize = MAX_CHUNK_SIZE) {
-  if (!text) return []
-
-  const chunks = []
-  let remaining = text
-
-  while (remaining.length > maxSize) {
-    const lineSplit = findLineBreakSplit(remaining, maxSize)
-    const sentenceSplit =
-      lineSplit > 0 ? -1 : findSentenceSplit(remaining, maxSize)
-    const splitAt =
-      lineSplit > 0 ? lineSplit : sentenceSplit > 0 ? sentenceSplit : maxSize
-
-    chunks.push(remaining.slice(0, splitAt))
-    remaining = remaining.slice(splitAt)
+  // Content lines in parse-friendly format: step text followed by integer minutes
+  const contentLines = []
+  validSteps.forEach((step, index) => {
+    const time =
+      step.timeMinutes && step.timeMinutes > 0 ? ` ${step.timeMinutes}` : ""
+    contentLines.push(`${index + 1}. ${step.text}${time}`)
+  })
+  if (trimmedProof) {
+    contentLines.push(`Proof att jag gjorde det jag sa: ${trimmedProof}`)
   }
 
-  if (remaining) {
-    chunks.push(remaining)
+  if (contentLines.length === 0) {
+    return [`* (1/1) ${goalPart}`]
   }
 
-  return chunks
+  // Reserve worst-case header length (2-digit chunk numbers) to stay safely under limit
+  const headerReserve = `* (99/99) ${goalPart}\n`.length
+
+  // Greedily pack lines into groups that each fit within maxSize
+  const chunkGroups = []
+  let currentLines = []
+  let currentLen = headerReserve
+
+  for (const line of contentLines) {
+    const lineLen = line.length + 1 // +1 for \n
+    if (currentLines.length > 0 && currentLen + lineLen > maxSize) {
+      chunkGroups.push(currentLines)
+      currentLines = [line]
+      currentLen = headerReserve + lineLen
+    } else {
+      currentLines.push(line)
+      currentLen += lineLen
+    }
+  }
+  if (currentLines.length > 0) {
+    chunkGroups.push(currentLines)
+  }
+
+  const total = chunkGroups.length
+  return chunkGroups.map((lines, i) => {
+    const header = `* (${i + 1}/${total}) ${goalPart}`
+    return `${header}\n${lines.join("\n")}`
+  })
 }
 
 function generateStepId() {
@@ -125,12 +136,11 @@ export default function StructuredTaskBuilder() {
   const [proof, setProof] = useState("")
   const [generatedText, setGeneratedText] = useState("")
   const [llamaText, setLlamaText] = useState("")
+  const [todoChunks, setTodoChunks] = useState([])
   const [todoChecks, setTodoChecks] = useState([])
   const [llamaPasted, setLlamaPasted] = useState(false)
   const [copyMessage, setCopyMessage] = useState("")
   const stepInputRefs = useRef({})
-
-  const chunks = useMemo(() => splitIntoChunks(generatedText), [generatedText])
 
   function showCopyMessage(message) {
     setCopyMessage(message)
@@ -226,10 +236,11 @@ export default function StructuredTaskBuilder() {
     event.preventDefault()
     const nextText = buildFormattedTask({ goal, steps, proof })
     const nextLlamaText = buildLlamaFormat({ goal, steps, proof })
-    const nextChunks = splitIntoChunks(nextText)
+    const nextTodoChunks = buildToDoChunks({ goal, steps, proof })
     setGeneratedText(nextText)
     setLlamaText(nextLlamaText)
-    setTodoChecks(new Array(nextChunks.length).fill(false))
+    setTodoChunks(nextTodoChunks)
+    setTodoChecks(new Array(nextTodoChunks.length).fill(false))
     setLlamaPasted(false)
   }
 
@@ -411,35 +422,30 @@ export default function StructuredTaskBuilder() {
               needed, keep splitting long chunks into multiple steps.
             </p>
             <div className="task-chunk-list">
-              {chunks.map((chunk, index) => {
-                const total = chunks.length
-                const label = `(${index + 1}/${total})`
-                return (
-                  <article className="task-chunk-box" key={`chunk-${index}`}>
-                    <p className="task-chunk-title">Chunk {label}</p>
-                    <pre className="task-builder-pre task-builder-pre--chunk">
-                      {chunk}
-                    </pre>
-                    <div className="task-chunk-actions">
-                      <button
-                        type="button"
-                        className="task-builder-copy-button"
-                        onClick={() => copyText(chunk, `Chunk copied`)}
-                      >
-                        Copy chunk
-                      </button>
-                      <label className="task-check-label">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(todoChecks[index])}
-                          onChange={() => toggleTodoCheck(index)}
-                        />
-                        Added to Microsoft To Do
-                      </label>
-                    </div>
-                  </article>
-                )
-              })}
+              {todoChunks.map((chunk, index) => (
+                <article className="task-chunk-box" key={`chunk-${index}`}>
+                  <pre className="task-builder-pre task-builder-pre--chunk">
+                    {chunk}
+                  </pre>
+                  <div className="task-chunk-actions">
+                    <button
+                      type="button"
+                      className="task-builder-copy-button"
+                      onClick={() => copyText(chunk, "Chunk copied")}
+                    >
+                      Copy chunk
+                    </button>
+                    <label className="task-check-label">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(todoChecks[index])}
+                        onChange={() => toggleTodoCheck(index)}
+                      />
+                      Added to Microsoft To Do
+                    </label>
+                  </div>
+                </article>
+              ))}
             </div>
           </section>
 
