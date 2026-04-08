@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useLocalStorage } from "../hooks/useLocalStorage"
 import { createTask, initStorageIfNew, EMOJIS, COLORS } from "../data/seedData"
+import confetti from "canvas-confetti"
 import TopBar from "./TopBar"
 import TimerPanel from "./TimerPanel"
 import TaskList from "./TaskList"
@@ -13,6 +14,13 @@ import BottomNav from "./BottomNav"
 import { TimerProvider } from "../context/TimerContext"
 import "../timer.css"
 import { playAlarmOnce } from "../utils/alarm"
+import {
+  addTrackFromFile,
+  deleteTrack,
+  getTrack,
+  listTracks,
+} from "../utils/musicStore"
+import { playClickSound, playCompletionSound } from "../utils/soundEffects"
 
 // Seed localStorage exactly once – never re-seeds after user clears tasks
 initStorageIfNew()
@@ -74,15 +82,40 @@ export default function TimerApp() {
   const [sessionSeconds, setSessionSeconds] = useLocalStorage("fst_session", 0)
   const [currentView, setCurrentView] = useLocalStorage("fst_view", "timer")
   const [theme, setTheme] = useLocalStorage("fst_theme", "dark")
+  const [musicVolume, setMusicVolume] = useLocalStorage(
+    "fst_music_volume",
+    0.55,
+  )
+  const [musicLoop, setMusicLoop] = useLocalStorage("fst_music_loop", true)
+  const [musicMuted, setMusicMuted] = useLocalStorage("fst_music_muted", false)
+  const [selectedTrackId, setSelectedTrackId] = useLocalStorage(
+    "fst_music_selected_track",
+    "",
+  )
 
   const [showAddForm, setShowAddForm] = useState(false)
   const [alarmActive, setAlarmActive] = useState(false)
+  const [uploadedTracks, setUploadedTracks] = useState([])
+  const [musicUiMessage, setMusicUiMessage] = useState("")
+  const [audioBlockedMessage, setAudioBlockedMessage] = useState("")
+  const [previewTrackId, setPreviewTrackId] = useState("")
   const alarmIntervalRef = useRef(null)
+  const taskMusicRef = useRef(null)
+  const taskMusicUrlRef = useRef("")
+  const previewAudioRef = useRef(null)
+  const previewUrlRef = useRef("")
+  const confettiTimerRef = useRef(null)
+  const lastConfettiAtRef = useRef(0)
 
   // First task is always the "current" active task tied to the timer
   const currentTask = activeTasks[0] ?? null
   const settingsRef = useRef(settings)
   settingsRef.current = settings
+
+  if (!taskMusicRef.current && typeof Audio !== "undefined") {
+    taskMusicRef.current = new Audio()
+    taskMusicRef.current.preload = "auto"
+  }
 
   // One-time data normalization for older localStorage schemas.
   useEffect(() => {
@@ -154,12 +187,278 @@ export default function TimerApp() {
     alarmIntervalRef.current = null
   }, [timerRunning])
 
+  // ── Music persistence and playback ───────────────────────────────────────
+  useEffect(() => {
+    let alive = true
+    listTracks()
+      .then((tracks) => {
+        if (!alive) return
+        setUploadedTracks(tracks)
+      })
+      .catch((err) => {
+        console.error("Failed to load tracks", err)
+        if (alive)
+          setMusicUiMessage("Could not load saved tracks from IndexedDB.")
+      })
+
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const audio = taskMusicRef.current
+    if (!audio) return
+    audio.volume = Math.max(0, Math.min(1, Number(musicVolume) || 0))
+    audio.loop = Boolean(musicLoop)
+    audio.muted = Boolean(musicMuted)
+  }, [musicVolume, musicLoop, musicMuted])
+
+  useEffect(() => {
+    if (!selectedTrackId) return
+    const found = uploadedTracks.some((t) => t.id === selectedTrackId)
+    if (!found) {
+      setSelectedTrackId(uploadedTracks[0]?.id ?? "")
+    }
+  }, [uploadedTracks, selectedTrackId, setSelectedTrackId])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadSelectedTrack() {
+      const audio = taskMusicRef.current
+      if (!audio) return
+
+      if (taskMusicUrlRef.current) {
+        URL.revokeObjectURL(taskMusicUrlRef.current)
+        taskMusicUrlRef.current = ""
+      }
+
+      audio.pause()
+      audio.removeAttribute("src")
+      audio.load()
+
+      if (!selectedTrackId) return
+
+      const row = await getTrack(selectedTrackId)
+      if (!row || !row.blob || cancelled) return
+
+      const url = URL.createObjectURL(row.blob)
+      taskMusicUrlRef.current = url
+      audio.src = url
+      audio.currentTime = 0
+    }
+
+    loadSelectedTrack().catch((err) => {
+      console.error("Failed to load selected track", err)
+      setMusicUiMessage("Failed to load selected music track.")
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedTrackId])
+
+  useEffect(() => {
+    const audio = taskMusicRef.current
+    if (!audio) return
+
+    const shouldPlay = Boolean(timerRunning && currentTask && selectedTrackId)
+    if (!shouldPlay) {
+      audio.pause()
+      return
+    }
+
+    if (previewAudioRef.current && !previewAudioRef.current.paused) {
+      previewAudioRef.current.pause()
+      setPreviewTrackId("")
+    }
+
+    if (audio.paused) {
+      audio
+        .play()
+        .then(() => setAudioBlockedMessage(""))
+        .catch(() => {
+          setAudioBlockedMessage(
+            "Browser blocked autoplay. Press play once in Music Settings to enable audio.",
+          )
+        })
+    }
+  }, [timerRunning, currentTask?.id, selectedTrackId, previewTrackId])
+
+  useEffect(() => {
+    return () => {
+      clearInterval(alarmIntervalRef.current)
+      clearTimeout(confettiTimerRef.current)
+      if (taskMusicRef.current) {
+        taskMusicRef.current.pause()
+        taskMusicRef.current.removeAttribute("src")
+      }
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause()
+        previewAudioRef.current.removeAttribute("src")
+      }
+      if (taskMusicUrlRef.current) URL.revokeObjectURL(taskMusicUrlRef.current)
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+    }
+  }, [])
+
+  function triggerCelebration() {
+    const now = Date.now()
+    const delta = now - lastConfettiAtRef.current
+    const run = () => {
+      confetti({
+        particleCount: 55,
+        spread: 65,
+        startVelocity: 34,
+        origin: { y: 0.72 },
+      })
+      lastConfettiAtRef.current = Date.now()
+    }
+    if (delta < 220) {
+      clearTimeout(confettiTimerRef.current)
+      confettiTimerRef.current = setTimeout(run, 220 - delta)
+      return
+    }
+    run()
+  }
+
+  function refreshTracks() {
+    return listTracks().then((tracks) => {
+      setUploadedTracks(tracks)
+      return tracks
+    })
+  }
+
+  function isSupportedAudioFile(file) {
+    const validMime = /^audio\//.test(file.type || "")
+    const validExt = /\.(mp3|wav|ogg|m4a)$/i.test(file.name || "")
+    return validMime || validExt
+  }
+
+  async function handleMusicUpload(files) {
+    const picked = Array.from(files || [])
+    if (!picked.length) return
+
+    const valid = picked.filter(isSupportedAudioFile)
+    const invalidCount = picked.length - valid.length
+
+    if (!valid.length) {
+      setMusicUiMessage(
+        "No supported audio files selected. Use mp3, wav, ogg, or m4a.",
+      )
+      return
+    }
+
+    for (const file of valid) {
+      await addTrackFromFile(file)
+    }
+
+    const tracks = await refreshTracks()
+    if (!selectedTrackId && tracks.length) {
+      setSelectedTrackId(tracks[tracks.length - 1].id)
+    }
+
+    const invalidHint =
+      invalidCount > 0 ? ` ${invalidCount} unsupported file(s) skipped.` : ""
+    setMusicUiMessage(`Uploaded ${valid.length} track(s).${invalidHint}`)
+  }
+
+  async function handleDeleteTrack(trackId) {
+    if (previewTrackId === trackId && previewAudioRef.current) {
+      previewAudioRef.current.pause()
+      setPreviewTrackId("")
+    }
+    await deleteTrack(trackId)
+    const tracks = await refreshTracks()
+    if (selectedTrackId === trackId) {
+      setSelectedTrackId(tracks[0]?.id ?? "")
+    }
+    setMusicUiMessage("Track removed.")
+  }
+
+  function toggleMusicPlaybackFromUI() {
+    const audio = taskMusicRef.current
+    if (!audio) return
+    playClickSound(musicVolume)
+    if (audio.paused) {
+      audio
+        .play()
+        .then(() => {
+          setAudioBlockedMessage("")
+          if (!timerRunning && currentTask) setTimerRunning(true)
+        })
+        .catch(() => {
+          setAudioBlockedMessage(
+            "Browser blocked autoplay. Press this play button once to enable audio.",
+          )
+        })
+    } else {
+      audio.pause()
+      if (timerRunning) setTimerRunning(false)
+    }
+  }
+
+  async function previewTrack(trackId) {
+    const track = uploadedTracks.find((t) => t.id === trackId)
+    if (!track) return
+
+    if (
+      previewTrackId === trackId &&
+      previewAudioRef.current &&
+      !previewAudioRef.current.paused
+    ) {
+      previewAudioRef.current.pause()
+      setPreviewTrackId("")
+      return
+    }
+
+    const row = await getTrack(trackId)
+    if (!row?.blob) return
+
+    if (!previewAudioRef.current && typeof Audio !== "undefined") {
+      previewAudioRef.current = new Audio()
+    }
+    const preview = previewAudioRef.current
+    const bg = taskMusicRef.current
+    if (!preview || !bg) return
+
+    preview.pause()
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+
+    if (!bg.paused) bg.pause()
+
+    previewUrlRef.current = URL.createObjectURL(row.blob)
+    preview.src = previewUrlRef.current
+    preview.volume = Math.max(0, Math.min(1, Number(musicVolume) || 0))
+    preview.loop = false
+
+    preview.onended = () => setPreviewTrackId("")
+
+    preview
+      .play()
+      .then(() => setPreviewTrackId(trackId))
+      .catch(() => {
+        setAudioBlockedMessage(
+          "Preview was blocked. Press play once to enable audio.",
+        )
+      })
+  }
+
+  function toggleTimerWithClick() {
+    if (!currentTask) return
+    playClickSound(musicVolume)
+    setTimerRunning((running) => !running)
+  }
+
   // ── Task actions ─────────────────────────────────────────────────────────
 
   function completeTask(id) {
     stopAlarm()
     const task = activeTasks.find((t) => t.id === id)
     if (!task) return
+    playCompletionSound(musicVolume)
+    triggerCelebration()
     setCompletedTasks((ct) => [
       ...ct,
       { ...task, completedAt: new Date().toISOString() },
@@ -183,7 +482,9 @@ export default function TimerApp() {
           ? {
               ...t,
               estimatedMinutes: clampMinutes(t.estimatedMinutes, 25),
-              remainingSeconds: clampSeconds(clampMinutes(t.estimatedMinutes, 25) * 60),
+              remainingSeconds: clampSeconds(
+                clampMinutes(t.estimatedMinutes, 25) * 60,
+              ),
               spentSeconds: 0,
             }
           : t,
@@ -203,7 +504,10 @@ export default function TimerApp() {
     setActiveTasks((prev) => [
       ...prev,
       ...toAdd.map((data) => {
-        const safeMinutes = clampMinutes(data.estimatedMinutes, settings.defaultTaskDuration)
+        const safeMinutes = clampMinutes(
+          data.estimatedMinutes,
+          settings.defaultTaskDuration,
+        )
         return createTask({ ...data, estimatedMinutes: safeMinutes })
       }),
     ])
@@ -279,6 +583,7 @@ export default function TimerApp() {
   }
 
   function playTask(id) {
+    playClickSound(musicVolume)
     setActiveTasks((prev) => {
       const idx = prev.findIndex((t) => t.id === id)
       if (idx < 0) return prev
@@ -369,7 +674,9 @@ export default function TimerApp() {
         ...t,
         id: Math.random().toString(36).slice(2, 10),
         estimatedMinutes: clampMinutes(t.estimatedMinutes, 25),
-        remainingSeconds: clampSeconds(clampMinutes(t.estimatedMinutes, 25) * 60),
+        remainingSeconds: clampSeconds(
+          clampMinutes(t.estimatedMinutes, 25) * 60,
+        ),
         spentSeconds: 0,
       })),
     )
@@ -406,9 +713,32 @@ export default function TimerApp() {
     currentTask,
     timerRunning,
     setTimerRunning,
+    toggleTimerWithClick,
     adjustTime,
     alarmActive,
     stopAlarm,
+  }
+
+  const musicProps = {
+    uploadedTracks,
+    selectedTrackId,
+    setSelectedTrackId,
+    musicVolume,
+    setMusicVolume,
+    musicLoop,
+    setMusicLoop,
+    musicMuted,
+    setMusicMuted,
+    onUploadTracks: handleMusicUpload,
+    onDeleteTrack: handleDeleteTrack,
+    onPreviewTrack: previewTrack,
+    previewTrackId,
+    onToggleMusicPlayback: toggleMusicPlaybackFromUI,
+    isMusicPlaying: Boolean(
+      taskMusicRef.current && !taskMusicRef.current.paused,
+    ),
+    audioBlockedMessage,
+    musicUiMessage,
   }
 
   const taskProps = {
@@ -437,7 +767,9 @@ export default function TimerApp() {
   }
 
   return (
-    <div className={`timer-app timer-app--${theme} ${settings.matchMainPageStyle ? "timer-app--main-style" : ""}`}>
+    <div
+      className={`timer-app timer-app--${theme} ${settings.matchMainPageStyle ? "timer-app--main-style" : ""}`}
+    >
       <TopBar
         sessionSeconds={sessionSeconds}
         projectedEndTime={projectedEndTime}
@@ -478,7 +810,11 @@ export default function TimerApp() {
             />
           )}
           {currentView === "settings" && (
-            <SettingsView settings={settings} setSettings={setSettings} />
+            <SettingsView
+              settings={settings}
+              setSettings={setSettings}
+              music={musicProps}
+            />
           )}
         </div>
       </TimerProvider>

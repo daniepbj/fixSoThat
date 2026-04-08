@@ -166,7 +166,9 @@
 }
 
 .timer-panel--running .timer-ring-wrapper {
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--timer-glow-color) 55%, white 10%));
+  filter: drop-shadow(
+    0 0 6px color-mix(in srgb, var(--timer-glow-color) 55%, white 10%)
+  );
 }
 
 .timer-panel--running .timer-ring__progress {
@@ -176,10 +178,14 @@
 @keyframes timer-glow {
   0%,
   100% {
-    filter: drop-shadow(0 0 0 color-mix(in srgb, var(--timer-glow-color) 35%, transparent));
+    filter: drop-shadow(
+      0 0 0 color-mix(in srgb, var(--timer-glow-color) 35%, transparent)
+    );
   }
   50% {
-    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--timer-glow-color) 70%, white 10%));
+    filter: drop-shadow(
+      0 0 8px color-mix(in srgb, var(--timer-glow-color) 70%, white 10%)
+    );
   }
 }
 
@@ -189,11 +195,13 @@
 }
 
 @keyframes alarm-flash {
-  0%, 100% {
+  0%,
+  100% {
     filter: drop-shadow(0 0 4px rgba(255, 70, 70, 0.5));
   }
   50% {
-    filter: drop-shadow(0 0 22px rgba(255, 70, 70, 1)) drop-shadow(0 0 44px rgba(255, 70, 70, 0.45));
+    filter: drop-shadow(0 0 22px rgba(255, 70, 70, 1))
+      drop-shadow(0 0 44px rgba(255, 70, 70, 0.45));
   }
 }
 
@@ -217,8 +225,13 @@
 }
 
 @keyframes dismiss-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.65; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.65;
+  }
 }
 
 .timer-ring__center {
@@ -261,7 +274,10 @@
   border: none;
   cursor: pointer;
   font-weight: 700;
-  transition: transform 0.15s, background 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.15s,
+    background 0.2s,
+    box-shadow 0.2s;
   border-radius: 50%;
   font-family: inherit;
 }
@@ -314,7 +330,9 @@
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  transition: background 0.2s, transform 0.15s;
+  transition:
+    background 0.2s,
+    transform 0.15s;
   white-space: nowrap;
 }
 .quick-btn:hover {
@@ -343,7 +361,9 @@
 
 .task-drag-wrap {
   border-radius: 16px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
   touch-action: none;
   cursor: grab;
 }
@@ -363,7 +383,8 @@
 }
 
 .task-drag-wrap--target .task-card {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ta-accent, #6c63ff) 65%, transparent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--ta-accent, #6c63ff) 65%, transparent);
 }
 .task-card:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
@@ -431,7 +452,10 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s;
 }
 
 .task-card__tag:hover {
@@ -476,7 +500,9 @@
   padding: 2px 6px;
   border-radius: 6px;
   font-size: 0.85rem;
-  transition: color 0.2s, background 0.2s;
+  transition:
+    color 0.2s,
+    background 0.2s;
   font-family: inherit;
 }
 .task-card__icon-btn:hover:not(:disabled) {
@@ -503,7 +529,9 @@
   font-size: 0.73rem;
   font-weight: 600;
   font-family: inherit;
-  transition: opacity 0.2s, transform 0.15s;
+  transition:
+    opacity 0.2s,
+    transform 0.15s;
 }
 .task-card__btn:hover {
   transform: translateY(-1px);
@@ -570,7 +598,9 @@
   font-family: inherit;
   cursor: pointer;
   margin: 6px 0 14px;
-  transition: border-color 0.2s, color 0.2s;
+  transition:
+    border-color 0.2s,
+    color 0.2s;
 }
 .add-task-btn:hover {
   border-color: #6c63ff;
@@ -696,7 +726,9 @@
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
-  transition: transform 0.15s, border-color 0.15s;
+  transition:
+    transform 0.15s,
+    border-color 0.15s;
 }
 .color-swatch:hover {
   transform: scale(1.15);
@@ -721,7 +753,9 @@
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.15s;
+  transition:
+    opacity 0.2s,
+    transform 0.15s;
 }
 .form-btn:hover {
   transform: translateY(-1px);
@@ -901,7 +935,9 @@
   border-radius: 10px;
   border: 1.5px solid var(--ta-border);
   cursor: pointer;
-  transition: background 0.18s, border-color 0.18s;
+  transition:
+    background 0.18s,
+    border-color 0.18s;
   font-size: 0.85rem;
   line-height: 1.3;
 }
@@ -926,6 +962,125 @@
 .alarm-option__desc {
   color: var(--ta-text-soft);
   font-size: 0.78rem;
+}
+
+.settings-row--compact {
+  gap: 12px;
+}
+
+.settings-help-text {
+  margin: 0;
+  color: var(--ta-text-soft);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.settings-warn-text {
+  margin: 0;
+  color: #ffb3b3;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.music-upload-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.music-upload-row input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.music-upload-btn,
+.music-control-btn {
+  border: 1px solid var(--ta-border);
+  border-radius: 8px;
+  background: var(--ta-btn);
+  color: var(--ta-text);
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    transform 0.12s ease;
+}
+
+.music-upload-btn:hover,
+.music-control-btn:hover:not(:disabled) {
+  background: var(--ta-btn-hover);
+  transform: translateY(-1px);
+}
+
+.music-control-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.music-control-btn--danger {
+  color: #ff9e9e;
+  border-color: rgba(255, 100, 100, 0.35);
+}
+
+.music-volume-slider {
+  width: 180px;
+  accent-color: #6c63ff;
+}
+
+.music-track-list {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+}
+
+.music-track-item {
+  border: 1px solid var(--ta-border);
+  border-radius: 10px;
+  background: var(--ta-input);
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.music-track-item--selected {
+  border-color: rgba(108, 99, 255, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(108, 99, 255, 0.35);
+}
+
+.music-track-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.music-track-meta strong {
+  font-size: 0.84rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}
+
+.music-track-meta small {
+  color: var(--ta-text-soft);
+  font-size: 0.72rem;
+}
+
+.music-track-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .bottom-nav {
