@@ -55,9 +55,10 @@ function buildLlamaFormat({ goal, steps, proof }) {
   if (goalLine) lines.push(goalLine)
 
   validSteps.forEach((step) => {
-    const stepLine = step.timeMinutes && step.timeMinutes > 0
-      ? `${step.text} ${step.timeMinutes}`
-      : step.text
+    const stepLine =
+      step.timeMinutes && step.timeMinutes > 0
+        ? `${step.text} ${step.timeMinutes}`
+        : step.text
     lines.push(stepLine)
   })
 
