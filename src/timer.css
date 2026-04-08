@@ -29,6 +29,33 @@
   font-family: "Poppins", "Segoe UI", sans-serif;
 }
 
+.timer-app--sidebar {
+  height: 100%;
+  min-height: 0;
+  border-radius: 18px;
+}
+
+.timer-app--sidebar .top-bar {
+  padding: 8px 12px;
+}
+
+.timer-app--sidebar .timer-main {
+  padding: 0 10px 10px;
+}
+
+.timer-app--sidebar .timer-ring-wrapper {
+  width: 178px;
+  height: 178px;
+}
+
+.timer-app--sidebar .bottom-nav {
+  overflow-x: auto;
+}
+
+.timer-app--sidebar .bottom-nav__btn {
+  min-width: 74px;
+}
+
 .timer-app--light {
   --ta-bg: linear-gradient(160deg, #f5f7ff 0%, #eef1ff 55%, #f0f8ff 100%);
   --ta-text: #1a1b3c;
@@ -1132,4 +1159,108 @@
   backdrop-filter: blur(10px);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
   animation: drift 6s ease-in-out infinite;
+}
+
+/* Internal task steps shown in sidebar timer view */
+.sidebar-steps {
+  margin: 12px 0;
+  border: 1px solid var(--ta-border);
+  border-radius: 12px;
+  background: var(--ta-card);
+  padding: 10px;
+}
+
+.sidebar-steps__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar-steps__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-steps__close {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--ta-border);
+  background: var(--ta-btn);
+  color: var(--ta-text-soft);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.sidebar-steps__progress {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--ta-text-soft);
+}
+
+.sidebar-steps__list {
+  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.sidebar-step {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.sidebar-step__text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-step__text--done {
+  text-decoration: line-through;
+  opacity: 0.65;
+}
+
+.sidebar-step__time {
+  font-size: 0.7rem;
+  border: 1px solid rgba(173, 255, 209, 0.35);
+  background: rgba(52, 209, 149, 0.16);
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
+.sidebar-steps__empty {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: var(--ta-text-soft);
+}
+
+.sidebar-steps__actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sidebar-steps__try-btn,
+.sidebar-steps__complete-btn {
+  border: 1px solid var(--ta-border);
+  border-radius: 8px;
+  background: var(--ta-btn);
+  color: var(--ta-text);
+  padding: 6px 9px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sidebar-steps__complete-btn {
+  border-color: rgba(139, 246, 187, 0.65);
+  background: rgba(34, 197, 94, 0.24);
 }

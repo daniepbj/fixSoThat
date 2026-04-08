@@ -1,4 +1,6 @@
 import { useState, useRef } from "react"
+import { useMainTask } from "../context/MainTaskContext"
+import { parseStepRaw, parseStepBlock, genStepId } from "../utils/stepUtils"
 
 const MAX_CHUNK_SIZE = 250
 
@@ -6,15 +8,15 @@ function normalizeInput(value) {
   return value.trim()
 }
 
+/**
+ * Build formatted preview text. Steps use "raw" format, parsed on the fly.
+ */
 function buildFormattedTask({ goal, steps, proof }) {
   const trimmedGoal = normalizeInput(goal)
   const trimmedProof = normalizeInput(proof)
   const validSteps = steps
-    .filter((s) => normalizeInput(s.text).length > 0)
-    .map((s) => ({
-      ...s,
-      text: normalizeInput(s.text),
-    }))
+    .map((s) => ({ ...s, raw: normalizeInput(s.raw) }))
+    .filter((s) => s.raw.length > 0)
 
   const lines = []
   lines.push(
@@ -22,9 +24,9 @@ function buildFormattedTask({ goal, steps, proof }) {
   )
 
   validSteps.forEach((step, index) => {
-    const time =
-      step.timeMinutes && step.timeMinutes > 0 ? ` ${step.timeMinutes}` : ""
-    lines.push(`${index + 1}. ${step.text}${time}`)
+    const { text, minutes } = parseStepRaw(step.raw)
+    const time = minutes > 0 ? ` ${minutes}` : ""
+    lines.push(`${index + 1}. ${text}${time}`)
   })
 
   lines.push(
@@ -40,15 +42,12 @@ function buildLlamaFormat({ goal, steps, proof }) {
   const trimmedGoal = normalizeInput(goal)
   const trimmedProof = normalizeInput(proof)
   const validSteps = steps
-    .filter((s) => normalizeInput(s.text).length > 0)
-    .map((s) => ({
-      ...s,
-      text: normalizeInput(s.text),
-    }))
+    .map((s) => ({ ...s, raw: normalizeInput(s.raw) }))
+    .filter((s) => s.raw.length > 0)
+    .map((s) => ({ ...s, ...parseStepRaw(s.raw) }))
 
   const lines = []
-
-  const totalTime = validSteps.reduce((sum, s) => sum + (s.timeMinutes || 0), 0)
+  const totalTime = validSteps.reduce((sum, s) => sum + (s.minutes || 0), 0)
   const goalLine = trimmedGoal
     ? `${trimmedGoal}${totalTime > 0 ? ` ${totalTime}` : ""}`
     : ""
@@ -56,9 +55,7 @@ function buildLlamaFormat({ goal, steps, proof }) {
 
   validSteps.forEach((step) => {
     const stepLine =
-      step.timeMinutes && step.timeMinutes > 0
-        ? `${step.text} ${step.timeMinutes}`
-        : step.text
+      step.minutes > 0 ? `${step.text} ${step.minutes}` : step.text
     lines.push(stepLine)
   })
 
@@ -73,18 +70,17 @@ function buildToDoChunks({ goal, steps, proof }, maxSize = MAX_CHUNK_SIZE) {
   const trimmedGoal = normalizeInput(goal)
   const trimmedProof = normalizeInput(proof)
   const validSteps = steps
-    .filter((s) => normalizeInput(s.text).length > 0)
-    .map((s) => ({ ...s, text: normalizeInput(s.text) }))
+    .map((s) => ({ ...s, raw: normalizeInput(s.raw) }))
+    .filter((s) => s.raw.length > 0)
+    .map((s) => ({ ...s, ...parseStepRaw(s.raw) }))
 
   const goalPart = trimmedGoal
     ? `Fixa så att jag ${trimmedGoal}`
     : "Fixa så att jag"
 
-  // Content lines in parse-friendly format: step text followed by integer minutes
   const contentLines = []
   validSteps.forEach((step, index) => {
-    const time =
-      step.timeMinutes && step.timeMinutes > 0 ? ` ${step.timeMinutes}` : ""
+    const time = step.minutes > 0 ? ` ${step.minutes}` : ""
     contentLines.push(`${index + 1}. ${step.text}${time}`)
   })
   if (trimmedProof) {
@@ -95,16 +91,14 @@ function buildToDoChunks({ goal, steps, proof }, maxSize = MAX_CHUNK_SIZE) {
     return [`* (1/1) ${goalPart}`]
   }
 
-  // Reserve worst-case header length (2-digit chunk numbers) to stay safely under limit
   const headerReserve = `* (99/99) ${goalPart}\n`.length
 
-  // Greedily pack lines into groups that each fit within maxSize
   const chunkGroups = []
   let currentLines = []
   let currentLen = headerReserve
 
   for (const line of contentLines) {
-    const lineLen = line.length + 1 // +1 for \n
+    const lineLen = line.length + 1
     if (currentLines.length > 0 && currentLen + lineLen > maxSize) {
       chunkGroups.push(currentLines)
       currentLines = [line]
@@ -125,21 +119,20 @@ function buildToDoChunks({ goal, steps, proof }, maxSize = MAX_CHUNK_SIZE) {
   })
 }
 
-function generateStepId() {
-  return `step-${Math.random().toString(36).slice(2, 9)}`
-}
-
 export default function StructuredTaskBuilder() {
-  const [isOpen, setIsOpen] = useState(false)
+  const { addMainTask } = useMainTask()
+
   const [goal, setGoal] = useState("")
-  const [steps, setSteps] = useState([])
+  const [steps, setSteps] = useState([{ id: genStepId(), raw: "" }])
   const [proof, setProof] = useState("")
+  const [priority, setPriority] = useState("")
   const [generatedText, setGeneratedText] = useState("")
   const [llamaText, setLlamaText] = useState("")
   const [todoChunks, setTodoChunks] = useState([])
   const [todoChecks, setTodoChecks] = useState([])
   const [llamaPasted, setLlamaPasted] = useState(false)
   const [copyMessage, setCopyMessage] = useState("")
+  const [loadMessage, setLoadMessage] = useState("")
   const stepInputRefs = useRef({})
 
   function showCopyMessage(message) {
@@ -158,11 +151,7 @@ export default function StructuredTaskBuilder() {
   }
 
   function addStep() {
-    const newStep = {
-      id: generateStepId(),
-      text: "",
-      timeMinutes: 0,
-    }
+    const newStep = { id: genStepId(), raw: "" }
     setSteps((prev) => [...prev, newStep])
     window.setTimeout(() => {
       const ref = stepInputRefs.current[newStep.id]
@@ -170,14 +159,15 @@ export default function StructuredTaskBuilder() {
     }, 0)
   }
 
-  function updateStep(id, field, value) {
-    setSteps((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, [field]: value } : s)),
-    )
+  function updateStepRaw(id, raw) {
+    setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, raw } : s)))
   }
 
   function removeStep(id) {
-    setSteps((prev) => prev.filter((s) => s.id !== id))
+    setSteps((prev) => {
+      const next = prev.filter((s) => s.id !== id)
+      return next.length > 0 ? next : [{ id: genStepId(), raw: "" }]
+    })
     delete stepInputRefs.current[id]
   }
 
@@ -201,25 +191,11 @@ export default function StructuredTaskBuilder() {
     })
   }
 
-  function adjustTime(id, delta) {
-    setSteps((prev) =>
-      prev.map((s) =>
-        s.id === id
-          ? { ...s, timeMinutes: Math.max(0, s.timeMinutes + delta) }
-          : s,
-      ),
-    )
-  }
-
   function handleStepKeyDown(event, id) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
       const idx = steps.findIndex((s) => s.id === id)
-      const newStep = {
-        id: generateStepId(),
-        text: "",
-        timeMinutes: 0,
-      }
+      const newStep = { id: genStepId(), raw: "" }
       setSteps((prev) => [
         ...prev.slice(0, idx + 1),
         newStep,
@@ -230,6 +206,50 @@ export default function StructuredTaskBuilder() {
         if (ref) ref.focus()
       }, 0)
     }
+    if (event.key === "Backspace") {
+      const step = steps.find((s) => s.id === id)
+      if (step && step.raw === "" && steps.length > 1) {
+        event.preventDefault()
+        const idx = steps.findIndex((s) => s.id === id)
+        removeStep(id)
+        window.setTimeout(() => {
+          const prevStep = steps[idx > 0 ? idx - 1 : 0]
+          if (prevStep) {
+            const ref = stepInputRefs.current[prevStep.id]
+            if (ref) {
+              ref.focus()
+              const len = ref.value.length
+              ref.setSelectionRange(len, len)
+            }
+          }
+        }, 0)
+      }
+    }
+  }
+
+  function handleStepPaste(event, id) {
+    const text = event.clipboardData.getData("text")
+    if (!text.includes("\n")) return
+    event.preventDefault()
+    const lines = text
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0)
+    if (lines.length === 0) return
+    const idx = steps.findIndex((s) => s.id === id)
+    const newSteps = lines.map((raw) => ({ id: genStepId(), raw }))
+    setSteps((prev) => {
+      const before = prev.slice(0, idx)
+      const after = prev.slice(idx + 1).filter((s) => s.raw.trim() !== "")
+      return [...before, ...newSteps, ...after]
+    })
+    window.setTimeout(() => {
+      const last = newSteps[newSteps.length - 1]
+      if (last) {
+        const ref = stepInputRefs.current[last.id]
+        if (ref) ref.focus()
+      }
+    }, 0)
   }
 
   function handleGenerate(event) {
@@ -244,6 +264,18 @@ export default function StructuredTaskBuilder() {
     setLlamaPasted(false)
   }
 
+  function handleLoadIntoTasks() {
+    const validSteps = steps.filter((s) => s.raw.trim().length > 0)
+    addMainTask({
+      title: goal.trim(),
+      steps: validSteps,
+      proof: proof.trim(),
+      priority: priority.trim(),
+    })
+    setLoadMessage("Loaded into task list ↓")
+    setTimeout(() => setLoadMessage(""), 2200)
+  }
+
   function toggleTodoCheck(index) {
     setTodoChecks((prev) => {
       const next = [...prev]
@@ -252,53 +284,42 @@ export default function StructuredTaskBuilder() {
     })
   }
 
+  const hasContent = goal.trim() || steps.some((s) => s.raw.trim())
+
   return (
     <section className="task-builder-card" aria-label="Fixa så att jag flow">
       <p className="hero-kicker">Structured task writer</p>
-      <h2 className="task-builder-title">
-        Build once, paste to Microsoft To Do and Llama
-      </h2>
+      <h2 className="task-builder-title">Fixa så att jag</h2>
       <p className="task-builder-help">
-        Dump your task, structure the steps, then generate output.
+        Type your goal and steps. Use <code>step name 5</code> format for
+        integer minutes. Press <kbd>Enter</kbd> to add a step; paste multiple
+        lines at once.
       </p>
 
-      {!isOpen && (
-        <button
-          className="task-builder-main-button"
-          type="button"
-          onClick={() => setIsOpen(true)}
-        >
-          Fixa så att jag
-        </button>
-      )}
+      <form className="task-builder-form" onSubmit={handleGenerate}>
+        <label className="task-builder-label" htmlFor="goal-input">
+          Fixa så att jag …
+        </label>
+        <textarea
+          id="goal-input"
+          className="task-builder-input task-builder-textarea"
+          value={goal}
+          onChange={(e) => setGoal(e.target.value)}
+          placeholder="ätit mat"
+          rows={2}
+        />
 
-      {isOpen && (
-        <form className="task-builder-form" onSubmit={handleGenerate}>
-          <label className="task-builder-label" htmlFor="goal-input">
-            Goal
-          </label>
-          <textarea
-            id="goal-input"
-            className="task-builder-input task-builder-textarea"
-            value={goal}
-            onChange={(e) => setGoal(e.target.value)}
-            placeholder="What should go after: * Fixa så att jag ..."
-          />
+        <fieldset className="task-builder-steps-section">
+          <legend className="task-builder-legend">Steps</legend>
+          <p className="task-builder-hint">
+            Format: <code>Diska 10</code> · Paste a block of lines to fill all
+            at once.
+          </p>
 
-          <fieldset className="task-builder-steps-section">
-            <legend className="task-builder-legend">Steps</legend>
-            <p className="task-builder-hint">
-              Press Enter to add a step. Click +/- to adjust time.
-            </p>
-
-            {steps.length === 0 && (
-              <p className="task-builder-empty-hint">
-                No steps yet. Add one below.
-              </p>
-            )}
-
-            <div className="task-step-list">
-              {steps.map((step, idx) => (
+          <div className="task-step-list">
+            {steps.map((step, idx) => {
+              const parsed = parseStepRaw(step.raw)
+              return (
                 <div className="task-step-row" key={step.id}>
                   <div className="task-step-number">{idx + 1}</div>
 
@@ -308,35 +329,18 @@ export default function StructuredTaskBuilder() {
                     }}
                     type="text"
                     className="task-step-input"
-                    value={step.text}
-                    onChange={(e) =>
-                      updateStep(step.id, "text", e.target.value)
-                    }
+                    value={step.raw}
+                    onChange={(e) => updateStepRaw(step.id, e.target.value)}
                     onKeyDown={(e) => handleStepKeyDown(e, step.id)}
-                    placeholder="Step description"
+                    onPaste={(e) => handleStepPaste(e, step.id)}
+                    placeholder="Step name 5"
                   />
 
-                  <div className="task-step-time-controls">
-                    <button
-                      type="button"
-                      className="task-time-btn"
-                      onClick={() => adjustTime(step.id, -1)}
-                      title="Decrease by 1 min"
-                    >
-                      −
-                    </button>
-                    <span className="task-time-display">
-                      {step.timeMinutes > 0 ? `${step.timeMinutes}m` : "—"}
+                  {parsed.minutes > 0 && (
+                    <span className="task-step-time-badge">
+                      {parsed.minutes}m
                     </span>
-                    <button
-                      type="button"
-                      className="task-time-btn"
-                      onClick={() => adjustTime(step.id, 1)}
-                      title="Increase by 1 min"
-                    >
-                      +
-                    </button>
-                  </div>
+                  )}
 
                   <div className="task-step-controls">
                     <button
@@ -367,35 +371,60 @@ export default function StructuredTaskBuilder() {
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              className="task-builder-add-step-btn"
-              onClick={addStep}
-            >
-              + Add step
-            </button>
-          </fieldset>
-
-          <label className="task-builder-label" htmlFor="proof-input">
-            Proof
-          </label>
-          <textarea
-            id="proof-input"
-            className="task-builder-input task-builder-textarea"
-            value={proof}
-            onChange={(e) => setProof(e.target.value)}
-            placeholder="Proof att jag gjorde det jag sa: ..."
-          />
-
-          <div className="task-builder-actions">
-            <button className="task-builder-generate" type="submit">
-              Generate output
-            </button>
+              )
+            })}
           </div>
-        </form>
+
+          <button
+            type="button"
+            className="task-builder-add-step-btn"
+            onClick={addStep}
+          >
+            + Add step
+          </button>
+        </fieldset>
+
+        <label className="task-builder-label" htmlFor="proof-input">
+          Proof
+        </label>
+        <textarea
+          id="proof-input"
+          className="task-builder-input task-builder-textarea"
+          value={proof}
+          onChange={(e) => setProof(e.target.value)}
+          placeholder="Proof att jag gjorde det jag sa: ..."
+          rows={2}
+        />
+
+        <label className="task-builder-label" htmlFor="priority-input">
+          Priority
+        </label>
+        <input
+          id="priority-input"
+          className="task-builder-input"
+          value={priority}
+          onChange={(e) => setPriority(e.target.value)}
+          placeholder="High / Medium / Low"
+        />
+
+        <div className="task-builder-actions">
+          <button className="task-builder-generate" type="submit">
+            Generate output
+          </button>
+          <button
+            type="button"
+            className="task-builder-load-btn"
+            onClick={handleLoadIntoTasks}
+            disabled={!hasContent}
+            title="Add this task to the internal task list below"
+          >
+            Load into task list ↓
+          </button>
+        </div>
+      </form>
+
+      {loadMessage && (
+        <p className="task-builder-load-message">{loadMessage}</p>
       )}
 
       {copyMessage && (
@@ -418,8 +447,7 @@ export default function StructuredTaskBuilder() {
           >
             <h3>2. Microsoft To Do chunks</h3>
             <p className="task-builder-help">
-              Paste these chunks into Microsoft To Do as steps, in order. If
-              needed, keep splitting long chunks into multiple steps.
+              Paste these chunks into Microsoft To Do as steps, in order.
             </p>
             <div className="task-chunk-list">
               {todoChunks.map((chunk, index) => (
@@ -452,8 +480,8 @@ export default function StructuredTaskBuilder() {
           <section className="task-builder-output" aria-label="Llama copy">
             <h3>3. Llama copy section</h3>
             <p className="task-builder-help">
-              Copy this text for Llama. Each item is formatted as "taskname
-              minutes" for easy parsing.
+              Copy this text for Llama. Each item is formatted as{" "}
+              <code>taskname minutes</code> for easy parsing.
             </p>
             <button
               type="button"

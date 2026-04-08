@@ -11,6 +11,7 @@ import ReportView from "./ReportView"
 import PresetsView from "./PresetsView"
 import SettingsView from "./SettingsView"
 import BottomNav from "./BottomNav"
+import SidebarTaskSteps from "./SidebarTaskSteps"
 import { TimerProvider } from "../context/TimerContext"
 import "../timer.css"
 import { playAlarmOnce } from "../utils/alarm"
@@ -61,7 +62,7 @@ function normalizeTask(task) {
   }
 }
 
-export default function TimerApp() {
+export default function TimerApp({ sidebarMode = false }) {
   // All defaults are [] / {} because initStorageIfNew already populated localStorage
   const [activeTasks, setActiveTasks] = useLocalStorage("fst_active", [])
   const [completedTasks, setCompletedTasks] = useLocalStorage(
@@ -768,7 +769,7 @@ export default function TimerApp() {
 
   return (
     <div
-      className={`timer-app timer-app--${theme} ${settings.matchMainPageStyle ? "timer-app--main-style" : ""}`}
+      className={`timer-app timer-app--${theme} ${settings.matchMainPageStyle ? "timer-app--main-style" : ""} ${sidebarMode ? "timer-app--sidebar" : ""}`}
     >
       <TopBar
         sessionSeconds={sessionSeconds}
@@ -783,6 +784,7 @@ export default function TimerApp() {
           {currentView === "timer" && (
             <>
               <TimerPanel />
+              <SidebarTaskSteps />
               <TaskList {...taskProps} />
             </>
           )}

@@ -180,6 +180,34 @@ body {
     background 0.2s ease;
 }
 
+.task-builder-load-btn {
+  margin-top: 16px;
+  border: 1px solid rgba(173, 255, 209, 0.45);
+  border-radius: 12px;
+  background: rgba(52, 209, 149, 0.12);
+  color: #d7ffe9;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease;
+}
+
+.task-builder-load-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.task-builder-load-btn:hover:not(:disabled),
+.task-builder-load-btn:focus-visible:not(:disabled) {
+  background: rgba(52, 209, 149, 0.22);
+  transform: translateY(-2px);
+  outline: 2px solid rgba(173, 255, 209, 0.5);
+  outline-offset: 2px;
+}
+
 .task-builder-main-button:hover,
 .task-builder-main-button:focus-visible,
 .task-builder-generate:hover,
@@ -228,6 +256,12 @@ body {
   margin: 16px 0 0;
   color: #d6ffd9;
   font-weight: 600;
+}
+
+.task-builder-load-message {
+  margin: 12px 0 0;
+  color: #9effc9;
+  font-weight: 700;
 }
 
 .task-builder-output {
@@ -368,6 +402,16 @@ body {
 
 .task-step-input::placeholder {
   color: rgba(255, 255, 255, 0.4);
+}
+
+.task-step-time-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #d8fff0;
+  background: rgba(52, 209, 149, 0.2);
+  border: 1px solid rgba(173, 255, 209, 0.4);
+  border-radius: 999px;
+  padding: 4px 8px;
 }
 
 .task-step-time-controls {
@@ -526,5 +570,498 @@ body {
     order: 4;
     justify-content: flex-end;
     width: 100%;
+  }
+}
+
+/* ── App layout ───────────────────────────────────────────────────────── */
+
+.app-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) 1fr;
+  gap: 18px;
+  padding: 16px;
+}
+
+.app-sidebar {
+  position: sticky;
+  top: 16px;
+  height: calc(100vh - 32px);
+}
+
+.app-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 20px;
+  padding: 6px 6px 28px;
+}
+
+/* ── Main task list ───────────────────────────────────────────────────── */
+
+.mtask-list-section {
+  width: min(900px, 100%);
+  border: 1px solid var(--card-border);
+  border-radius: 24px;
+  padding: clamp(20px, 4vw, 28px);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+}
+
+.mtask-list-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mtask-list-title {
+  margin: 0;
+  font-size: clamp(1.25rem, 3vw, 1.7rem);
+}
+
+.mtask-filter-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mtask-filter-btn {
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.mtask-filter-btn--on {
+  background: rgba(255, 255, 255, 0.2);
+  font-weight: 700;
+}
+
+.mtask-empty-state {
+  color: var(--text-soft);
+  margin-top: 12px;
+}
+
+.mtask-list-cards {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.mtask-card {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.mtask-card--completed {
+  border-color: rgba(151, 247, 199, 0.45);
+  background: rgba(151, 247, 199, 0.08);
+}
+
+.mtask-card--is-active {
+  box-shadow: 0 0 0 2px rgba(255, 208, 121, 0.6);
+}
+
+.mtask-card__header {
+  cursor: pointer;
+  padding: 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mtask-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mtask-card__expand {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.mtask-card__title {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mtask-card__done-mark {
+  color: #8effb3;
+}
+
+.mtask-card__header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mtask-card__step-progress {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.mtask-card__status-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mtask-badge {
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border: 1px solid;
+}
+
+.mtask-badge--green {
+  color: #d8ffe8;
+  border-color: rgba(137, 246, 187, 0.65);
+  background: rgba(21, 128, 61, 0.42);
+}
+
+.mtask-badge--red {
+  color: #ffd8d8;
+  border-color: rgba(248, 113, 113, 0.6);
+  background: rgba(127, 29, 29, 0.4);
+}
+
+.mtask-card__body {
+  padding: 0 12px 12px;
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.mtask-card__field,
+.mtask-card__tries {
+  display: grid;
+  gap: 4px;
+}
+
+.mtask-field-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+}
+
+.mtask-field-value {
+  font-size: 0.9rem;
+  cursor: text;
+}
+
+.mtask-empty {
+  color: #ffbab0;
+  font-style: italic;
+}
+
+.mtask-inline-edit {
+  display: flex;
+  gap: 6px;
+}
+
+.mtask-edit-input {
+  flex: 1;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text-main);
+  padding: 6px 8px;
+}
+
+.mtask-edit-btn {
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-main);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.mtask-edit-btn--cancel {
+  color: #ffb7b7;
+}
+
+.mtask-card__steps {
+  display: grid;
+  gap: 6px;
+}
+
+.mtask-step-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.mtask-step-text {
+  font-size: 0.88rem;
+}
+
+.mtask-step-text--done {
+  text-decoration: line-through;
+  opacity: 0.72;
+}
+
+.mtask-step-time {
+  font-size: 0.76rem;
+  color: #c2ffe1;
+  background: rgba(52, 209, 149, 0.2);
+  border: 1px solid rgba(173, 255, 209, 0.35);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.mtask-step-remove {
+  border: 1px solid rgba(255, 167, 167, 0.5);
+  background: rgba(255, 125, 125, 0.16);
+  color: #ffd3d3;
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.mtask-add-step-form {
+  display: flex;
+  gap: 8px;
+}
+
+.mtask-add-step-input {
+  flex: 1;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text-main);
+  padding: 7px 9px;
+}
+
+.mtask-add-step-btn,
+.mtask-tries-btn,
+.mtask-action-btn {
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-main);
+  padding: 7px 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mtask-action-btn--active-on {
+  border-color: rgba(255, 210, 123, 0.7);
+  background: rgba(255, 210, 123, 0.2);
+}
+
+.mtask-action-btn--complete {
+  border-color: rgba(137, 246, 187, 0.7);
+  background: rgba(21, 128, 61, 0.34);
+}
+
+.mtask-action-btn--danger {
+  border-color: rgba(255, 145, 145, 0.58);
+  background: rgba(127, 29, 29, 0.34);
+}
+
+.mtask-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mtask-tries-count {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* ── Presets panel ─────────────────────────────────────────────────────── */
+
+.fixa-preset-panel,
+.save-load-panel {
+  width: min(900px, 100%);
+  border: 1px solid var(--card-border);
+  border-radius: 24px;
+  padding: clamp(20px, 4vw, 28px);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+}
+
+.fixa-preset-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fixa-preset-panel__title,
+.save-load-panel__title {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.8vw, 1.6rem);
+}
+
+.fixa-preset-toggle-btn,
+.fixa-preset-save-btn,
+.fixa-preset-load-btn,
+.fixa-preset-del-btn,
+.save-slot-btn {
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-main);
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fixa-preset-del-btn,
+.save-slot-btn--clear {
+  color: #ffd1d1;
+  border-color: rgba(255, 167, 167, 0.45);
+  background: rgba(127, 29, 29, 0.3);
+}
+
+.fixa-preset-msg,
+.save-load-msg {
+  margin: 10px 0 0;
+  color: #bafed8;
+  font-weight: 700;
+}
+
+.fixa-preset-form {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.fixa-preset-label {
+  font-size: 0.84rem;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.fixa-preset-hint {
+  font-weight: 500;
+  font-size: 0.78rem;
+}
+
+.fixa-preset-input,
+.fixa-preset-textarea,
+.save-slot__name-input {
+  width: 100%;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  padding: 9px 12px;
+  font: inherit;
+}
+
+.fixa-preset-textarea {
+  resize: vertical;
+}
+
+.fixa-preset-list {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.fixa-preset-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fixa-preset-item__info {
+  display: grid;
+  gap: 2px;
+}
+
+.fixa-preset-item__name {
+  font-weight: 700;
+}
+
+.fixa-preset-item__goal,
+.fixa-preset-item__steps-count,
+.save-load-panel__help,
+.save-slot__meta,
+.save-slot__empty-label {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+
+.fixa-preset-item__actions,
+.save-slot__actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Save/load slots ───────────────────────────────────────────────────── */
+
+.save-load-slots {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.save-slot {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.save-slot--filled {
+  border-color: rgba(145, 217, 255, 0.4);
+}
+
+.save-slot__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-slot__num {
+  font-weight: 700;
+}
+
+.save-slot__name {
+  font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .app-sidebar {
+    position: static;
+    height: auto;
   }
 }
