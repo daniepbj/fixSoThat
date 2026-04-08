@@ -133,6 +133,7 @@ export default function StructuredTaskBuilder() {
   const [llamaPasted, setLlamaPasted] = useState(false)
   const [copyMessage, setCopyMessage] = useState("")
   const [loadMessage, setLoadMessage] = useState("")
+  const [draggedStepId, setDraggedStepId] = useState("")
   const stepInputRefs = useRef({})
 
   function showCopyMessage(message) {
@@ -189,6 +190,40 @@ export default function StructuredTaskBuilder() {
       ;[copy[idx], copy[idx + 1]] = [copy[idx + 1], copy[idx]]
       return copy
     })
+  }
+
+  function handleStepDragStart(id, event) {
+    setDraggedStepId(id)
+    event.dataTransfer.effectAllowed = "move"
+    event.dataTransfer.setData("text/plain", id)
+  }
+
+  function handleStepDragOver(targetId, event) {
+    const sourceId = draggedStepId || event.dataTransfer.getData("text/plain")
+    if (!sourceId || sourceId === targetId) return
+    event.preventDefault()
+  }
+
+  function handleStepDrop(targetId, event) {
+    event.preventDefault()
+    const sourceId = draggedStepId || event.dataTransfer.getData("text/plain")
+    if (!sourceId || sourceId === targetId) return
+
+    setSteps((prev) => {
+      const fromIndex = prev.findIndex((step) => step.id === sourceId)
+      const toIndex = prev.findIndex((step) => step.id === targetId)
+      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return prev
+      const copy = [...prev]
+      const [moved] = copy.splice(fromIndex, 1)
+      copy.splice(toIndex, 0, moved)
+      return copy
+    })
+
+    setDraggedStepId("")
+  }
+
+  function clearStepDrag() {
+    setDraggedStepId("")
   }
 
   function handleStepKeyDown(event, id) {
@@ -265,14 +300,21 @@ export default function StructuredTaskBuilder() {
   }
 
   function handleLoadIntoTasks() {
-    const validSteps = steps.filter((s) => s.raw.trim().length > 0)
-    addMainTask({
-      title: goal.trim(),
-      steps: validSteps,
-      proof: proof.trim(),
-      priority: priority.trim(),
-    })
-    setLoadMessage("Loaded into task list ↓")
+    try {
+      const validSteps = (steps || [])
+        .map((s) => ({ raw: String(s?.raw || "").trim() }))
+        .filter((s) => s.raw.length > 0)
+
+      addMainTask({
+        title: String(goal || "").trim(),
+        steps: validSteps,
+        proof: String(proof || "").trim(),
+        priority: String(priority || "").trim(),
+      })
+      setLoadMessage("Loaded into task list ↓")
+    } catch {
+      setLoadMessage("Could not load task. Please try again.")
+    }
     setTimeout(() => setLoadMessage(""), 2200)
   }
 
@@ -320,8 +362,23 @@ export default function StructuredTaskBuilder() {
             {steps.map((step, idx) => {
               const parsed = parseStepRaw(step.raw)
               return (
-                <div className="task-step-row" key={step.id}>
+                <div
+                  className={`task-step-row ${draggedStepId === step.id ? "task-step-row--dragging" : ""}`}
+                  key={step.id}
+                  onDragOver={(e) => handleStepDragOver(step.id, e)}
+                  onDrop={(e) => handleStepDrop(step.id, e)}
+                >
                   <div className="task-step-number">{idx + 1}</div>
+                  <button
+                    type="button"
+                    className="task-step-drag-btn"
+                    draggable
+                    onDragStart={(e) => handleStepDragStart(step.id, e)}
+                    onDragEnd={clearStepDrag}
+                    title="Drag to reorder steps"
+                  >
+                    ⋮⋮
+                  </button>
 
                   <input
                     ref={(el) => {

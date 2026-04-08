@@ -376,6 +376,30 @@ body {
   transition: background 0.15s ease;
 }
 
+.task-step-row--dragging {
+  opacity: 0.55;
+}
+
+.task-step-drag-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: grab;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.task-step-drag-btn:active {
+  cursor: grabbing;
+}
+
 .task-step-row:focus-within {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.35);

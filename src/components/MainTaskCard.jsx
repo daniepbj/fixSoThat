@@ -13,13 +13,34 @@ function StatusBadge({ label, isGreen }) {
 }
 
 function computeStatus(task) {
-  const validSteps = task.steps.filter((s) => s.raw.trim().length > 0)
+  const steps = Array.isArray(task?.steps) ? task.steps : []
+  const proof = typeof task?.proof === "string" ? task.proof : ""
+  const priority = typeof task?.priority === "string" ? task.priority : ""
+  const validSteps = steps.filter((s) => (s?.raw || "").trim().length > 0)
   const hasSteps = validSteps.length > 0
   const hasTime =
     hasSteps && validSteps.every((s) => parseStepRaw(s.raw).minutes > 0)
-  const hasProof = task.proof.trim().length > 0
-  const hasPriority = task.priority.trim().length > 0
+  const hasProof = proof.trim().length > 0
+  const hasPriority = priority.trim().length > 0
   return { hasSteps, hasTime, hasProof, hasPriority }
+}
+
+function normalizeRenderSteps(taskId, steps) {
+  return (Array.isArray(steps) ? steps : []).map((step, index) => {
+    const isObject = step && typeof step === "object"
+    return {
+      id:
+        (isObject && typeof step.id === "string" && step.id) ||
+        `safe-${taskId}-${index}`,
+      raw: isObject ? String(step.raw || "") : String(step || ""),
+      completed: Boolean(isObject && step.completed),
+      tries: Math.max(0, Number(isObject ? step.tries : 0) || 0),
+      linkedAfter:
+        isObject && typeof step.linkedAfter === "string"
+          ? step.linkedAfter
+          : null,
+    }
+  })
 }
 
 export default function MainTaskCard({ task }) {
@@ -64,12 +85,13 @@ export default function MainTaskCard({ task }) {
     if (!editingPriority) setPriorityDraft(task.priority)
   }, [task.priority, editingPriority])
 
+  const safeSteps = normalizeRenderSteps(task?.id || "task", task?.steps)
   const status = computeStatus(task)
   const isActive = activeMainTaskId === task.id
   const isCompleted = task.status === "completed"
-  const sortedSteps = sortStepsWithLinks(task.steps, { includeCompleted: true })
-  const completedSteps = task.steps.filter((s) => s.completed).length
-  const totalSteps = task.steps.length
+  const sortedSteps = sortStepsWithLinks(safeSteps, { includeCompleted: true })
+  const completedSteps = safeSteps.filter((s) => s.completed).length
+  const totalSteps = safeSteps.length
 
   function saveTitle() {
     updateMainTask(task.id, { title: titleDraft.trim() })
@@ -214,32 +236,31 @@ export default function MainTaskCard({ task }) {
           {/* Steps */}
           <div className="mtask-card__steps">
             <span className="mtask-field-label">Steps</span>
-            {task.steps.length === 0 && (
+            {safeSteps.length === 0 && (
               <p className="mtask-empty">No steps yet.</p>
             )}
             {sortedSteps.map((step, stepIdx) => {
               const parsed = parseStepRaw(step.raw)
-              const sourceIndex = task.steps.findIndex(
+              const sourceIndex = safeSteps.findIndex(
                 (candidate) => candidate.id === step.id,
               )
               const prevSourceIndex =
                 stepIdx > 0
-                  ? task.steps.findIndex(
+                  ? safeSteps.findIndex(
                       (candidate) =>
                         candidate.id === sortedSteps[stepIdx - 1].id,
                     )
                   : -1
               const nextSourceIndex =
                 stepIdx < sortedSteps.length - 1
-                  ? task.steps.findIndex(
+                  ? safeSteps.findIndex(
                       (candidate) =>
                         candidate.id === sortedSteps[stepIdx + 1].id,
                     )
                   : -1
               const linkedBefore =
-                task.steps.find(
-                  (candidate) => candidate.linkedAfter === step.id,
-                )?.id || ""
+                safeSteps.find((candidate) => candidate.linkedAfter === step.id)
+                  ?.id || ""
               const linkValue = step.linkedAfter
                 ? `after:${step.linkedAfter}`
                 : linkedBefore
@@ -328,7 +349,7 @@ export default function MainTaskCard({ task }) {
                       onClick={() =>
                         reorderSteps(task.id, sourceIndex, nextSourceIndex)
                       }
-                      disabled={stepIdx === task.steps.length - 1}
+                      disabled={stepIdx === sortedSteps.length - 1}
                       title="Move step down"
                     >
                       ↓
@@ -361,7 +382,7 @@ export default function MainTaskCard({ task }) {
                       title="Linked ordering"
                     >
                       <option value="">🔗 free</option>
-                      {task.steps
+                      {safeSteps
                         .filter((s) => s.id !== step.id)
                         .map((s) => {
                           const p = parseStepRaw(s.raw)
@@ -374,7 +395,7 @@ export default function MainTaskCard({ task }) {
                             </option>
                           )
                         })}
-                      {task.steps
+                      {safeSteps
                         .filter((s) => s.id !== step.id)
                         .map((s) => {
                           const p = parseStepRaw(s.raw)

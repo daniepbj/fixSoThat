@@ -41,7 +41,9 @@ function deriveTaskStatus(task) {
 }
 
 function normalizeTask(task) {
-  const steps = (task?.steps || []).map((step, index) => normalizeStep(step, index))
+  const steps = (task?.steps || []).map((step, index) =>
+    normalizeStep(step, index),
+  )
   return {
     id: task?.id || genTaskId(),
     title: task?.title || "",
@@ -56,7 +58,11 @@ function normalizeTask(task) {
 }
 
 export function MainTaskProvider({ children }) {
-  const [mainTasks, setMainTasks] = useLocalStorage("fst_main_tasks", [])
+  const [mainTasks, setMainTasks] = useLocalStorage(
+    "fst_main_tasks",
+    [],
+    (raw) => (Array.isArray(raw) ? raw : []).map((t) => normalizeTask(t)),
+  )
   const [saveSlots, setSaveSlots] = useLocalStorage("fst_save_slots", [
     null,
     null,
@@ -322,7 +328,12 @@ export function MainTaskProvider({ children }) {
     setMainTasks((prev) =>
       prev.map((t) => {
         if (t.id !== taskId) return t
-        if (fromIndex < 0 || toIndex < 0 || fromIndex >= t.steps.length || toIndex >= t.steps.length) {
+        if (
+          fromIndex < 0 ||
+          toIndex < 0 ||
+          fromIndex >= t.steps.length ||
+          toIndex >= t.steps.length
+        ) {
           return t
         }
         const steps = [...t.steps]
@@ -358,13 +369,17 @@ export function MainTaskProvider({ children }) {
 
                 if (relation === "after") {
                   return steps.map((step) =>
-                    step.id === stepId ? { ...step, linkedAfter: targetId } : step,
+                    step.id === stepId
+                      ? { ...step, linkedAfter: targetId }
+                      : step,
                   )
                 }
 
                 if (relation === "before") {
                   return steps.map((step) =>
-                    step.id === targetId ? { ...step, linkedAfter: stepId } : step,
+                    step.id === targetId
+                      ? { ...step, linkedAfter: stepId }
+                      : step,
                   )
                 }
 
