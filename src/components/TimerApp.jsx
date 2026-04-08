@@ -525,6 +525,12 @@ export default function TimerApp({ sidebarMode = false }) {
 
   function toggleTimerWithClick() {
     if (!currentTask) return
+
+    // If user resumes from the alarm state, count it as a retry attempt.
+    if (alarmActive && currentTask.sourceMainTaskId) {
+      incrementTries(currentTask.sourceMainTaskId)
+    }
+
     playClickSound(musicVolume)
     setTimerRunning((running) => !running)
   }
@@ -559,6 +565,11 @@ export default function TimerApp({ sidebarMode = false }) {
   }
 
   function resetTask(id) {
+    const task = activeTasks.find((t) => t.id === id)
+    if (task?.sourceMainTaskId) {
+      incrementTries(task.sourceMainTaskId)
+    }
+
     setActiveTasks((prev) =>
       prev.map((t) =>
         t.id === id
