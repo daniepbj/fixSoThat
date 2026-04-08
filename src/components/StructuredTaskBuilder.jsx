@@ -36,6 +36,38 @@ function buildFormattedTask({ goal, steps, proof }) {
   return lines.join("\n")
 }
 
+function buildLlamaFormat({ goal, steps, proof }) {
+  const trimmedGoal = normalizeInput(goal)
+  const trimmedProof = normalizeInput(proof)
+  const validSteps = steps
+    .filter((s) => normalizeInput(s.text).length > 0)
+    .map((s) => ({
+      ...s,
+      text: normalizeInput(s.text),
+    }))
+
+  const lines = []
+
+  const totalTime = validSteps.reduce((sum, s) => sum + (s.timeMinutes || 0), 0)
+  const goalLine = trimmedGoal
+    ? `${trimmedGoal}${totalTime > 0 ? ` ${totalTime}` : ""}`
+    : ""
+  if (goalLine) lines.push(goalLine)
+
+  validSteps.forEach((step) => {
+    const stepLine = step.timeMinutes && step.timeMinutes > 0
+      ? `${step.text} ${step.timeMinutes}`
+      : step.text
+    lines.push(stepLine)
+  })
+
+  if (trimmedProof) {
+    lines.push(`Proof: ${trimmedProof}`)
+  }
+
+  return lines.join("\n")
+}
+
 function findLineBreakSplit(text, maxSize) {
   for (let i = maxSize; i > 0; i -= 1) {
     if (text[i - 1] === "\n") return i
@@ -91,6 +123,7 @@ export default function StructuredTaskBuilder() {
   const [steps, setSteps] = useState([])
   const [proof, setProof] = useState("")
   const [generatedText, setGeneratedText] = useState("")
+  const [llamaText, setLlamaText] = useState("")
   const [todoChecks, setTodoChecks] = useState([])
   const [llamaPasted, setLlamaPasted] = useState(false)
   const [copyMessage, setCopyMessage] = useState("")
@@ -191,8 +224,10 @@ export default function StructuredTaskBuilder() {
   function handleGenerate(event) {
     event.preventDefault()
     const nextText = buildFormattedTask({ goal, steps, proof })
+    const nextLlamaText = buildLlamaFormat({ goal, steps, proof })
     const nextChunks = splitIntoChunks(nextText)
     setGeneratedText(nextText)
+    setLlamaText(nextLlamaText)
     setTodoChecks(new Array(nextChunks.length).fill(false))
     setLlamaPasted(false)
   }
@@ -204,8 +239,6 @@ export default function StructuredTaskBuilder() {
       return next
     })
   }
-
-  const allChunksJoined = chunks.join("")
 
   return (
     <section className="task-builder-card" aria-label="Fixa så att jag flow">
@@ -412,15 +445,15 @@ export default function StructuredTaskBuilder() {
           <section className="task-builder-output" aria-label="Llama copy">
             <h3>3. Llama copy section</h3>
             <p className="task-builder-help">
-              Copy all chunks as one string for Llama. The chunk order is
-              preserved.
+              Copy this text for Llama. Each item is formatted as "taskname
+              minutes" for easy parsing.
             </p>
             <button
               type="button"
               className="task-builder-copy-button"
-              onClick={() => copyText(allChunksJoined, "All chunks copied")}
+              onClick={() => copyText(llamaText, "Llama format copied")}
             >
-              Copy all chunks
+              Copy for Llama
             </button>
             <label className="task-check-label task-check-label--llama">
               <input
