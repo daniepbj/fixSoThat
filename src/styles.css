@@ -754,6 +754,12 @@ body {
   gap: 4px;
 }
 
+.mtask-card__tries {
+  grid-template-columns: auto auto auto auto;
+  align-items: center;
+  column-gap: 8px;
+}
+
 .mtask-field-label {
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -816,6 +822,21 @@ body {
 
 .mtask-step-text {
   font-size: 0.88rem;
+}
+
+.mtask-step-edit {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  padding: 5px 8px;
+  font-size: 0.88rem;
+  min-width: 0;
+}
+
+.mtask-step-edit:focus {
+  outline: 2px solid rgba(173, 255, 209, 0.45);
+  outline-offset: 0;
 }
 
 .mtask-step-text--done {

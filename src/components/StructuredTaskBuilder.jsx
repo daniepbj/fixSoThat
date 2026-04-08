@@ -1,6 +1,6 @@
 import { useState, useRef } from "react"
 import { useMainTask } from "../context/MainTaskContext"
-import { parseStepRaw, parseStepBlock, genStepId } from "../utils/stepUtils"
+import { parseStepRaw, genStepId } from "../utils/stepUtils"
 
 const MAX_CHUNK_SIZE = 250
 
@@ -120,7 +120,7 @@ function buildToDoChunks({ goal, steps, proof }, maxSize = MAX_CHUNK_SIZE) {
 }
 
 export default function StructuredTaskBuilder() {
-  const { addMainTask } = useMainTask()
+  const { addMainTaskAndActivate } = useMainTask()
 
   const [goal, setGoal] = useState("")
   const [steps, setSteps] = useState([{ id: genStepId(), raw: "" }])
@@ -266,7 +266,7 @@ export default function StructuredTaskBuilder() {
 
   function handleLoadIntoTasks() {
     const validSteps = steps.filter((s) => s.raw.trim().length > 0)
-    addMainTask({
+    addMainTaskAndActivate({
       title: goal.trim(),
       steps: validSteps,
       proof: proof.trim(),

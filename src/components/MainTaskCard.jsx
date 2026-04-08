@@ -28,6 +28,7 @@ export default function MainTaskCard({ task }) {
     completeMainTask,
     restoreMainTask,
     incrementTries,
+    decrementTries,
     toggleStepComplete,
     updateMainTask,
     updateStep,
@@ -174,12 +175,13 @@ export default function MainTaskCard({ task }) {
                     onChange={() => toggleStepComplete(task.id, step.id)}
                     id={`step-${step.id}`}
                   />
-                  <label
-                    htmlFor={`step-${step.id}`}
-                    className={`mtask-step-text ${step.completed ? "mtask-step-text--done" : ""}`}
-                  >
-                    {parsed.text || step.raw}
-                  </label>
+                  <input
+                    type="text"
+                    className={`mtask-step-edit ${step.completed ? "mtask-step-text--done" : ""}`}
+                    value={step.raw}
+                    onChange={(e) => updateStep(task.id, step.id, e.target.value)}
+                    placeholder="Step name 5"
+                  />
                   {parsed.minutes > 0 && (
                     <span className="mtask-step-time">{parsed.minutes}m</span>
                   )}
@@ -287,6 +289,14 @@ export default function MainTaskCard({ task }) {
           <div className="mtask-card__tries">
             <span className="mtask-field-label">Tries</span>
             <span className="mtask-tries-count">{task.tries || 0}</span>
+            <button
+              type="button"
+              className="mtask-tries-btn"
+              onClick={() => decrementTries(task.id)}
+              title="Decrease try count"
+            >
+              - attempt
+            </button>
             <button
               type="button"
               className="mtask-tries-btn"

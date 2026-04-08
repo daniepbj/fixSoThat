@@ -9,6 +9,7 @@ export default function SidebarTaskSteps() {
     toggleStepComplete,
     completeMainTask,
     incrementTries,
+    decrementTries,
   } = useMainTask()
 
   const task = mainTasks.find((t) => t.id === activeMainTaskId)
@@ -72,6 +73,14 @@ export default function SidebarTaskSteps() {
       )}
 
       <div className="sidebar-steps__actions">
+        <button
+          type="button"
+          className="sidebar-steps__try-btn"
+          onClick={() => decrementTries(task.id)}
+          title={`Tries: ${task.tries || 0}`}
+        >
+          Tries: {task.tries || 0} -
+        </button>
         <button
           type="button"
           className="sidebar-steps__try-btn"

@@ -13,8 +13,10 @@ import SettingsView from "./SettingsView"
 import BottomNav from "./BottomNav"
 import SidebarTaskSteps from "./SidebarTaskSteps"
 import { TimerProvider } from "../context/TimerContext"
+import { useMainTask } from "../context/MainTaskContext"
 import "../timer.css"
 import { playAlarmOnce } from "../utils/alarm"
+import { parseStepRaw } from "../utils/stepUtils"
 import {
   addTrackFromFile,
   deleteTrack,
@@ -63,6 +65,9 @@ function normalizeTask(task) {
 }
 
 export default function TimerApp({ sidebarMode = false }) {
+  const { mainTasks, activeMainTaskId, setStepCompleted, incrementTries } =
+    useMainTask()
+
   // All defaults are [] / {} because initStorageIfNew already populated localStorage
   const [activeTasks, setActiveTasks] = useLocalStorage("fst_active", [])
   const [completedTasks, setCompletedTasks] = useLocalStorage(
@@ -107,9 +112,11 @@ export default function TimerApp({ sidebarMode = false }) {
   const previewUrlRef = useRef("")
   const confettiTimerRef = useRef(null)
   const lastConfettiAtRef = useRef(0)
+  const lastTryIncrementKeyRef = useRef("")
 
   // First task is always the "current" active task tied to the timer
   const currentTask = activeTasks[0] ?? null
+  const activeMainTask = mainTasks.find((t) => t.id === activeMainTaskId) || null
   const settingsRef = useRef(settings)
   settingsRef.current = settings
 
@@ -129,6 +136,61 @@ export default function TimerApp({ sidebarMode = false }) {
       alarmMode: prev.alarmMode ?? (prev.soundEnabled ? "nag" : "silent"),
     }))
   }, [setActiveTasks, setDeferredTasks, setSettings])
+
+  // Keep timer tasks synced with the currently active main task.
+  useEffect(() => {
+    if (!activeMainTask) return
+
+    setActiveTasks((prev) => {
+      const prevByStepId = new Map(
+        prev
+          .filter(
+            (t) => t.sourceMainTaskId === activeMainTask.id && t.sourceStepId,
+          )
+          .map((t) => [t.sourceStepId, t]),
+      )
+
+      const next = activeMainTask.steps
+        .filter((s) => !s.completed)
+        .sort((a, b) => a.order - b.order)
+        .map((step) => {
+          const parsed = parseStepRaw(step.raw)
+          const safeMinutes = clampMinutes(
+            parsed.minutes,
+            settings.defaultTaskDuration,
+          )
+          const existing = prevByStepId.get(step.id)
+
+          if (existing) {
+            return {
+              ...existing,
+              title: parsed.text || step.raw || "Step",
+              estimatedMinutes: safeMinutes,
+              sourceMainTaskId: activeMainTask.id,
+              sourceStepId: step.id,
+            }
+          }
+
+          return createTask({
+            title: parsed.text || step.raw || "Step",
+            estimatedMinutes: safeMinutes,
+            sourceMainTaskId: activeMainTask.id,
+            sourceStepId: step.id,
+            emoji: "✅",
+            color: "#10b981",
+          })
+        })
+
+      return next
+    })
+    setCurrentView("timer")
+  }, [
+    activeMainTask,
+    activeMainTaskId,
+    settings.defaultTaskDuration,
+    setActiveTasks,
+    setCurrentView,
+  ])
 
   // ── Timer tick ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -176,9 +238,24 @@ export default function TimerApp({ sidebarMode = false }) {
   useEffect(() => {
     if (!timerRunning || !currentTask || currentTask.remainingSeconds > 0)
       return
+
+    if (currentTask.sourceMainTaskId) {
+      const key = `${currentTask.sourceMainTaskId}:${currentTask.id}:${currentTask.remainingSeconds}`
+      if (lastTryIncrementKeyRef.current !== key) {
+        incrementTries(currentTask.sourceMainTaskId)
+        lastTryIncrementKeyRef.current = key
+      }
+    }
+
     setTimerRunning(false)
     triggerAlarm()
-  }, [currentTask?.remainingSeconds, timerRunning])
+  }, [
+    currentTask?.remainingSeconds,
+    currentTask?.id,
+    currentTask?.sourceMainTaskId,
+    incrementTries,
+    timerRunning,
+  ])
 
   // ── Auto-dismiss alarm when timer restarts ───────────────────────────────
   useEffect(() => {
@@ -458,6 +535,11 @@ export default function TimerApp({ sidebarMode = false }) {
     stopAlarm()
     const task = activeTasks.find((t) => t.id === id)
     if (!task) return
+
+    if (task.sourceMainTaskId && task.sourceStepId) {
+      setStepCompleted(task.sourceMainTaskId, task.sourceStepId, true)
+    }
+
     playCompletionSound(musicVolume)
     triggerCelebration()
     setCompletedTasks((ct) => [

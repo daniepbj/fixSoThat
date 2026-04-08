@@ -100,6 +100,20 @@ export function MainTaskProvider({ children }) {
     )
   }
 
+  function decrementTries(id) {
+    setMainTasks((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              tries: Math.max(0, (t.tries || 0) - 1),
+              updatedAt: new Date().toISOString(),
+            }
+          : t,
+      ),
+    )
+  }
+
   // ── Step operations ─────────────────────────────────────────────────────
 
   function toggleStepComplete(taskId, stepId) {
@@ -110,6 +124,22 @@ export function MainTaskProvider({ children }) {
               ...t,
               steps: t.steps.map((s) =>
                 s.id === stepId ? { ...s, completed: !s.completed } : s,
+              ),
+              updatedAt: new Date().toISOString(),
+            }
+          : t,
+      ),
+    )
+  }
+
+  function setStepCompleted(taskId, stepId, completed) {
+    setMainTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              steps: t.steps.map((s) =>
+                s.id === stepId ? { ...s, completed: Boolean(completed) } : s,
               ),
               updatedAt: new Date().toISOString(),
             }
@@ -146,6 +176,12 @@ export function MainTaskProvider({ children }) {
     )
   }
 
+  function addMainTaskAndActivate(taskData) {
+    const task = addMainTask(taskData)
+    if (task?.id) setActiveMainTaskId(task.id)
+    return task
+  }
+
   function removeStepFromTask(taskId, stepId) {
     setMainTasks((prev) =>
       prev.map((t) =>
@@ -180,6 +216,8 @@ export function MainTaskProvider({ children }) {
     const slot = saveSlots[index]
     if (!slot) return false
     setMainTasks(slot.tasks)
+    const firstActive = (slot.tasks || []).find((t) => t.status !== "completed")
+    setActiveMainTaskId(firstActive?.id ?? "")
     return true
   }
 
@@ -272,12 +310,15 @@ export function MainTaskProvider({ children }) {
     activeMainTaskId,
     setActiveMainTaskId,
     addMainTask,
+    addMainTaskAndActivate,
     updateMainTask,
     deleteMainTask,
     completeMainTask,
     restoreMainTask,
     incrementTries,
+    decrementTries,
     toggleStepComplete,
+    setStepCompleted,
     updateStep,
     addStepToTask,
     removeStepFromTask,

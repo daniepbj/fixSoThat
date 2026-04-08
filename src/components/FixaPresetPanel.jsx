@@ -3,7 +3,12 @@ import { useMainTask } from "../context/MainTaskContext"
 import { parseStepBlock } from "../utils/stepUtils"
 
 export default function FixaPresetPanel() {
-  const { fixaPresets, saveFixaPreset, deleteFixaPreset, addMainTask } =
+  const {
+    fixaPresets,
+    saveFixaPreset,
+    deleteFixaPreset,
+    addMainTaskAndActivate,
+  } =
     useMainTask()
 
   const [showCreate, setShowCreate] = useState(false)
@@ -39,7 +44,7 @@ export default function FixaPresetPanel() {
     const preset = fixaPresets.find((p) => p.id === presetId)
     if (!preset) return
     const steps = parseStepBlock(preset.stepsBlock || "")
-    addMainTask({
+    addMainTaskAndActivate({
       title: preset.title,
       steps,
       proof: preset.proof,
