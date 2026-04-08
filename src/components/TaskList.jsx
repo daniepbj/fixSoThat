@@ -1,14 +1,99 @@
 import { useState } from 'react';
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import TaskCard from './TaskCard';
+
+function SortableTaskRow({
+  task,
+  idx,
+  totalTasks,
+  completeTask,
+  deleteTask,
+  resetTask,
+  deferTask,
+  moveUp,
+  moveDown,
+  moveToTop,
+  moveToBottom,
+  playTask,
+  toggleTaskFlag,
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+    isOver,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`task-drag-wrap${isDragging ? ' task-drag-wrap--dragging' : ''}${isOver ? ' task-drag-wrap--target' : ''}`}
+      {...attributes}
+      {...listeners}
+    >
+      <TaskCard
+        task={task}
+        isFirst={idx === 0}
+        index={idx}
+        totalTasks={totalTasks}
+        completeTask={completeTask}
+        deleteTask={deleteTask}
+        resetTask={resetTask}
+        deferTask={deferTask}
+        moveUp={moveUp}
+        moveDown={moveDown}
+        moveToTop={moveToTop}
+        moveToBottom={moveToBottom}
+        playTask={playTask}
+        toggleTaskFlag={toggleTaskFlag}
+      />
+    </div>
+  );
+}
 
 export default function TaskList({
   activeTasks, completedTasks, settings,
   completeTask, deleteTask, resetTask, deferTask, moveUp, moveDown, moveToTop, moveToBottom,
-  playTask, toggleTaskFlag, currentTaskId, timerRunning,
+  reorderTask,
+  playTask, toggleTaskFlag,
   emojiMe, colorMe, randomTask, addOvertime, clearActiveTasks,
   showAddForm, setShowAddForm,
 }) {
   const [showCompleted, setShowCompleted] = useState(settings.showCompletedByDefault);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 6,
+      },
+    }),
+  );
+
+  function handleDragEnd(event) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    reorderTask(active.id, over.id);
+  }
 
   return (
     <section className="task-list-section">
@@ -27,27 +112,35 @@ export default function TaskList({
         {activeTasks.length === 0 && (
           <p className="list-empty">No active tasks — add one below!</p>
         )}
-        {activeTasks.map((task, idx) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            isFirst={idx === 0}
-            index={idx}
-            totalTasks={activeTasks.length}
-            completeTask={completeTask}
-            deleteTask={deleteTask}
-            resetTask={resetTask}
-            deferTask={deferTask}
-            moveUp={moveUp}
-            moveDown={moveDown}
-            moveToTop={moveToTop}
-            moveToBottom={moveToBottom}
-            playTask={playTask}
-            toggleTaskFlag={toggleTaskFlag}
-            currentTaskId={currentTaskId}
-            timerRunning={timerRunning}
-          />
-        ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={activeTasks.map((t) => t.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            {activeTasks.map((task, idx) => (
+              <SortableTaskRow
+                key={task.id}
+                task={task}
+                idx={idx}
+                totalTasks={activeTasks.length}
+                completeTask={completeTask}
+                deleteTask={deleteTask}
+                resetTask={resetTask}
+                deferTask={deferTask}
+                moveUp={moveUp}
+                moveDown={moveDown}
+                moveToTop={moveToTop}
+                moveToBottom={moveToBottom}
+                playTask={playTask}
+                toggleTaskFlag={toggleTaskFlag}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       </div>
 
       <button className="add-task-btn" onClick={() => setShowAddForm(true)}>

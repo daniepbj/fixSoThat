@@ -1,3 +1,5 @@
+import { useTimerContext } from "../context/TimerContext"
+
 function fmtSeconds(s) {
   const m = Math.floor(s / 60);
   const sec = s % 60;
@@ -12,8 +14,9 @@ function fmtTime(iso) {
 export default function TaskCard({
   task, isFirst, index, totalTasks,
   completeTask, deleteTask, resetTask, deferTask, moveUp, moveDown, moveToTop, moveToBottom,
-  playTask, toggleTaskFlag, currentTaskId, timerRunning,
+  playTask, toggleTaskFlag,
 }) {
+  const { currentTask, timerRunning } = useTimerContext()
   const projectedEnd = new Date(Date.now() + task.remainingSeconds * 1000);
   const flags = {
     needsSteps: false,
@@ -22,7 +25,7 @@ export default function TaskCard({
     priority: false,
     ...(task.adhdFlags || {}),
   };
-  const isFocusedTask = currentTaskId === task.id;
+  const isFocusedTask = currentTask?.id === task.id;
 
   // Mini pie chart for the current task
   const PIE_R = 15;
