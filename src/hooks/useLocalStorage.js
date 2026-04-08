@@ -16,9 +16,11 @@ export function useLocalStorage(key, initialValue) {
 
   const setValue = (value) => {
     try {
-      const next = typeof value === 'function' ? value(stored) : value;
-      setStored(next);
-      window.localStorage.setItem(key, JSON.stringify(next));
+      setStored((prev) => {
+        const next = typeof value === 'function' ? value(prev) : value;
+        window.localStorage.setItem(key, JSON.stringify(next));
+        return next;
+      });
     } catch (e) {
       console.error('useLocalStorage write error:', e);
     }

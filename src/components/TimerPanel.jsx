@@ -1,10 +1,13 @@
+import { useTimerContext } from "../context/TimerContext"
+
 function fmtDisplay(seconds) {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export default function TimerPanel({ currentTask, timerRunning, setTimerRunning, adjustTime }) {
+export default function TimerPanel() {
+  const { currentTask, timerRunning, setTimerRunning, adjustTime, alarmActive, stopAlarm } = useTimerContext()
   const remaining = currentTask?.remainingSeconds ?? 0;
   const total = 60 * 60;
   const progress = Math.max(0, Math.min(1, remaining / total));
@@ -22,7 +25,7 @@ export default function TimerPanel({ currentTask, timerRunning, setTimerRunning,
 
   return (
     <section
-      className={`timer-panel ${timerRunning ? 'timer-panel--running' : ''}`}
+      className={`timer-panel${timerRunning ? ' timer-panel--running' : ''}${alarmActive ? ' timer-panel--alarm' : ''}`}
       style={{ '--timer-glow-color': currentTask?.color ?? '#6c63ff' }}
     >
       <div className="timer-ring-wrapper">
@@ -77,6 +80,12 @@ export default function TimerPanel({ currentTask, timerRunning, setTimerRunning,
           +5m
         </button>
       </div>
+
+      {alarmActive && (
+        <button className="timer-btn timer-btn--dismiss" onClick={stopAlarm}>
+          🔕 Dismiss alarm
+        </button>
+      )}
     </section>
   );
 }

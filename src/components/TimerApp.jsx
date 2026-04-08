@@ -10,7 +10,9 @@ import ReportView from "./ReportView"
 import PresetsView from "./PresetsView"
 import SettingsView from "./SettingsView"
 import BottomNav from "./BottomNav"
+import { TimerProvider } from "../context/TimerContext"
 import "../timer.css"
+import { playAlarmOnce } from "../utils/alarm"
 
 // Seed localStorage exactly once – never re-seeds after user clears tasks
 initStorageIfNew()
@@ -66,6 +68,7 @@ export default function TimerApp() {
     defaultTaskDuration: 25,
     showCompletedByDefault: false,
     matchMainPageStyle: false,
+    alarmMode: "nag",
   })
   const [timerRunning, setTimerRunning] = useLocalStorage("fst_running", false)
   const [sessionSeconds, setSessionSeconds] = useLocalStorage("fst_session", 0)
@@ -73,6 +76,8 @@ export default function TimerApp() {
   const [theme, setTheme] = useLocalStorage("fst_theme", "dark")
 
   const [showAddForm, setShowAddForm] = useState(false)
+  const [alarmActive, setAlarmActive] = useState(false)
+  const alarmIntervalRef = useRef(null)
 
   // First task is always the "current" active task tied to the timer
   const currentTask = activeTasks[0] ?? null
@@ -87,6 +92,7 @@ export default function TimerApp() {
       ...prev,
       defaultTaskDuration: clampMinutes(prev.defaultTaskDuration, 25),
       matchMainPageStyle: Boolean(prev.matchMainPageStyle),
+      alarmMode: prev.alarmMode ?? (prev.soundEnabled ? "nag" : "silent"),
     }))
   }, [setActiveTasks, setDeferredTasks, setSettings])
 
@@ -112,19 +118,46 @@ export default function TimerApp() {
     return () => clearInterval(id)
   }, [timerRunning])
 
+  // ── Alarm ────────────────────────────────────────────────────────────────
+  function triggerAlarm() {
+    const mode = settingsRef.current.alarmMode ?? "silent"
+    setAlarmActive(true)
+    clearInterval(alarmIntervalRef.current)
+    if (mode === "silent") return
+    playAlarmOnce()
+    if (mode === "nag") {
+      alarmIntervalRef.current = setInterval(playAlarmOnce, 60_000)
+    } else if (mode === "continuous") {
+      alarmIntervalRef.current = setInterval(playAlarmOnce, 2_500)
+    }
+  }
+
+  function stopAlarm() {
+    setAlarmActive(false)
+    clearInterval(alarmIntervalRef.current)
+    alarmIntervalRef.current = null
+  }
+
   // ── Auto-complete when timer hits zero ───────────────────────────────────
   useEffect(() => {
     if (!timerRunning || !currentTask || currentTask.remainingSeconds > 0)
       return
     setTimerRunning(false)
-    if (settingsRef.current.autoStartNextTask) {
-      setTimeout(() => completeTask(currentTask.id), 50)
-    }
+    triggerAlarm()
   }, [currentTask?.remainingSeconds, timerRunning])
+
+  // ── Auto-dismiss alarm when timer restarts ───────────────────────────────
+  useEffect(() => {
+    if (!timerRunning) return
+    setAlarmActive(false)
+    clearInterval(alarmIntervalRef.current)
+    alarmIntervalRef.current = null
+  }, [timerRunning])
 
   // ── Task actions ─────────────────────────────────────────────────────────
 
   function completeTask(id) {
+    stopAlarm()
     const task = activeTasks.find((t) => t.id === id)
     if (!task) return
     setCompletedTasks((ct) => [
@@ -229,6 +262,19 @@ export default function TimerApp() {
       const copy = [...prev]
       const [item] = copy.splice(idx, 1)
       return [...copy, item]
+    })
+  }
+
+  function reorderTask(dragId, targetId) {
+    if (!dragId || !targetId || dragId === targetId) return
+    setActiveTasks((prev) => {
+      const from = prev.findIndex((t) => t.id === dragId)
+      const to = prev.findIndex((t) => t.id === targetId)
+      if (from < 0 || to < 0 || from === to) return prev
+      const copy = [...prev]
+      const [item] = copy.splice(from, 1)
+      copy.splice(to, 0, item)
+      return copy
     })
   }
 
@@ -356,6 +402,15 @@ export default function TimerApp() {
   )
   const projectedEndTime = new Date(Date.now() + totalRemainingSeconds * 1000)
 
+  const timerContextValue = {
+    currentTask,
+    timerRunning,
+    setTimerRunning,
+    adjustTime,
+    alarmActive,
+    stopAlarm,
+  }
+
   const taskProps = {
     activeTasks,
     completedTasks,
@@ -369,10 +424,9 @@ export default function TimerApp() {
     moveDown,
     moveToTop,
     moveToBottom,
+    reorderTask,
     playTask,
     toggleTaskFlag,
-    currentTaskId: currentTask?.id,
-    timerRunning,
     emojiMe,
     colorMe,
     randomTask,
@@ -392,45 +446,42 @@ export default function TimerApp() {
         theme={theme}
         setTheme={setTheme}
       />
-      <div className="timer-main">
-        {currentView === "timer" && (
-          <>
-            <TimerPanel
-              currentTask={currentTask}
-              timerRunning={timerRunning}
-              setTimerRunning={setTimerRunning}
-              adjustTime={adjustTime}
+      <TimerProvider value={timerContextValue}>
+        <div className="timer-main">
+          {currentView === "timer" && (
+            <>
+              <TimerPanel />
+              <TaskList {...taskProps} />
+            </>
+          )}
+          {currentView === "not-now" && (
+            <DeferredTasksPanel
+              deferredTasks={deferredTasks}
+              restoreDeferred={restoreDeferred}
+              deleteDeferred={deleteDeferred}
             />
-            <TaskList {...taskProps} />
-          </>
-        )}
-        {currentView === "not-now" && (
-          <DeferredTasksPanel
-            deferredTasks={deferredTasks}
-            restoreDeferred={restoreDeferred}
-            deleteDeferred={deleteDeferred}
-          />
-        )}
-        {currentView === "report" && (
-          <ReportView
-            activeTasks={activeTasks}
-            completedTasks={completedTasks}
-            deferredTasks={deferredTasks}
-            sessionSeconds={sessionSeconds}
-          />
-        )}
-        {currentView === "presets" && (
-          <PresetsView
-            presets={presets}
-            savePreset={savePreset}
-            loadPreset={loadPreset}
-            deletePreset={deletePreset}
-          />
-        )}
-        {currentView === "settings" && (
-          <SettingsView settings={settings} setSettings={setSettings} />
-        )}
-      </div>
+          )}
+          {currentView === "report" && (
+            <ReportView
+              activeTasks={activeTasks}
+              completedTasks={completedTasks}
+              deferredTasks={deferredTasks}
+              sessionSeconds={sessionSeconds}
+            />
+          )}
+          {currentView === "presets" && (
+            <PresetsView
+              presets={presets}
+              savePreset={savePreset}
+              loadPreset={loadPreset}
+              deletePreset={deletePreset}
+            />
+          )}
+          {currentView === "settings" && (
+            <SettingsView settings={settings} setSettings={setSettings} />
+          )}
+        </div>
+      </TimerProvider>
 
       {showAddForm && (
         <AddTaskForm
