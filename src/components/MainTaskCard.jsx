@@ -50,6 +50,8 @@ export default function MainTaskCard({ task }) {
   const [editingPriority, setEditingPriority] = useState(false)
   const [priorityDraft, setPriorityDraft] = useState(task.priority)
   const [newStepRaw, setNewStepRaw] = useState("")
+  const [draggedStepId, setDraggedStepId] = useState("")
+  const [linkPrompt, setLinkPrompt] = useState(null)
 
   // Keep draft values in sync with task prop updates (e.g. external edits)
   useEffect(() => {
@@ -97,6 +99,41 @@ export default function MainTaskCard({ task }) {
     ) {
       completeMainTask(task.id)
     }
+  }
+
+  function handleStepDragStart(stepId, event) {
+    setDraggedStepId(stepId)
+    setLinkPrompt(null)
+    event.dataTransfer.effectAllowed = "move"
+    event.dataTransfer.setData("text/plain", stepId)
+  }
+
+  function handleStepDragOver(stepId, event) {
+    const sourceId = draggedStepId || event.dataTransfer.getData("text/plain")
+    if (!sourceId || sourceId === stepId) return
+    event.preventDefault()
+  }
+
+  function handleStepDrop(targetStepId, event) {
+    event.preventDefault()
+    const sourceId = draggedStepId || event.dataTransfer.getData("text/plain")
+    if (!sourceId || sourceId === targetStepId) return
+    setLinkPrompt({ sourceId, targetStepId })
+    setDraggedStepId("")
+  }
+
+  function clearStepDragState() {
+    setDraggedStepId("")
+  }
+
+  function applyDroppedLink(relation) {
+    if (!linkPrompt) return
+    setStepLink(
+      task.id,
+      linkPrompt.sourceId,
+      `${relation}:${linkPrompt.targetStepId}`,
+    )
+    setLinkPrompt(null)
   }
 
   return (
@@ -182,29 +219,51 @@ export default function MainTaskCard({ task }) {
             )}
             {sortedSteps.map((step, stepIdx) => {
               const parsed = parseStepRaw(step.raw)
-              const sourceIndex = task.steps.findIndex((candidate) => candidate.id === step.id)
+              const sourceIndex = task.steps.findIndex(
+                (candidate) => candidate.id === step.id,
+              )
               const prevSourceIndex =
                 stepIdx > 0
                   ? task.steps.findIndex(
-                      (candidate) => candidate.id === sortedSteps[stepIdx - 1].id,
+                      (candidate) =>
+                        candidate.id === sortedSteps[stepIdx - 1].id,
                     )
                   : -1
               const nextSourceIndex =
                 stepIdx < sortedSteps.length - 1
                   ? task.steps.findIndex(
-                      (candidate) => candidate.id === sortedSteps[stepIdx + 1].id,
+                      (candidate) =>
+                        candidate.id === sortedSteps[stepIdx + 1].id,
                     )
                   : -1
               const linkedBefore =
-                task.steps.find((candidate) => candidate.linkedAfter === step.id)
-                  ?.id || ""
+                task.steps.find(
+                  (candidate) => candidate.linkedAfter === step.id,
+                )?.id || ""
               const linkValue = step.linkedAfter
                 ? `after:${step.linkedAfter}`
                 : linkedBefore
                   ? `before:${linkedBefore}`
                   : ""
+              const showLinkPrompt = linkPrompt?.targetStepId === step.id
+              const isDraggedSource = draggedStepId === step.id
               return (
-                <div key={step.id} className="mtask-step-row">
+                <div
+                  key={step.id}
+                  className={`mtask-step-row ${isDraggedSource ? "mtask-step-row--dragging" : ""} ${showLinkPrompt ? "mtask-step-row--drop-target" : ""}`}
+                  onDragOver={(event) => handleStepDragOver(step.id, event)}
+                  onDrop={(event) => handleStepDrop(step.id, event)}
+                >
+                  <button
+                    type="button"
+                    className="mtask-step-drag"
+                    draggable
+                    onDragStart={(event) => handleStepDragStart(step.id, event)}
+                    onDragEnd={clearStepDragState}
+                    title="Drag onto another step to link before/after"
+                  >
+                    ⋮⋮
+                  </button>
                   <input
                     type="checkbox"
                     className="mtask-step-check"
@@ -223,11 +282,41 @@ export default function MainTaskCard({ task }) {
                   {parsed.minutes > 0 && (
                     <span className="mtask-step-time">{parsed.minutes}m</span>
                   )}
+                  {showLinkPrompt && (
+                    <div className="mtask-step-link-prompt">
+                      <span className="mtask-step-link-prompt-label">
+                        Link dropped step:
+                      </span>
+                      <button
+                        type="button"
+                        className="mtask-step-link-action"
+                        onClick={() => applyDroppedLink("before")}
+                      >
+                        before this
+                      </button>
+                      <button
+                        type="button"
+                        className="mtask-step-link-action"
+                        onClick={() => applyDroppedLink("after")}
+                      >
+                        after this
+                      </button>
+                      <button
+                        type="button"
+                        className="mtask-step-link-cancel"
+                        onClick={() => setLinkPrompt(null)}
+                      >
+                        cancel
+                      </button>
+                    </div>
+                  )}
                   <div className="mtask-step-right">
                     <button
                       type="button"
                       className="mtask-step-ctrl"
-                      onClick={() => reorderSteps(task.id, sourceIndex, prevSourceIndex)}
+                      onClick={() =>
+                        reorderSteps(task.id, sourceIndex, prevSourceIndex)
+                      }
                       disabled={stepIdx === 0}
                       title="Move step up"
                     >
@@ -236,7 +325,9 @@ export default function MainTaskCard({ task }) {
                     <button
                       type="button"
                       className="mtask-step-ctrl"
-                      onClick={() => reorderSteps(task.id, sourceIndex, nextSourceIndex)}
+                      onClick={() =>
+                        reorderSteps(task.id, sourceIndex, nextSourceIndex)
+                      }
                       disabled={stepIdx === task.steps.length - 1}
                       title="Move step down"
                     >
@@ -275,7 +366,10 @@ export default function MainTaskCard({ task }) {
                         .map((s) => {
                           const p = parseStepRaw(s.raw)
                           return (
-                            <option key={`before-${s.id}`} value={`before:${s.id}`}>
+                            <option
+                              key={`before-${s.id}`}
+                              value={`before:${s.id}`}
+                            >
                               before: {p.text || s.raw}
                             </option>
                           )
@@ -285,7 +379,10 @@ export default function MainTaskCard({ task }) {
                         .map((s) => {
                           const p = parseStepRaw(s.raw)
                           return (
-                            <option key={`after-${s.id}`} value={`after:${s.id}`}>
+                            <option
+                              key={`after-${s.id}`}
+                              value={`after:${s.id}`}
+                            >
                               after: {p.text || s.raw}
                             </option>
                           )

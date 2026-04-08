@@ -812,11 +812,41 @@ body {
 .mtask-step-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 8px;
   padding: 6px 8px;
   background: rgba(255, 255, 255, 0.05);
+}
+
+.mtask-step-row--dragging {
+  opacity: 0.55;
+}
+
+.mtask-step-row--drop-target {
+  border-color: rgba(255, 210, 123, 0.55);
+  box-shadow: 0 0 0 1px rgba(255, 210, 123, 0.22);
+}
+
+.mtask-step-drag {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: grab;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mtask-step-drag:active {
+  cursor: grabbing;
 }
 
 .mtask-step-text {
@@ -882,6 +912,39 @@ body {
   padding: 2px 4px;
   max-width: 82px;
   cursor: pointer;
+}
+
+.mtask-step-link-prompt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 210, 123, 0.12);
+  border: 1px solid rgba(255, 210, 123, 0.26);
+}
+
+.mtask-step-link-prompt-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ffe0a1;
+}
+
+.mtask-step-link-action,
+.mtask-step-link-cancel {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  padding: 4px 9px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mtask-step-link-cancel {
+  color: #ffcfbf;
 }
 
 .mtask-step-edit:focus {
