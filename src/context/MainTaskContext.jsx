@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react"
+import { createContext, useContext, useEffect } from "react"
 import confetti from "canvas-confetti"
 import { useLocalStorage } from "../hooks/useLocalStorage"
 import { genStepId } from "../utils/stepUtils"
@@ -10,7 +10,49 @@ function genTaskId() {
 }
 
 function makeStep(raw, order) {
-  return { id: genStepId(), raw: raw || "", completed: false, order }
+  return {
+    id: genStepId(),
+    raw: raw || "",
+    completed: false,
+    order,
+    tries: 0,
+    linkedAfter: null,
+  }
+}
+
+function normalizeStep(step, order) {
+  return {
+    id: step?.id || genStepId(),
+    raw: step?.raw || "",
+    completed: Boolean(step?.completed),
+    order,
+    tries: Math.max(0, Number(step?.tries) || 0),
+    linkedAfter: step?.linkedAfter || null,
+  }
+}
+
+function deriveTaskStatus(task) {
+  const totalSteps = task.steps.length
+  const completedSteps = task.steps.filter((step) => step.completed).length
+  if (totalSteps > 0 && completedSteps === totalSteps) return "completed"
+  return task.status === "completed" && completedSteps !== totalSteps
+    ? "active"
+    : task.status || "active"
+}
+
+function normalizeTask(task) {
+  const steps = (task?.steps || []).map((step, index) => normalizeStep(step, index))
+  return {
+    id: task?.id || genTaskId(),
+    title: task?.title || "",
+    steps,
+    proof: task?.proof || "",
+    priority: task?.priority || "",
+    status: deriveTaskStatus({ ...task, steps }),
+    tries: Math.max(0, Number(task?.tries) || 0),
+    createdAt: task?.createdAt || new Date().toISOString(),
+    updatedAt: task?.updatedAt || new Date().toISOString(),
+  }
 }
 
 export function MainTaskProvider({ children }) {
@@ -28,11 +70,31 @@ export function MainTaskProvider({ children }) {
     "",
   )
 
+  useEffect(() => {
+    setMainTasks((prev) => prev.map((task) => normalizeTask(task)))
+    setSaveSlots((prev) =>
+      prev.map((slot) =>
+        slot
+          ? {
+              ...slot,
+              tasks: (slot.tasks || []).map((task) => normalizeTask(task)),
+            }
+          : slot,
+      ),
+    )
+  }, [setMainTasks, setSaveSlots])
+
+  useEffect(() => {
+    if (!activeMainTaskId) return
+    const exists = mainTasks.some((task) => task.id === activeMainTaskId)
+    if (!exists) setActiveMainTaskId("")
+  }, [activeMainTaskId, mainTasks, setActiveMainTaskId])
+
   // ── Main Task CRUD ──────────────────────────────────────────────────────
 
   function addMainTask(taskData) {
     const now = new Date().toISOString()
-    const task = {
+    const task = normalizeTask({
       id: genTaskId(),
       title: taskData.title || "",
       steps: (taskData.steps || []).map((s, i) =>
@@ -44,7 +106,7 @@ export function MainTaskProvider({ children }) {
       tries: 0,
       createdAt: now,
       updatedAt: now,
-    }
+    })
     setMainTasks((prev) => [...prev, task])
     return task
   }
@@ -53,7 +115,11 @@ export function MainTaskProvider({ children }) {
     setMainTasks((prev) =>
       prev.map((t) =>
         t.id === id
-          ? { ...t, ...updates, updatedAt: new Date().toISOString() }
+          ? normalizeTask({
+              ...t,
+              ...updates,
+              updatedAt: new Date().toISOString(),
+            })
           : t,
       ),
     )
@@ -117,46 +183,66 @@ export function MainTaskProvider({ children }) {
   // ── Step operations ─────────────────────────────────────────────────────
 
   function toggleStepComplete(taskId, stepId) {
+    let becameCompleted = false
     setMainTasks((prev) =>
       prev.map((t) =>
         t.id === taskId
-          ? {
-              ...t,
-              steps: t.steps.map((s) =>
-                s.id === stepId ? { ...s, completed: !s.completed } : s,
-              ),
-              updatedAt: new Date().toISOString(),
-            }
+          ? (() => {
+              const next = normalizeTask({
+                ...t,
+                steps: t.steps.map((s) =>
+                  s.id === stepId ? { ...s, completed: !s.completed } : s,
+                ),
+                updatedAt: new Date().toISOString(),
+              })
+              becameCompleted =
+                t.status !== "completed" && next.status === "completed"
+              return next
+            })()
           : t,
       ),
     )
+    if (becameCompleted) {
+      if (activeMainTaskId === taskId) setActiveMainTaskId("")
+      triggerBigCelebration()
+    }
   }
 
   function setStepCompleted(taskId, stepId, completed) {
+    let becameCompleted = false
     setMainTasks((prev) =>
       prev.map((t) =>
         t.id === taskId
-          ? {
-              ...t,
-              steps: t.steps.map((s) =>
-                s.id === stepId ? { ...s, completed: Boolean(completed) } : s,
-              ),
-              updatedAt: new Date().toISOString(),
-            }
+          ? (() => {
+              const next = normalizeTask({
+                ...t,
+                steps: t.steps.map((s) =>
+                  s.id === stepId ? { ...s, completed: Boolean(completed) } : s,
+                ),
+                updatedAt: new Date().toISOString(),
+              })
+              becameCompleted =
+                t.status !== "completed" && next.status === "completed"
+              return next
+            })()
           : t,
       ),
     )
+    if (becameCompleted) {
+      if (activeMainTaskId === taskId) setActiveMainTaskId("")
+      triggerBigCelebration()
+    }
   }
 
   function updateStep(taskId, stepId, raw) {
     setMainTasks((prev) =>
       prev.map((t) =>
         t.id === taskId
-          ? {
+          ? normalizeTask({
               ...t,
               steps: t.steps.map((s) => (s.id === stepId ? { ...s, raw } : s)),
               updatedAt: new Date().toISOString(),
-            }
+            })
           : t,
       ),
     )
@@ -166,11 +252,11 @@ export function MainTaskProvider({ children }) {
     setMainTasks((prev) =>
       prev.map((t) =>
         t.id === taskId
-          ? {
+          ? normalizeTask({
               ...t,
               steps: [...t.steps, makeStep(raw, t.steps.length)],
               updatedAt: new Date().toISOString(),
-            }
+            })
           : t,
       ),
     )
@@ -186,14 +272,106 @@ export function MainTaskProvider({ children }) {
     setMainTasks((prev) =>
       prev.map((t) =>
         t.id === taskId
-          ? {
+          ? normalizeTask({
               ...t,
               steps: t.steps
                 .filter((s) => s.id !== stepId)
                 .map((s, i) => ({ ...s, order: i })),
               updatedAt: new Date().toISOString(),
-            }
+            })
           : t,
+      ),
+    )
+  }
+
+  function incrementStepTries(taskId, stepId) {
+    setMainTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? normalizeTask({
+              ...t,
+              steps: t.steps.map((s) =>
+                s.id === stepId ? { ...s, tries: (s.tries || 0) + 1 } : s,
+              ),
+              updatedAt: new Date().toISOString(),
+            })
+          : t,
+      ),
+    )
+  }
+
+  function decrementStepTries(taskId, stepId) {
+    setMainTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? normalizeTask({
+              ...t,
+              steps: t.steps.map((s) =>
+                s.id === stepId
+                  ? { ...s, tries: Math.max(0, (s.tries || 0) - 1) }
+                  : s,
+              ),
+              updatedAt: new Date().toISOString(),
+            })
+          : t,
+      ),
+    )
+  }
+
+  function reorderSteps(taskId, fromIndex, toIndex) {
+    setMainTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t
+        if (fromIndex < 0 || toIndex < 0 || fromIndex >= t.steps.length || toIndex >= t.steps.length) {
+          return t
+        }
+        const steps = [...t.steps]
+        const [item] = steps.splice(fromIndex, 1)
+        steps.splice(toIndex, 0, item)
+        return normalizeTask({
+          ...t,
+          steps: steps.map((s, i) => ({ ...s, order: i })),
+          updatedAt: new Date().toISOString(),
+        })
+      }),
+    )
+  }
+
+  function setStepLink(taskId, stepId, relationValue) {
+    setMainTasks((prev) =>
+      prev.map((t) =>
+        t.id !== taskId
+          ? t
+          : normalizeTask({
+              ...t,
+              steps: (() => {
+                const steps = t.steps.map((s) => ({ ...s }))
+                for (const step of steps) {
+                  if (step.id === stepId || step.linkedAfter === stepId) {
+                    step.linkedAfter = null
+                  }
+                }
+                if (!relationValue) return steps
+
+                const [relation, targetId] = relationValue.split(":")
+                if (!targetId) return steps
+
+                if (relation === "after") {
+                  return steps.map((step) =>
+                    step.id === stepId ? { ...step, linkedAfter: targetId } : step,
+                  )
+                }
+
+                if (relation === "before") {
+                  return steps.map((step) =>
+                    step.id === targetId ? { ...step, linkedAfter: stepId } : step,
+                  )
+                }
+
+                return steps
+              })(),
+              updatedAt: new Date().toISOString(),
+            }),
       ),
     )
   }
@@ -215,9 +393,9 @@ export function MainTaskProvider({ children }) {
   function loadSlot(index) {
     const slot = saveSlots[index]
     if (!slot) return false
-    setMainTasks(slot.tasks)
-    const firstActive = (slot.tasks || []).find((t) => t.status !== "completed")
-    setActiveMainTaskId(firstActive?.id ?? "")
+    setMainTasks((slot.tasks || []).map((task) => normalizeTask(task)))
+    setActiveMainTaskId("")
+    // Do not auto-activate — user selects which task to work on
     return true
   }
 
@@ -317,6 +495,10 @@ export function MainTaskProvider({ children }) {
     restoreMainTask,
     incrementTries,
     decrementTries,
+    incrementStepTries,
+    decrementStepTries,
+    reorderSteps,
+    setStepLink,
     toggleStepComplete,
     setStepCompleted,
     updateStep,

@@ -57,21 +57,63 @@
 }
 
 .timer-app--light {
-  --ta-bg: linear-gradient(160deg, #f5f7ff 0%, #eef1ff 55%, #f0f8ff 100%);
-  --ta-text: #1a1b3c;
-  --ta-text-soft: rgba(26, 27, 60, 0.6);
-  --ta-card: rgba(255, 255, 255, 0.85);
-  --ta-card-hover: rgba(255, 255, 255, 0.97);
-  --ta-border: rgba(0, 0, 0, 0.1);
-  --ta-nav: rgba(240, 244, 255, 0.97);
-  --ta-nav-border: rgba(0, 0, 0, 0.1);
-  --ta-btn: rgba(0, 0, 0, 0.07);
-  --ta-btn-hover: rgba(0, 0, 0, 0.14);
-  --ta-input: rgba(0, 0, 0, 0.06);
-  --ta-top-bar: rgba(255, 255, 255, 0.75);
-  --ta-top-border: rgba(0, 0, 0, 0.08);
-  --ta-ring-track: rgba(0, 0, 0, 0.1);
-  --ta-icon-btn: rgba(26, 27, 60, 0.45);
+  --ta-bg: linear-gradient(160deg, #f2f4fd 0%, #e9ecfb 60%, #f0f6ff 100%);
+  --ta-text: #1e1f3d;
+  --ta-text-soft: rgba(30, 31, 61, 0.56);
+  --ta-card: rgba(255, 255, 255, 0.92);
+  --ta-card-hover: rgba(255, 255, 255, 1);
+  --ta-border: rgba(90, 90, 200, 0.15);
+  --ta-nav: rgba(246, 248, 255, 0.98);
+  --ta-nav-border: rgba(90, 90, 200, 0.13);
+  --ta-btn: rgba(108, 99, 255, 0.08);
+  --ta-btn-hover: rgba(108, 99, 255, 0.17);
+  --ta-input: rgba(90, 90, 200, 0.07);
+  --ta-top-bar: rgba(255, 255, 255, 0.94);
+  --ta-top-border: rgba(90, 90, 200, 0.11);
+  --ta-ring-track: rgba(90, 90, 200, 0.14);
+  --ta-icon-btn: rgba(30, 31, 61, 0.42);
+}
+
+/* Light theme elevation and polish */
+.timer-app--light .task-card {
+  box-shadow:
+    0 2px 10px rgba(80, 80, 180, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.timer-app--light .task-card:hover {
+  box-shadow:
+    0 4px 18px rgba(80, 80, 180, 0.12),
+    0 2px 5px rgba(0, 0, 0, 0.06);
+}
+.timer-app--light .top-bar {
+  box-shadow: 0 1px 8px rgba(80, 80, 180, 0.07);
+}
+.timer-app--light .bottom-nav {
+  box-shadow: 0 -2px 12px rgba(80, 80, 180, 0.07);
+}
+.timer-app--light .timer-btn--play {
+  box-shadow: 0 4px 20px rgba(108, 99, 255, 0.45);
+}
+.timer-app--light .alarm-option {
+  background: rgba(90, 90, 200, 0.03);
+}
+.timer-app--light .alarm-option:hover {
+  background: rgba(108, 99, 255, 0.07);
+}
+.timer-app--light .alarm-option--selected {
+  background: rgba(108, 99, 255, 0.1);
+}
+.timer-app--light .report-stat,
+.timer-app--light .preset-card {
+  box-shadow: 0 1px 6px rgba(80, 80, 180, 0.07);
+}
+.timer-app--light .add-task-btn:hover {
+  border-color: #8b85ff;
+  color: #5b52e0;
+}
+.timer-app--light .sidebar-steps {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(90, 90, 200, 0.18);
 }
 
 .timer-main {
@@ -1208,14 +1250,14 @@
 }
 
 .sidebar-step {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 0.8rem;
 }
 
 .sidebar-step__text {
+  flex: 1;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -1233,6 +1275,34 @@
   background: rgba(52, 209, 149, 0.16);
   border-radius: 999px;
   padding: 2px 6px;
+}
+
+.sidebar-step__step-tries {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(255, 200, 120, 0.9);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-step__tries-btn {
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(255, 200, 120, 0.4);
+  border-radius: 4px;
+  background: rgba(255, 200, 80, 0.12);
+  color: rgba(255, 200, 120, 0.9);
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .sidebar-steps__empty {

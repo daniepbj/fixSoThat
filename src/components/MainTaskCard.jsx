@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useMainTask } from "../context/MainTaskContext"
-import { parseStepRaw } from "../utils/stepUtils"
+import { parseStepRaw, sortStepsWithLinks } from "../utils/stepUtils"
 
 function StatusBadge({ label, isGreen }) {
   return (
@@ -29,6 +29,10 @@ export default function MainTaskCard({ task }) {
     restoreMainTask,
     incrementTries,
     decrementTries,
+    incrementStepTries,
+    decrementStepTries,
+    reorderSteps,
+    setStepLink,
     toggleStepComplete,
     updateMainTask,
     updateStep,
@@ -47,9 +51,21 @@ export default function MainTaskCard({ task }) {
   const [priorityDraft, setPriorityDraft] = useState(task.priority)
   const [newStepRaw, setNewStepRaw] = useState("")
 
+  // Keep draft values in sync with task prop updates (e.g. external edits)
+  useEffect(() => {
+    if (!editingTitle) setTitleDraft(task.title)
+  }, [task.title, editingTitle])
+  useEffect(() => {
+    if (!editingProof) setProofDraft(task.proof)
+  }, [task.proof, editingProof])
+  useEffect(() => {
+    if (!editingPriority) setPriorityDraft(task.priority)
+  }, [task.priority, editingPriority])
+
   const status = computeStatus(task)
   const isActive = activeMainTaskId === task.id
   const isCompleted = task.status === "completed"
+  const sortedSteps = sortStepsWithLinks(task.steps, { includeCompleted: true })
   const completedSteps = task.steps.filter((s) => s.completed).length
   const totalSteps = task.steps.length
 
@@ -164,8 +180,29 @@ export default function MainTaskCard({ task }) {
             {task.steps.length === 0 && (
               <p className="mtask-empty">No steps yet.</p>
             )}
-            {task.steps.map((step) => {
+            {sortedSteps.map((step, stepIdx) => {
               const parsed = parseStepRaw(step.raw)
+              const sourceIndex = task.steps.findIndex((candidate) => candidate.id === step.id)
+              const prevSourceIndex =
+                stepIdx > 0
+                  ? task.steps.findIndex(
+                      (candidate) => candidate.id === sortedSteps[stepIdx - 1].id,
+                    )
+                  : -1
+              const nextSourceIndex =
+                stepIdx < sortedSteps.length - 1
+                  ? task.steps.findIndex(
+                      (candidate) => candidate.id === sortedSteps[stepIdx + 1].id,
+                    )
+                  : -1
+              const linkedBefore =
+                task.steps.find((candidate) => candidate.linkedAfter === step.id)
+                  ?.id || ""
+              const linkValue = step.linkedAfter
+                ? `after:${step.linkedAfter}`
+                : linkedBefore
+                  ? `before:${linkedBefore}`
+                  : ""
               return (
                 <div key={step.id} className="mtask-step-row">
                   <input
@@ -173,7 +210,6 @@ export default function MainTaskCard({ task }) {
                     className="mtask-step-check"
                     checked={step.completed}
                     onChange={() => toggleStepComplete(task.id, step.id)}
-                    id={`step-${step.id}`}
                   />
                   <input
                     type="text"
@@ -187,14 +223,83 @@ export default function MainTaskCard({ task }) {
                   {parsed.minutes > 0 && (
                     <span className="mtask-step-time">{parsed.minutes}m</span>
                   )}
-                  <button
-                    type="button"
-                    className="mtask-step-remove"
-                    onClick={() => removeStepFromTask(task.id, step.id)}
-                    title="Remove step"
-                  >
-                    ×
-                  </button>
+                  <div className="mtask-step-right">
+                    <button
+                      type="button"
+                      className="mtask-step-ctrl"
+                      onClick={() => reorderSteps(task.id, sourceIndex, prevSourceIndex)}
+                      disabled={stepIdx === 0}
+                      title="Move step up"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="mtask-step-ctrl"
+                      onClick={() => reorderSteps(task.id, sourceIndex, nextSourceIndex)}
+                      disabled={stepIdx === task.steps.length - 1}
+                      title="Move step down"
+                    >
+                      ↓
+                    </button>
+                    <span className="mtask-step-tries-count">
+                      {step.tries || 0}×
+                    </span>
+                    <button
+                      type="button"
+                      className="mtask-step-ctrl"
+                      onClick={() => decrementStepTries(task.id, step.id)}
+                      title="Decrease step tries"
+                    >
+                      -
+                    </button>
+                    <button
+                      type="button"
+                      className="mtask-step-ctrl"
+                      onClick={() => incrementStepTries(task.id, step.id)}
+                      title="Increase step tries"
+                    >
+                      +
+                    </button>
+                    <select
+                      className="mtask-step-link-select"
+                      value={linkValue}
+                      onChange={(e) =>
+                        setStepLink(task.id, step.id, e.target.value)
+                      }
+                      title="Linked ordering"
+                    >
+                      <option value="">🔗 free</option>
+                      {task.steps
+                        .filter((s) => s.id !== step.id)
+                        .map((s) => {
+                          const p = parseStepRaw(s.raw)
+                          return (
+                            <option key={`before-${s.id}`} value={`before:${s.id}`}>
+                              before: {p.text || s.raw}
+                            </option>
+                          )
+                        })}
+                      {task.steps
+                        .filter((s) => s.id !== step.id)
+                        .map((s) => {
+                          const p = parseStepRaw(s.raw)
+                          return (
+                            <option key={`after-${s.id}`} value={`after:${s.id}`}>
+                              after: {p.text || s.raw}
+                            </option>
+                          )
+                        })}
+                    </select>
+                    <button
+                      type="button"
+                      className="mtask-step-remove"
+                      onClick={() => removeStepFromTask(task.id, step.id)}
+                      title="Remove step"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
               )
             })}

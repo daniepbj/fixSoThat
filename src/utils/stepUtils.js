@@ -36,3 +36,39 @@ export function parseStepBlock(block) {
 export function genStepId() {
     return `s-${Math.random().toString(36).slice(2, 9)}`
 }
+
+/**
+ * Sort steps respecting linkedAfter ordering constraints.
+ * A step with linkedAfter must appear directly after its parent step.
+ */
+export function sortStepsWithLinks(steps, options = {}) {
+    if (!steps || steps.length === 0) return []
+    const includeCompleted = Boolean(options.includeCompleted)
+    const workingSet = includeCompleted ? steps : steps.filter(s => !s.completed)
+    if (workingSet.length === 0) return []
+
+    // Start with stable order-based sort
+    const working = [...workingSet].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+
+    // Enforce linkedAfter constraints iteratively (bounded to prevent loops)
+    let maxPasses = working.length + 1
+    let changed = true
+    while (changed && maxPasses-- > 0) {
+        changed = false
+        for (let i = 0; i < working.length; i++) {
+            const step = working[i]
+            if (!step.linkedAfter) continue
+            const parentIdx = working.findIndex(s => s.id === step.linkedAfter)
+            if (parentIdx < 0) continue
+            if (parentIdx + 1 !== i) {
+                working.splice(i, 1)
+                const np = working.findIndex(s => s.id === step.linkedAfter)
+                if (np >= 0) working.splice(np + 1, 0, step)
+                else working.push(step)
+                changed = true
+                break
+            }
+        }
+    }
+    return working
+}

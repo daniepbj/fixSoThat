@@ -1,5 +1,5 @@
 import { useMainTask } from "../context/MainTaskContext"
-import { parseStepRaw } from "../utils/stepUtils"
+import { parseStepRaw, sortStepsWithLinks } from "../utils/stepUtils"
 
 export default function SidebarTaskSteps() {
   const {
@@ -10,6 +10,8 @@ export default function SidebarTaskSteps() {
     completeMainTask,
     incrementTries,
     decrementTries,
+    incrementStepTries,
+    decrementStepTries,
   } = useMainTask()
 
   const task = mainTasks.find((t) => t.id === activeMainTaskId)
@@ -19,6 +21,7 @@ export default function SidebarTaskSteps() {
   const completedCount = task.steps.filter((s) => s.completed).length
   const totalCount = task.steps.length
   const allDone = totalCount > 0 && completedCount === totalCount
+  const sortedSteps = sortStepsWithLinks(task.steps, { includeCompleted: true })
 
   return (
     <div className="sidebar-steps">
@@ -46,10 +49,10 @@ export default function SidebarTaskSteps() {
       )}
 
       <div className="sidebar-steps__list">
-        {task.steps.map((step) => {
+        {sortedSteps.map((step) => {
           const parsed = parseStepRaw(step.raw)
           return (
-            <label key={step.id} className="sidebar-step">
+            <div key={step.id} className="sidebar-step">
               <input
                 type="checkbox"
                 checked={step.completed}
@@ -63,7 +66,26 @@ export default function SidebarTaskSteps() {
               {parsed.minutes > 0 && (
                 <span className="sidebar-step__time">{parsed.minutes}m</span>
               )}
-            </label>
+              <span className="sidebar-step__step-tries">
+                {step.tries || 0}×
+                <button
+                  type="button"
+                  className="sidebar-step__tries-btn"
+                  onClick={() => decrementStepTries(task.id, step.id)}
+                  title="Decrease step tries"
+                >
+                  -
+                </button>
+                <button
+                  type="button"
+                  className="sidebar-step__tries-btn"
+                  onClick={() => incrementStepTries(task.id, step.id)}
+                  title="Increase step tries"
+                >
+                  +
+                </button>
+              </span>
+            </div>
           )
         })}
       </div>

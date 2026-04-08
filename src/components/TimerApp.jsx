@@ -16,7 +16,7 @@ import { TimerProvider } from "../context/TimerContext"
 import { useMainTask } from "../context/MainTaskContext"
 import "../timer.css"
 import { playAlarmOnce } from "../utils/alarm"
-import { parseStepRaw } from "../utils/stepUtils"
+import { parseStepRaw, sortStepsWithLinks } from "../utils/stepUtils"
 import {
   addTrackFromFile,
   deleteTrack,
@@ -32,7 +32,7 @@ const MAX_TASK_SECONDS = 60 * 60
 
 function clampMinutes(value, fallback = 25) {
   const num = Number(value)
-  if (!Number.isFinite(num)) return fallback
+  if (!Number.isFinite(num) || num <= 0) return fallback
   return Math.max(1, Math.min(60, Math.round(num)))
 }
 
@@ -65,8 +65,13 @@ function normalizeTask(task) {
 }
 
 export default function TimerApp({ sidebarMode = false }) {
-  const { mainTasks, activeMainTaskId, setStepCompleted, incrementTries } =
-    useMainTask()
+  const {
+    mainTasks,
+    activeMainTaskId,
+    setStepCompleted,
+    incrementTries,
+    incrementStepTries,
+  } = useMainTask()
 
   // All defaults are [] / {} because initStorageIfNew already populated localStorage
   const [activeTasks, setActiveTasks] = useLocalStorage("fst_active", [])
@@ -151,46 +156,42 @@ export default function TimerApp({ sidebarMode = false }) {
           .map((t) => [t.sourceStepId, t]),
       )
 
-      const next = activeMainTask.steps
-        .filter((s) => !s.completed)
-        .sort((a, b) => a.order - b.order)
-        .map((step) => {
-          const parsed = parseStepRaw(step.raw)
-          const safeMinutes = clampMinutes(
-            parsed.minutes,
-            settings.defaultTaskDuration,
-          )
-          const existing = prevByStepId.get(step.id)
+      const next = sortStepsWithLinks(activeMainTask.steps).map((step) => {
+        const parsed = parseStepRaw(step.raw)
+        const safeMinutes = clampMinutes(
+          parsed.minutes,
+          settings.defaultTaskDuration,
+        )
+        const existing = prevByStepId.get(step.id)
 
-          if (existing) {
-            return {
-              ...existing,
-              title: parsed.text || step.raw || "Step",
-              estimatedMinutes: safeMinutes,
-              sourceMainTaskId: activeMainTask.id,
-              sourceStepId: step.id,
-            }
-          }
-
-          return createTask({
+        if (existing) {
+          return {
+            ...existing,
             title: parsed.text || step.raw || "Step",
             estimatedMinutes: safeMinutes,
             sourceMainTaskId: activeMainTask.id,
             sourceStepId: step.id,
-            emoji: "✅",
-            color: "#10b981",
-          })
+          }
+        }
+
+        return createTask({
+          title: parsed.text || step.raw || "Step",
+          estimatedMinutes: safeMinutes,
+          sourceMainTaskId: activeMainTask.id,
+          sourceStepId: step.id,
+          emoji: "✅",
+          color: "#10b981",
         })
+      })
 
       return next
     })
-    setCurrentView("timer")
+    // Note: do NOT setCurrentView here — user may be on settings or another view
   }, [
     activeMainTask,
     activeMainTaskId,
     settings.defaultTaskDuration,
     setActiveTasks,
-    setCurrentView,
   ])
 
   // ── Timer tick ───────────────────────────────────────────────────────────
@@ -244,6 +245,12 @@ export default function TimerApp({ sidebarMode = false }) {
       const key = `${currentTask.sourceMainTaskId}:${currentTask.id}:${currentTask.remainingSeconds}`
       if (lastTryIncrementKeyRef.current !== key) {
         incrementTries(currentTask.sourceMainTaskId)
+        if (currentTask.sourceStepId) {
+          incrementStepTries(
+            currentTask.sourceMainTaskId,
+            currentTask.sourceStepId,
+          )
+        }
         lastTryIncrementKeyRef.current = key
       }
     }
@@ -254,7 +261,9 @@ export default function TimerApp({ sidebarMode = false }) {
     currentTask?.remainingSeconds,
     currentTask?.id,
     currentTask?.sourceMainTaskId,
+    currentTask?.sourceStepId,
     incrementTries,
+    incrementStepTries,
     timerRunning,
   ])
 
@@ -291,10 +300,24 @@ export default function TimerApp({ sidebarMode = false }) {
     audio.volume = Math.max(0, Math.min(1, Number(musicVolume) || 0))
     audio.loop = Boolean(musicLoop)
     audio.muted = Boolean(musicMuted)
+    // Keep preview volume in sync with the same slider
+    if (previewAudioRef.current) {
+      previewAudioRef.current.volume = Math.max(
+        0,
+        Math.min(1, Number(musicVolume) || 0),
+      )
+    }
   }, [musicVolume, musicLoop, musicMuted])
 
   useEffect(() => {
-    if (!selectedTrackId) return
+    if (!uploadedTracks.length) {
+      if (selectedTrackId) setSelectedTrackId("")
+      return
+    }
+    if (!selectedTrackId) {
+      setSelectedTrackId(uploadedTracks[0].id)
+      return
+    }
     const found = uploadedTracks.some((t) => t.id === selectedTrackId)
     if (!found) {
       setSelectedTrackId(uploadedTracks[0]?.id ?? "")
@@ -510,6 +533,7 @@ export default function TimerApp({ sidebarMode = false }) {
     previewUrlRef.current = URL.createObjectURL(row.blob)
     preview.src = previewUrlRef.current
     preview.volume = Math.max(0, Math.min(1, Number(musicVolume) || 0))
+    preview.muted = Boolean(musicMuted)
     preview.loop = false
 
     preview.onended = () => setPreviewTrackId("")
@@ -530,6 +554,12 @@ export default function TimerApp({ sidebarMode = false }) {
     // If user resumes from the alarm state, count it as a retry attempt.
     if (alarmActive && currentTask.sourceMainTaskId) {
       incrementTries(currentTask.sourceMainTaskId)
+      if (currentTask.sourceStepId) {
+        incrementStepTries(
+          currentTask.sourceMainTaskId,
+          currentTask.sourceStepId,
+        )
+      }
     }
 
     playClickSound(musicVolume)
@@ -569,6 +599,9 @@ export default function TimerApp({ sidebarMode = false }) {
     const task = activeTasks.find((t) => t.id === id)
     if (task?.sourceMainTaskId) {
       incrementTries(task.sourceMainTaskId)
+      if (task.sourceStepId) {
+        incrementStepTries(task.sourceMainTaskId, task.sourceStepId)
+      }
     }
 
     setActiveTasks((prev) =>

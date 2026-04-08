@@ -120,7 +120,7 @@ function buildToDoChunks({ goal, steps, proof }, maxSize = MAX_CHUNK_SIZE) {
 }
 
 export default function StructuredTaskBuilder() {
-  const { addMainTaskAndActivate } = useMainTask()
+  const { addMainTask } = useMainTask()
 
   const [goal, setGoal] = useState("")
   const [steps, setSteps] = useState([{ id: genStepId(), raw: "" }])
@@ -266,7 +266,7 @@ export default function StructuredTaskBuilder() {
 
   function handleLoadIntoTasks() {
     const validSteps = steps.filter((s) => s.raw.trim().length > 0)
-    addMainTaskAndActivate({
+    addMainTask({
       title: goal.trim(),
       steps: validSteps,
       proof: proof.trim(),
