@@ -8,8 +8,7 @@ export default function FixaPresetPanel() {
     saveFixaPreset,
     deleteFixaPreset,
     addMainTaskAndActivate,
-  } =
-    useMainTask()
+  } = useMainTask()
 
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState("")

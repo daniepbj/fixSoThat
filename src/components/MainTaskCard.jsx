@@ -179,7 +179,9 @@ export default function MainTaskCard({ task }) {
                     type="text"
                     className={`mtask-step-edit ${step.completed ? "mtask-step-text--done" : ""}`}
                     value={step.raw}
-                    onChange={(e) => updateStep(task.id, step.id, e.target.value)}
+                    onChange={(e) =>
+                      updateStep(task.id, step.id, e.target.value)
+                    }
                     placeholder="Step name 5"
                   />
                   {parsed.minutes > 0 && (

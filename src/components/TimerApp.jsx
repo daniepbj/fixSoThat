@@ -116,7 +116,8 @@ export default function TimerApp({ sidebarMode = false }) {
 
   // First task is always the "current" active task tied to the timer
   const currentTask = activeTasks[0] ?? null
-  const activeMainTask = mainTasks.find((t) => t.id === activeMainTaskId) || null
+  const activeMainTask =
+    mainTasks.find((t) => t.id === activeMainTaskId) || null
   const settingsRef = useRef(settings)
   settingsRef.current = settings
 
