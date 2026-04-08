@@ -296,6 +296,198 @@ body {
   margin-left: 12px;
 }
 
+/* Dynamic Steps Section */
+.task-builder-steps-section {
+  margin: 20px 0 0;
+  padding: 0;
+  border: none;
+}
+
+.task-builder-legend {
+  display: block;
+  font-weight: 700;
+  color: var(--text-soft);
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.task-builder-hint {
+  margin: 8px 0;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.task-builder-empty-hint {
+  margin: 0 0 8px;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.task-step-list {
+  margin: 12px 0;
+  display: grid;
+  gap: 10px;
+}
+
+.task-step-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  transition: background 0.15s ease;
+}
+
+.task-step-row:focus-within {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.task-step-number {
+  min-width: 28px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.task-step-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0;
+  outline: none;
+}
+
+.task-step-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.task-step-time-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 70px;
+  justify-content: flex-end;
+}
+
+.task-time-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+  padding: 0;
+}
+
+.task-time-btn:hover:not(:disabled),
+.task-time-btn:focus-visible:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.4);
+  outline: none;
+}
+
+.task-time-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.task-time-display {
+  display: inline-block;
+  min-width: 32px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.task-step-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.task-control-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+  padding: 0;
+}
+
+.task-control-btn:hover:not(:disabled),
+.task-control-btn:focus-visible:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.4);
+  outline: none;
+}
+
+.task-control-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.task-control-btn--remove {
+  border-color: rgba(233, 91, 91, 0.3);
+  color: #ffa0a0;
+}
+
+.task-control-btn--remove:hover:not(:disabled) {
+  background: rgba(233, 91, 91, 0.2);
+  border-color: rgba(233, 91, 91, 0.5);
+}
+
+.task-builder-add-step-btn {
+  margin: 8px 0 0;
+  width: 100%;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-soft);
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.task-builder-add-step-btn:hover,
+.task-builder-add-step-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.45);
+  outline: none;
+}
+
 @media (max-width: 640px) {
   .task-builder-card {
     padding: 18px;
@@ -309,5 +501,30 @@ body {
   .task-check-label--llama {
     margin-left: 0;
     margin-top: 10px;
+  }
+
+  .task-step-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .task-step-input {
+    width: 100%;
+    order: 2;
+  }
+
+  .task-step-number {
+    order: 1;
+  }
+
+  .task-step-time-controls {
+    order: 3;
+    justify-content: flex-start;
+  }
+
+  .task-step-controls {
+    order: 4;
+    justify-content: flex-end;
+    width: 100%;
   }
 }
