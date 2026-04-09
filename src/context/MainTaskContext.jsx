@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect } from "react"
+import { playPowerUpSound, playCompletionSound } from "../utils/soundEffects"
 import confetti from "canvas-confetti"
 import { useLocalStorage } from "../hooks/useLocalStorage"
 import {
@@ -33,7 +34,12 @@ function normalizeStep(step, order) {
     raw: step?.raw || "",
     completed: Boolean(step?.completed),
     parentId: step?.parentId ?? null,
-    order: typeof step?.order === "number" ? step.order : (typeof order === "number" ? order : 0),
+    order:
+      typeof step?.order === "number"
+        ? step.order
+        : typeof order === "number"
+          ? order
+          : 0,
     tries: Math.max(0, Number(step?.tries) || 0),
   }
 }
@@ -113,7 +119,10 @@ function normalizeTask(task) {
   const rawSteps = Array.isArray(task?.steps) ? task.steps : []
 
   let flatSteps
-  if (rawSteps.length > 0 && rawSteps.some((s) => "substeps" in s || "children" in s)) {
+  if (
+    rawSteps.length > 0 &&
+    rawSteps.some((s) => "substeps" in s || "children" in s)
+  ) {
     // Old embedded format: flatten to flat array with parentId
     flatSteps = flattenTreeToSteps(rawSteps, null)
   } else {
@@ -125,7 +134,8 @@ function normalizeTask(task) {
   const validIds = new Set(flatSteps.map((s) => s.id))
   flatSteps = flatSteps.map((s) => ({
     ...s,
-    parentId: s.parentId != null && validIds.has(s.parentId) ? s.parentId : null,
+    parentId:
+      s.parentId != null && validIds.has(s.parentId) ? s.parentId : null,
   }))
 
   // Bottom-up completion normalization
@@ -238,7 +248,10 @@ export function MainTaskProvider({ children }) {
       ),
     )
     if (activeMainTaskId === id) setActiveMainTaskId("")
-    triggerBigCelebration()
+    playPowerUpSound().then(() => {
+      playCompletionSound()
+      triggerBigCelebration()
+    })
   }
 
   function restoreMainTask(id) {
@@ -290,7 +303,11 @@ export function MainTaskProvider({ children }) {
               const step = findStepById(t.steps, stepId)
               if (!step) return t
               const nextCompleted = !step.completed
-              const branchedSteps = setBranchCompleted(t.steps, stepId, nextCompleted)
+              const branchedSteps = setBranchCompleted(
+                t.steps,
+                stepId,
+                nextCompleted,
+              )
               const next = normalizeTask({
                 ...t,
                 steps: branchedSteps,
@@ -317,7 +334,11 @@ export function MainTaskProvider({ children }) {
           ? (() => {
               const step = findStepById(t.steps, stepId)
               if (!step) return t
-              const branchedSteps = setBranchCompleted(t.steps, stepId, completed)
+              const branchedSteps = setBranchCompleted(
+                t.steps,
+                stepId,
+                completed,
+              )
               const next = normalizeTask({
                 ...t,
                 steps: branchedSteps,
@@ -452,7 +473,8 @@ export function MainTaskProvider({ children }) {
         if (direction === "down" && idx >= siblings.length - 1) return t
         const swapStep = siblings[direction === "up" ? idx - 1 : idx + 1]
         const stepOrd = step.order ?? idx
-        const swapOrd = swapStep.order ?? (direction === "up" ? idx - 1 : idx + 1)
+        const swapOrd =
+          swapStep.order ?? (direction === "up" ? idx - 1 : idx + 1)
         const newSteps = t.steps.map((s) => {
           if (s.id === stepId) return { ...s, order: swapOrd }
           if (s.id === swapStep.id) return { ...s, order: stepOrd }
@@ -476,11 +498,13 @@ export function MainTaskProvider({ children }) {
         if (stepId === (newParentId ?? null)) return t
         // Prevent reparenting into own subtree
         const descendants = getDescendants(t.steps, stepId)
-        if (newParentId && descendants.some((d) => d.id === newParentId)) return t
-        const order = maxSiblingOrder(
-          t.steps.filter((s) => s.id !== stepId),
-          newParentId ?? null,
-        ) + 1
+        if (newParentId && descendants.some((d) => d.id === newParentId))
+          return t
+        const order =
+          maxSiblingOrder(
+            t.steps.filter((s) => s.id !== stepId),
+            newParentId ?? null,
+          ) + 1
         const newSteps = t.steps.map((s) =>
           s.id === stepId ? { ...s, parentId: newParentId ?? null, order } : s,
         )
@@ -747,7 +771,7 @@ export function MainTaskProvider({ children }) {
     reparentStep,
     promoteStep,
     demoteStep,
-      moveStepNextTo,
+    moveStepNextTo,
     toggleStepComplete,
     setStepCompleted,
     updateStep,
