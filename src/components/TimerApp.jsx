@@ -18,6 +18,7 @@ import "../timer.css"
 import { playAlarmOnce } from "../utils/alarm"
 import {
   parseStepRaw,
+  formatStepRaw,
   sortStepsWithLinks,
   getChildren,
 } from "../utils/stepUtils"
@@ -91,6 +92,7 @@ export default function TimerApp({ sidebarMode = false }) {
   const {
     mainTasks,
     activeMainTaskId,
+    addMainTaskAndActivate,
     setStepCompleted,
     incrementTries,
     incrementStepTries,
@@ -179,7 +181,12 @@ export default function TimerApp({ sidebarMode = false }) {
           .map((t) => [t.sourceStepId, t]),
       )
 
-      const next = flattenActionableSteps(activeMainTask.steps)
+      // Keep tasks that don't belong to this main task (manually added or from other sources)
+      const unrelated = prev.filter(
+        (t) => t.sourceMainTaskId !== activeMainTask.id,
+      )
+
+      const synced = flattenActionableSteps(activeMainTask.steps)
         .filter((step) => !step.completed)
         .map((step) => {
           const parsed = parseStepRaw(step.raw)
@@ -209,7 +216,7 @@ export default function TimerApp({ sidebarMode = false }) {
           })
         })
 
-      return next
+      return [...synced, ...unrelated]
     })
     // Note: do NOT setCurrentView here — user may be on settings or another view
   }, [
@@ -654,6 +661,26 @@ export default function TimerApp({ sidebarMode = false }) {
 
   function addTask(taskData) {
     const toAdd = Array.isArray(taskData) ? taskData : [taskData]
+    if (toAdd.some((d) => !d.sourceMainTaskId)) {
+      // Create a main task with each item as a step, then activate it.
+      // The sync effect will generate the corresponding timer tasks.
+      const steps = toAdd.map((d) => {
+        // Parse trailing number from title: "example task 3" → text="example task", minutes=3
+        const parsed = parseStepRaw(d.title || "New Task")
+        const mins = parsed.minutes > 0
+          ? parsed.minutes
+          : clampMinutes(d.estimatedMinutes, settings.defaultTaskDuration)
+        return { raw: formatStepRaw(parsed.text || d.title || "New Task", mins) }
+      })
+      const firstParsed = parseStepRaw(toAdd[0].title || "New Task")
+      const title =
+        toAdd.length === 1
+          ? firstParsed.text || toAdd[0].title || "New Task"
+          : `${toAdd.length} tasks`
+      addMainTaskAndActivate({ title, steps })
+      return
+    }
+    // Tasks already linked to a main task — add directly
     setActiveTasks((prev) => [
       ...prev,
       ...toAdd.map((data) => {
