@@ -22,7 +22,7 @@ export function formatStepRaw(text, minutes) {
 }
 
 /**
- * Parse a block of text (multi-line) into step objects.
+ * Parse a block of text (multi-line) into step objects (flat, no nesting).
  * Each non-empty line becomes one step.
  */
 export function parseStepBlock(block) {
@@ -33,42 +33,159 @@ export function parseStepBlock(block) {
         .map((raw) => ({ id: genStepId(), raw }))
 }
 
+function stripStepPrefix(text) {
+    return text
+        .replace(/^\s*[-*]\s+/, "")
+        .replace(/^\s*\d+[.)]\s+/, "")
+        .trim()
+}
+
+/**
+ * Parse a step block into a nested tree using indentation.
+ * Two leading spaces equals one nesting level. Tabs are treated as two spaces.
+ * Returns an array of embedded-tree nodes (used for initial parse before flattening).
+ */
+export function parseStepBlockTree(block) {
+    const lines = String(block || "")
+        .replace(/\r\n/g, "\n")
+        .split("\n")
+        .map((line) => ({
+            raw: line,
+            expanded: line.replace(/\t/g, "  "),
+        }))
+        .filter(({ expanded }) => expanded.trim().length > 0)
+
+    if (!lines.length) return []
+
+    const roots = []
+    const stack = [{ depth: -1, children: roots }]
+
+    for (const line of lines) {
+        const indentMatch = line.expanded.match(/^\s*/)
+        const indent = indentMatch ? indentMatch[0].length : 0
+        const requestedDepth = Math.floor(indent / 2)
+        const maxNextDepth = stack[stack.length - 1].depth + 1
+        const depth = Math.max(0, Math.min(requestedDepth, maxNextDepth))
+        const cleaned = stripStepPrefix(line.expanded)
+        if (!cleaned) continue
+
+        while (stack.length > 1 && stack[stack.length - 1].depth >= depth) {
+            stack.pop()
+        }
+
+        const parent = stack[stack.length - 1]
+        const node = {
+            id: genStepId(),
+            raw: cleaned,
+            substeps: [],
+        }
+        parent.children.push(node)
+        stack.push({ depth, children: node.substeps })
+    }
+
+    return roots
+}
+
 export function genStepId() {
     return `s-${Math.random().toString(36).slice(2, 9)}`
 }
 
+// ── Flat model utilities ─────────────────────────────────────────────────────
+
 /**
- * Sort steps respecting linkedAfter ordering constraints.
- * A step with linkedAfter must appear directly after its parent step.
+ * Flatten an embedded-tree (old format with substeps arrays) into a flat array
+ * with parentId references. Preserves existing IDs.
+ */
+export function flattenTreeToSteps(embeddedSteps, parentId = null) {
+    const result = []
+    const visit = (nodes, pid) => {
+        const list = Array.isArray(nodes) ? nodes : []
+        list.forEach((node, i) => {
+            const step = {
+                id: node.id || genStepId(),
+                raw: node.raw || "",
+                completed: Boolean(node.completed),
+                parentId: pid,
+                order: typeof node.order === "number" ? node.order : i,
+                tries: Math.max(0, Number(node.tries) || 0),
+            }
+            result.push(step)
+            const children = Array.isArray(node.substeps) ? node.substeps
+                : Array.isArray(node.children) ? node.children
+                    : []
+            if (children.length) visit(children, step.id)
+        })
+    }
+    visit(embeddedSteps, parentId)
+    return result
+}
+
+/**
+ * Return direct children of parentId (null = root), sorted by order.
+ */
+export function getChildren(flatSteps, parentId) {
+    return (flatSteps || [])
+        .filter((s) => (s.parentId ?? null) === (parentId ?? null))
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+}
+
+/**
+ * Return all descendants of stepId (all depths).
+ */
+export function getDescendants(flatSteps, stepId) {
+    const result = []
+    const queue = [stepId]
+    while (queue.length) {
+        const pid = queue.shift()
+        const children = (flatSteps || []).filter((s) => s.parentId === pid)
+        for (const c of children) {
+            result.push(c)
+            queue.push(c.id)
+        }
+    }
+    return result
+}
+
+/**
+ * Compute the depth of a step (0 = root).
+ */
+export function getDepth(flatSteps, stepId) {
+    let depth = 0
+    let current = (flatSteps || []).find((s) => s.id === stepId)
+    while (current && current.parentId != null) {
+        depth++
+        current = (flatSteps || []).find((s) => s.id === current.parentId)
+    }
+    return depth
+}
+
+/**
+ * Build a render tree: array of { ...step, children: [...] } nodes
+ * for display purposes only. Does NOT mutate input.
+ */
+export function buildRenderTree(flatSteps, parentId = null) {
+    const children = getChildren(flatSteps, parentId)
+    return children.map((step) => ({
+        ...step,
+        children: buildRenderTree(flatSteps, step.id),
+    }))
+}
+
+/**
+ * Sort a flat array of SIBLING steps (same parentId) by order.
+ * Kept for backward-compat import in TimerApp.
+ */
+export function sortStepsByOrder(steps) {
+    return [...(steps || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+}
+
+/**
+ * Thin wrapper kept for backward-compat (TimerApp imports this).
+ * Now just sorts by order — linkedAfter system has been removed.
  */
 export function sortStepsWithLinks(steps, options = {}) {
     if (!steps || steps.length === 0) return []
     const includeCompleted = Boolean(options.includeCompleted)
-    const workingSet = includeCompleted ? steps : steps.filter(s => !s.completed)
-    if (workingSet.length === 0) return []
-
-    // Start with stable order-based sort
-    const working = [...workingSet].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-
-    // Enforce linkedAfter constraints iteratively (bounded to prevent loops)
-    let maxPasses = working.length + 1
-    let changed = true
-    while (changed && maxPasses-- > 0) {
-        changed = false
-        for (let i = 0; i < working.length; i++) {
-            const step = working[i]
-            if (!step.linkedAfter) continue
-            const parentIdx = working.findIndex(s => s.id === step.linkedAfter)
-            if (parentIdx < 0) continue
-            if (parentIdx + 1 !== i) {
-                working.splice(i, 1)
-                const np = working.findIndex(s => s.id === step.linkedAfter)
-                if (np >= 0) working.splice(np + 1, 0, step)
-                else working.push(step)
-                changed = true
-                break
-            }
-        }
-    }
-    return working
+    const workingSet = includeCompleted ? steps : steps.filter((s) => !s.completed)
+    return sortStepsByOrder(workingSet)
 }

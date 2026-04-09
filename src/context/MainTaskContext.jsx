@@ -1,7 +1,12 @@
 import { createContext, useContext, useEffect } from "react"
 import confetti from "canvas-confetti"
 import { useLocalStorage } from "../hooks/useLocalStorage"
-import { genStepId } from "../utils/stepUtils"
+import {
+  genStepId,
+  parseStepBlockTree,
+  flattenTreeToSteps,
+  getDescendants,
+} from "../utils/stepUtils"
 
 const MainTaskContext = createContext(null)
 
@@ -9,14 +14,16 @@ function genTaskId() {
   return `mt-${Math.random().toString(36).slice(2, 10)}`
 }
 
-function makeStep(raw, order) {
+// ── Flat step helpers ────────────────────────────────────────────────────
+
+function makeStep(raw, order, parentId = null, options = {}) {
   return {
-    id: genStepId(),
+    id: options.id || genStepId(),
     raw: raw || "",
-    completed: false,
-    order,
-    tries: 0,
-    linkedAfter: null,
+    completed: Boolean(options.completed),
+    parentId: parentId ?? null,
+    order: typeof order === "number" ? order : 0,
+    tries: Math.max(0, Number(options.tries) || 0),
   }
 }
 
@@ -25,15 +32,77 @@ function normalizeStep(step, order) {
     id: step?.id || genStepId(),
     raw: step?.raw || "",
     completed: Boolean(step?.completed),
-    order,
+    parentId: step?.parentId ?? null,
+    order: typeof step?.order === "number" ? step.order : (typeof order === "number" ? order : 0),
     tries: Math.max(0, Number(step?.tries) || 0),
-    linkedAfter: step?.linkedAfter || null,
   }
 }
 
+// Bottom-up completion propagation: if all children done → parent done
+function normalizeCompletionFlat(flatSteps) {
+  const steps = flatSteps.map((s) => ({ ...s }))
+  let changed = true
+  let maxPasses = steps.length + 2
+  while (changed && maxPasses-- > 0) {
+    changed = false
+    for (const step of steps) {
+      const children = steps.filter((s) => s.parentId === step.id)
+      if (children.length === 0) continue
+      const allDone = children.every((c) => c.completed)
+      if (step.completed !== allDone) {
+        step.completed = allDone
+        changed = true
+      }
+    }
+  }
+  return steps
+}
+
+function countTreeStats(flatSteps) {
+  let total = 0
+  let completed = 0
+  for (const s of flatSteps || []) {
+    total++
+    if (s.completed) completed++
+  }
+  return { total, completed }
+}
+
+// Mark a step and all its descendants as completed/uncompleted
+function setBranchCompleted(flatSteps, stepId, completed) {
+  const descendants = getDescendants(flatSteps, stepId)
+  const ids = new Set([stepId, ...descendants.map((d) => d.id)])
+  return (flatSteps || []).map((s) =>
+    ids.has(s.id) ? { ...s, completed: Boolean(completed) } : s,
+  )
+}
+
+function updateStepById(flatSteps, stepId, updater) {
+  let found = false
+  const steps = (flatSteps || []).map((s) => {
+    if (s.id === stepId) {
+      found = true
+      return updater(s)
+    }
+    return s
+  })
+  return { steps, found }
+}
+
+function removeStepById(flatSteps, stepId) {
+  const descendants = getDescendants(flatSteps, stepId)
+  const ids = new Set([stepId, ...descendants.map((d) => d.id)])
+  return { steps: (flatSteps || []).filter((s) => !ids.has(s.id)), found: true }
+}
+
+function findStepById(flatSteps, stepId) {
+  return (flatSteps || []).find((s) => s.id === stepId) || null
+}
+
 function deriveTaskStatus(task) {
-  const totalSteps = task.steps.length
-  const completedSteps = task.steps.filter((step) => step.completed).length
+  const { total: totalSteps, completed: completedSteps } = countTreeStats(
+    task.steps,
+  )
   if (totalSteps > 0 && completedSteps === totalSteps) return "completed"
   return task.status === "completed" && completedSteps !== totalSteps
     ? "active"
@@ -41,20 +110,46 @@ function deriveTaskStatus(task) {
 }
 
 function normalizeTask(task) {
-  const steps = (task?.steps || []).map((step, index) =>
-    normalizeStep(step, index),
-  )
+  const rawSteps = Array.isArray(task?.steps) ? task.steps : []
+
+  let flatSteps
+  if (rawSteps.length > 0 && rawSteps.some((s) => "substeps" in s || "children" in s)) {
+    // Old embedded format: flatten to flat array with parentId
+    flatSteps = flattenTreeToSteps(rawSteps, null)
+  } else {
+    // Already flat: normalize each step
+    flatSteps = rawSteps.map((s, i) => normalizeStep(s, i))
+  }
+
+  // Remove dangling parentId references (after step deletions etc.)
+  const validIds = new Set(flatSteps.map((s) => s.id))
+  flatSteps = flatSteps.map((s) => ({
+    ...s,
+    parentId: s.parentId != null && validIds.has(s.parentId) ? s.parentId : null,
+  }))
+
+  // Bottom-up completion normalization
+  flatSteps = normalizeCompletionFlat(flatSteps)
+
   return {
     id: task?.id || genTaskId(),
     title: task?.title || "",
-    steps,
+    steps: flatSteps,
     proof: task?.proof || "",
     priority: task?.priority || "",
-    status: deriveTaskStatus({ ...task, steps }),
+    status: deriveTaskStatus({ ...task, steps: flatSteps }),
     tries: Math.max(0, Number(task?.tries) || 0),
     createdAt: task?.createdAt || new Date().toISOString(),
     updatedAt: task?.updatedAt || new Date().toISOString(),
   }
+}
+
+// Max order among siblings of a given parentId
+function maxSiblingOrder(flatSteps, parentId) {
+  const siblings = (flatSteps || []).filter(
+    (s) => (s.parentId ?? null) === (parentId ?? null),
+  )
+  return siblings.length ? Math.max(...siblings.map((s) => s.order ?? 0)) : -1
 }
 
 export function MainTaskProvider({ children }) {
@@ -103,9 +198,7 @@ export function MainTaskProvider({ children }) {
     const task = normalizeTask({
       id: genTaskId(),
       title: taskData.title || "",
-      steps: (taskData.steps || []).map((s, i) =>
-        makeStep(typeof s === "string" ? s : s.raw, i),
-      ),
+      steps: Array.isArray(taskData.steps) ? taskData.steps : [],
       proof: taskData.proof || "",
       priority: taskData.priority || "",
       status: "active",
@@ -194,11 +287,13 @@ export function MainTaskProvider({ children }) {
       prev.map((t) =>
         t.id === taskId
           ? (() => {
+              const step = findStepById(t.steps, stepId)
+              if (!step) return t
+              const nextCompleted = !step.completed
+              const branchedSteps = setBranchCompleted(t.steps, stepId, nextCompleted)
               const next = normalizeTask({
                 ...t,
-                steps: t.steps.map((s) =>
-                  s.id === stepId ? { ...s, completed: !s.completed } : s,
-                ),
+                steps: branchedSteps,
                 updatedAt: new Date().toISOString(),
               })
               becameCompleted =
@@ -220,11 +315,12 @@ export function MainTaskProvider({ children }) {
       prev.map((t) =>
         t.id === taskId
           ? (() => {
+              const step = findStepById(t.steps, stepId)
+              if (!step) return t
+              const branchedSteps = setBranchCompleted(t.steps, stepId, completed)
               const next = normalizeTask({
                 ...t,
-                steps: t.steps.map((s) =>
-                  s.id === stepId ? { ...s, completed: Boolean(completed) } : s,
-                ),
+                steps: branchedSteps,
                 updatedAt: new Date().toISOString(),
               })
               becameCompleted =
@@ -246,7 +342,10 @@ export function MainTaskProvider({ children }) {
         t.id === taskId
           ? normalizeTask({
               ...t,
-              steps: t.steps.map((s) => (s.id === stepId ? { ...s, raw } : s)),
+              steps: updateStepById(t.steps, stepId, (current) => ({
+                ...current,
+                raw,
+              })).steps,
               updatedAt: new Date().toISOString(),
             })
           : t,
@@ -256,15 +355,15 @@ export function MainTaskProvider({ children }) {
 
   function addStepToTask(taskId, raw = "") {
     setMainTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? normalizeTask({
-              ...t,
-              steps: [...t.steps, makeStep(raw, t.steps.length)],
-              updatedAt: new Date().toISOString(),
-            })
-          : t,
-      ),
+      prev.map((t) => {
+        if (t.id !== taskId) return t
+        const order = maxSiblingOrder(t.steps, null) + 1
+        return normalizeTask({
+          ...t,
+          steps: [...t.steps, makeStep(raw, order, null)],
+          updatedAt: new Date().toISOString(),
+        })
+      }),
     )
   }
 
@@ -280,9 +379,7 @@ export function MainTaskProvider({ children }) {
         t.id === taskId
           ? normalizeTask({
               ...t,
-              steps: t.steps
-                .filter((s) => s.id !== stepId)
-                .map((s, i) => ({ ...s, order: i })),
+              steps: removeStepById(t.steps, stepId).steps,
               updatedAt: new Date().toISOString(),
             })
           : t,
@@ -296,9 +393,10 @@ export function MainTaskProvider({ children }) {
         t.id === taskId
           ? normalizeTask({
               ...t,
-              steps: t.steps.map((s) =>
-                s.id === stepId ? { ...s, tries: (s.tries || 0) + 1 } : s,
-              ),
+              steps: updateStepById(t.steps, stepId, (current) => ({
+                ...current,
+                tries: (current.tries || 0) + 1,
+              })).steps,
               updatedAt: new Date().toISOString(),
             })
           : t,
@@ -312,11 +410,10 @@ export function MainTaskProvider({ children }) {
         t.id === taskId
           ? normalizeTask({
               ...t,
-              steps: t.steps.map((s) =>
-                s.id === stepId
-                  ? { ...s, tries: Math.max(0, (s.tries || 0) - 1) }
-                  : s,
-              ),
+              steps: updateStepById(t.steps, stepId, (current) => ({
+                ...current,
+                tries: Math.max(0, (current.tries || 0) - 1),
+              })).steps,
               updatedAt: new Date().toISOString(),
             })
           : t,
@@ -324,71 +421,204 @@ export function MainTaskProvider({ children }) {
     )
   }
 
-  function reorderSteps(taskId, fromIndex, toIndex) {
+  // Add a child step under parentStepId
+  function addSubstep(taskId, parentStepId, raw = "") {
     setMainTasks((prev) =>
       prev.map((t) => {
         if (t.id !== taskId) return t
-        if (
-          fromIndex < 0 ||
-          toIndex < 0 ||
-          fromIndex >= t.steps.length ||
-          toIndex >= t.steps.length
-        ) {
-          return t
-        }
-        const steps = [...t.steps]
-        const [item] = steps.splice(fromIndex, 1)
-        steps.splice(toIndex, 0, item)
+        if (!findStepById(t.steps, parentStepId)) return t
+        const order = maxSiblingOrder(t.steps, parentStepId) + 1
         return normalizeTask({
           ...t,
-          steps: steps.map((s, i) => ({ ...s, order: i })),
+          steps: [...t.steps, makeStep(raw, order, parentStepId)],
           updatedAt: new Date().toISOString(),
         })
       }),
     )
   }
 
-  function setStepLink(taskId, stepId, relationValue) {
+  // Move a step up or down among its siblings (subtree follows automatically)
+  function reorderStep(taskId, stepId, direction) {
     setMainTasks((prev) =>
-      prev.map((t) =>
-        t.id !== taskId
-          ? t
-          : normalizeTask({
-              ...t,
-              steps: (() => {
-                const steps = t.steps.map((s) => ({ ...s }))
-                for (const step of steps) {
-                  if (step.id === stepId || step.linkedAfter === stepId) {
-                    step.linkedAfter = null
-                  }
-                }
-                if (!relationValue) return steps
-
-                const [relation, targetId] = relationValue.split(":")
-                if (!targetId) return steps
-
-                if (relation === "after") {
-                  return steps.map((step) =>
-                    step.id === stepId
-                      ? { ...step, linkedAfter: targetId }
-                      : step,
-                  )
-                }
-
-                if (relation === "before") {
-                  return steps.map((step) =>
-                    step.id === targetId
-                      ? { ...step, linkedAfter: stepId }
-                      : step,
-                  )
-                }
-
-                return steps
-              })(),
-              updatedAt: new Date().toISOString(),
-            }),
-      ),
+      prev.map((t) => {
+        if (t.id !== taskId) return t
+        const step = t.steps.find((s) => s.id === stepId)
+        if (!step) return t
+        const siblings = t.steps
+          .filter((s) => (s.parentId ?? null) === (step.parentId ?? null))
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        const idx = siblings.findIndex((s) => s.id === stepId)
+        if (direction === "up" && idx <= 0) return t
+        if (direction === "down" && idx >= siblings.length - 1) return t
+        const swapStep = siblings[direction === "up" ? idx - 1 : idx + 1]
+        const stepOrd = step.order ?? idx
+        const swapOrd = swapStep.order ?? (direction === "up" ? idx - 1 : idx + 1)
+        const newSteps = t.steps.map((s) => {
+          if (s.id === stepId) return { ...s, order: swapOrd }
+          if (s.id === swapStep.id) return { ...s, order: stepOrd }
+          return s
+        })
+        return normalizeTask({
+          ...t,
+          steps: newSteps,
+          updatedAt: new Date().toISOString(),
+        })
+      }),
     )
+  }
+
+  // Move a step under a different parent (descendants follow automatically)
+  function reparentStep(taskId, stepId, newParentId) {
+    setMainTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t
+        if (!t.steps.find((s) => s.id === stepId)) return t
+        if (stepId === (newParentId ?? null)) return t
+        // Prevent reparenting into own subtree
+        const descendants = getDescendants(t.steps, stepId)
+        if (newParentId && descendants.some((d) => d.id === newParentId)) return t
+        const order = maxSiblingOrder(
+          t.steps.filter((s) => s.id !== stepId),
+          newParentId ?? null,
+        ) + 1
+        const newSteps = t.steps.map((s) =>
+          s.id === stepId ? { ...s, parentId: newParentId ?? null, order } : s,
+        )
+        return normalizeTask({
+          ...t,
+          steps: newSteps,
+          updatedAt: new Date().toISOString(),
+        })
+      }),
+    )
+  }
+
+  // Promote a step one level up (parentId → grandparentId), placed after current parent
+  function promoteStep(taskId, stepId) {
+    setMainTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t
+        const step = t.steps.find((s) => s.id === stepId)
+        if (!step || step.parentId == null) return t
+        const parent = t.steps.find((s) => s.id === step.parentId)
+        if (!parent) return t
+        const grandparentId = parent.parentId ?? null
+        const parentOrder = parent.order ?? 0
+        // Place right after parent in grandparent group; use fractional order then renumber
+        const newSteps = t.steps.map((s) =>
+          s.id === stepId
+            ? { ...s, parentId: grandparentId, order: parentOrder + 0.5 }
+            : s,
+        )
+        // Renumber grandparent group to integers
+        const gpGroup = newSteps
+          .filter((s) => (s.parentId ?? null) === (grandparentId ?? null))
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        const renumbered = new Map(gpGroup.map((s, i) => [s.id, i]))
+        const finalSteps = newSteps.map((s) =>
+          renumbered.has(s.id) ? { ...s, order: renumbered.get(s.id) } : s,
+        )
+        return normalizeTask({
+          ...t,
+          steps: finalSteps,
+          updatedAt: new Date().toISOString(),
+        })
+      }),
+    )
+  }
+
+  // Demote a step under its previous sibling (becomes that sibling's last child)
+  function demoteStep(taskId, stepId) {
+    setMainTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t
+        const step = t.steps.find((s) => s.id === stepId)
+        if (!step) return t
+        const siblings = t.steps
+          .filter((s) => (s.parentId ?? null) === (step.parentId ?? null))
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        const idx = siblings.findIndex((s) => s.id === stepId)
+        if (idx <= 0) return t
+        const prevSibling = siblings[idx - 1]
+        const order = maxSiblingOrder(t.steps, prevSibling.id) + 1
+        const newSteps = t.steps.map((s) =>
+          s.id === stepId ? { ...s, parentId: prevSibling.id, order } : s,
+        )
+        return normalizeTask({
+          ...t,
+          steps: newSteps,
+          updatedAt: new Date().toISOString(),
+        })
+      }),
+    )
+  }
+
+  // Move sourceId next to targetId as a sibling ("before" or "after")
+  function moveStepNextTo(taskId, sourceId, targetId, zone) {
+    setMainTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t
+        const source = t.steps.find((s) => s.id === sourceId)
+        const target = t.steps.find((s) => s.id === targetId)
+        if (!source || !target) return t
+        // Prevent dropping into own subtree
+        const descendants = getDescendants(t.steps, sourceId)
+        if (descendants.some((d) => d.id === targetId)) return t
+        const targetParentId = target.parentId ?? null
+        const targetOrder = target.order ?? 0
+        // Place source in target's parent group at a fractional order
+        const offset = zone === "before" ? -0.5 : 0.5
+        const newSteps = t.steps.map((s) =>
+          s.id === sourceId
+            ? { ...s, parentId: targetParentId, order: targetOrder + offset }
+            : s,
+        )
+        // Renumber siblings to clean integers
+        const group = newSteps
+          .filter((s) => (s.parentId ?? null) === (targetParentId ?? null))
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        const renumbered = new Map(group.map((s, i) => [s.id, i]))
+        const finalSteps = newSteps.map((s) =>
+          renumbered.has(s.id) ? { ...s, order: renumbered.get(s.id) } : s,
+        )
+        return normalizeTask({
+          ...t,
+          steps: finalSteps,
+          updatedAt: new Date().toISOString(),
+        })
+      }),
+    )
+  }
+
+  function breakDownStepWithFixa(taskId, stepId, stepsBlock) {
+    const parsed = parseStepBlockTree(stepsBlock || "")
+    if (!parsed.length) return false
+
+    // Flatten the parsed embedded tree into flat steps with stepId as the root parent
+    const newFlatSteps = flattenTreeToSteps(parsed, stepId)
+
+    let applied = false
+    setMainTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t
+        if (!findStepById(t.steps, stepId)) return t
+        // Offset root-level new children's orders so they append after existing children
+        const existingChildMaxOrder = maxSiblingOrder(t.steps, stepId)
+        const adjustedSteps = newFlatSteps.map((s) =>
+          (s.parentId ?? null) === (stepId ?? null)
+            ? { ...s, order: s.order + existingChildMaxOrder + 1 }
+            : s,
+        )
+        applied = true
+        return normalizeTask({
+          ...t,
+          steps: [...t.steps, ...adjustedSteps],
+          updatedAt: new Date().toISOString(),
+        })
+      }),
+    )
+
+    return applied
   }
 
   // ── Save/load slots ─────────────────────────────────────────────────────
@@ -512,13 +742,18 @@ export function MainTaskProvider({ children }) {
     decrementTries,
     incrementStepTries,
     decrementStepTries,
-    reorderSteps,
-    setStepLink,
+    reorderStep,
+    addSubstep,
+    reparentStep,
+    promoteStep,
+    demoteStep,
+      moveStepNextTo,
     toggleStepComplete,
     setStepCompleted,
     updateStep,
     addStepToTask,
     removeStepFromTask,
+    breakDownStepWithFixa,
     saveSlot,
     loadSlot,
     clearSlot,

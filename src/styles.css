@@ -853,6 +853,20 @@ body {
   box-shadow: 0 0 0 1px rgba(255, 210, 123, 0.22);
 }
 
+.mtask-step-row--drop-before {
+  border-top: 3px solid rgba(100, 200, 255, 0.8);
+}
+
+.mtask-step-row--drop-after {
+  border-bottom: 3px solid rgba(100, 200, 255, 0.8);
+}
+
+.mtask-step-row--drop-into {
+  border-color: rgba(137, 246, 187, 0.7);
+  box-shadow: 0 0 0 2px rgba(137, 246, 187, 0.25);
+  background: rgba(137, 246, 187, 0.08);
+}
+
 .mtask-step-drag {
   width: 26px;
   height: 26px;
@@ -871,6 +885,19 @@ body {
 
 .mtask-step-drag:active {
   cursor: grabbing;
+}
+
+.mtask-step-indent {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-soft);
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .mtask-step-text {
@@ -917,6 +944,12 @@ body {
 .mtask-step-ctrl:disabled {
   opacity: 0.28;
   cursor: not-allowed;
+}
+
+.mtask-step-ctrl--label {
+  width: auto;
+  min-width: 48px;
+  padding: 0 6px;
 }
 
 .mtask-step-tries-count {
@@ -998,6 +1031,18 @@ body {
   width: 24px;
   height: 24px;
   cursor: pointer;
+}
+
+.mtask-step-add-child {
+  display: flex;
+  gap: 6px;
+  padding: 4px 0;
+  align-items: center;
+}
+
+.mtask-step-add-child .mtask-add-step-input {
+  flex: 1;
+  min-width: 0;
 }
 
 .mtask-add-step-form {

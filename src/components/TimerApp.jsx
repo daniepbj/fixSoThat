@@ -16,7 +16,11 @@ import { TimerProvider } from "../context/TimerContext"
 import { useMainTask } from "../context/MainTaskContext"
 import "../timer.css"
 import { playAlarmOnce } from "../utils/alarm"
-import { parseStepRaw, sortStepsWithLinks } from "../utils/stepUtils"
+import {
+  parseStepRaw,
+  sortStepsWithLinks,
+  getChildren,
+} from "../utils/stepUtils"
 import {
   addTrackFromFile,
   deleteTrack,
@@ -62,6 +66,25 @@ function normalizeTask(task) {
     spentSeconds: Math.max(0, Number(task.spentSeconds) || 0),
     adhdFlags: normalizeAdhdFlags(task.adhdFlags),
   }
+}
+
+function flattenActionableSteps(steps) {
+  // Flat model: steps is a flat array with parentId + order.
+  // DFS through hierarchy, collecting leaf steps.
+  const flattened = []
+  const visit = (parentId) => {
+    const children = getChildren(steps, parentId)
+    for (const step of children) {
+      const grandchildren = getChildren(steps, step.id)
+      if (grandchildren.length === 0) {
+        flattened.push(step)
+      } else {
+        visit(step.id)
+      }
+    }
+  }
+  visit(null)
+  return flattened
 }
 
 export default function TimerApp({ sidebarMode = false }) {
@@ -156,33 +179,35 @@ export default function TimerApp({ sidebarMode = false }) {
           .map((t) => [t.sourceStepId, t]),
       )
 
-      const next = sortStepsWithLinks(activeMainTask.steps).map((step) => {
-        const parsed = parseStepRaw(step.raw)
-        const safeMinutes = clampMinutes(
-          parsed.minutes,
-          settings.defaultTaskDuration,
-        )
-        const existing = prevByStepId.get(step.id)
+      const next = flattenActionableSteps(activeMainTask.steps)
+        .filter((step) => !step.completed)
+        .map((step) => {
+          const parsed = parseStepRaw(step.raw)
+          const safeMinutes = clampMinutes(
+            parsed.minutes,
+            settings.defaultTaskDuration,
+          )
+          const existing = prevByStepId.get(step.id)
 
-        if (existing) {
-          return {
-            ...existing,
+          if (existing) {
+            return {
+              ...existing,
+              title: parsed.text || step.raw || "Step",
+              estimatedMinutes: safeMinutes,
+              sourceMainTaskId: activeMainTask.id,
+              sourceStepId: step.id,
+            }
+          }
+
+          return createTask({
             title: parsed.text || step.raw || "Step",
             estimatedMinutes: safeMinutes,
             sourceMainTaskId: activeMainTask.id,
             sourceStepId: step.id,
-          }
-        }
-
-        return createTask({
-          title: parsed.text || step.raw || "Step",
-          estimatedMinutes: safeMinutes,
-          sourceMainTaskId: activeMainTask.id,
-          sourceStepId: step.id,
-          emoji: "✅",
-          color: "#10b981",
+            emoji: "✅",
+            color: "#10b981",
+          })
         })
-      })
 
       return next
     })
