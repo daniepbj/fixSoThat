@@ -1,15 +1,10 @@
 import { useState } from "react"
 import { useMainTask } from "../context/MainTaskContext"
+import { fmtLocalDateTime } from "../utils/timeUtils"
 
 function formatSavedAt(iso) {
   if (!iso) return ""
-  const d = new Date(iso)
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+  return fmtLocalDateTime(iso)
 }
 
 export default function SaveLoadPanel() {

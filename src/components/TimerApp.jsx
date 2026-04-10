@@ -98,6 +98,8 @@ export default function TimerApp({ sidebarMode = false }) {
     incrementStepTries,
   } = useMainTask()
 
+  const mountedRef = useRef(false)
+
   // All defaults are [] / {} because initStorageIfNew already populated localStorage
   const [activeTasks, setActiveTasks] = useLocalStorage("fst_active", [])
   const [completedTasks, setCompletedTasks] = useLocalStorage(
@@ -157,9 +159,12 @@ export default function TimerApp({ sidebarMode = false }) {
   }
 
   // One-time data normalization for older localStorage schemas.
-  // Also reset timerRunning on mount — prevents ghost timers from persisted state.
+  // Also reset timerRunning on first mount — prevents ghost timers from persisted state.
   useEffect(() => {
-    setTimerRunning(false)
+    if (!mountedRef.current) {
+      mountedRef.current = true
+      setTimerRunning(false)
+    }
     setActiveTasks((prev) => prev.map(normalizeTask))
     setDeferredTasks((prev) => prev.map(normalizeTask))
     setSettings((prev) => ({
@@ -902,7 +907,6 @@ export default function TimerApp({ sidebarMode = false }) {
     (sum, t) => sum + t.remainingSeconds,
     0,
   )
-  const projectedEndTime = new Date(Date.now() + totalRemainingSeconds * 1000)
 
   const timerContextValue = {
     currentTask,
@@ -967,7 +971,7 @@ export default function TimerApp({ sidebarMode = false }) {
     >
       <TopBar
         sessionSeconds={sessionSeconds}
-        projectedEndTime={projectedEndTime}
+        totalRemainingSeconds={totalRemainingSeconds}
         settings={settings}
         setSettings={setSettings}
         theme={theme}

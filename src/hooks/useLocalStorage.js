@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 /**
  * Drop-in replacement for useState that also persists to localStorage.
  * Uses JSON serialisation – works with objects, arrays, primitives.
+ * The returned setter is stable (same reference across renders), just like useState.
  */
 export function useLocalStorage(key, initialValue, transform) {
   const [stored, setStored] = useState(() => {
@@ -15,7 +16,7 @@ export function useLocalStorage(key, initialValue, transform) {
     }
   });
 
-  const setValue = (value) => {
+  const setValue = useCallback((value) => {
     try {
       setStored((prev) => {
         const next = typeof value === 'function' ? value(prev) : value;
@@ -25,7 +26,7 @@ export function useLocalStorage(key, initialValue, transform) {
     } catch (e) {
       console.error('useLocalStorage write error:', e);
     }
-  };
+  }, [key]);
 
   return [stored, setValue];
 }

@@ -1,6 +1,32 @@
+import { useState } from "react"
+import { getAutoTimezone, getTimezoneOverride, setTimezoneOverride } from "../utils/timeUtils"
+
 export default function SettingsView({ settings, setSettings, music }) {
+  const [tzOverride, setTzOverride] = useState(getTimezoneOverride())
+  const [tzInput, setTzInput] = useState(tzOverride)
+  const [tzError, setTzError] = useState("")
+
   function update(key, value) {
     setSettings((s) => ({ ...s, [key]: value }))
+  }
+
+  function handleTzApply() {
+    const trimmed = tzInput.trim()
+    setTimezoneOverride(trimmed)
+    const effective = getTimezoneOverride()
+    if (trimmed && !effective) {
+      setTzError("Invalid timezone. Use IANA format like Europe/Oslo")
+    } else {
+      setTzError("")
+      setTzOverride(effective)
+    }
+  }
+
+  function handleTzClear() {
+    setTimezoneOverride("")
+    setTzOverride("")
+    setTzInput("")
+    setTzError("")
   }
 
   function onUpload(event) {
@@ -94,6 +120,32 @@ export default function SettingsView({ settings, setSettings, music }) {
             className="settings-number"
           />
         </label>
+
+        <div className="settings-row settings-row--block">
+          <span className="settings-row__label">Timezone override</span>
+          <p className="settings-help-text">
+            Auto-detected: <strong>{getAutoTimezone()}</strong>.
+            {tzOverride ? <> Override: <strong>{tzOverride}</strong>.</> : " Set a manual timezone if your browser spoofs it (e.g. LibreWolf)."}
+          </p>
+          <div className="tz-override-row">
+            <input
+              type="text"
+              placeholder="e.g. Europe/Oslo"
+              value={tzInput}
+              onChange={(e) => setTzInput(e.target.value)}
+              className="settings-text-input"
+              list="tz-suggestions"
+            />
+            <datalist id="tz-suggestions">
+              {["Europe/Oslo","Europe/London","Europe/Berlin","Europe/Paris","Europe/Stockholm","America/New_York","America/Chicago","America/Denver","America/Los_Angeles","Asia/Tokyo","Asia/Shanghai","Australia/Sydney","Pacific/Auckland","UTC"].map(z => (
+                <option key={z} value={z} />
+              ))}
+            </datalist>
+            <button type="button" className="quick-btn" onClick={handleTzApply}>Apply</button>
+            {tzOverride && <button type="button" className="quick-btn quick-btn--danger" onClick={handleTzClear}>Clear</button>}
+          </div>
+          {tzError && <p className="settings-warn-text">{tzError}</p>}
+        </div>
 
         <div className="settings-row settings-row--block">
           <span className="settings-row__label">Task music</span>

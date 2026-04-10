@@ -1,9 +1,4 @@
-function fmtDuration(seconds) {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
-}
+import { fmtDurationHuman, isToday } from "../utils/timeUtils"
 
 export default function ReportView({
   activeTasks,
@@ -11,10 +6,7 @@ export default function ReportView({
   deferredTasks,
   sessionSeconds,
 }) {
-  const today = new Date().toDateString()
-  const todayCompleted = completedTasks.filter(
-    (t) => new Date(t.completedAt).toDateString() === today,
-  )
+  const todayCompleted = completedTasks.filter((t) => isToday(t.completedAt))
   const totalFocusSeconds = completedTasks.reduce(
     (sum, t) => sum + t.spentSeconds,
     0,
@@ -22,9 +14,9 @@ export default function ReportView({
 
   const stats = [
     { value: completedTasks.length, label: "Total completed" },
-    { value: fmtDuration(totalFocusSeconds), label: "Total focus time" },
+    { value: fmtDurationHuman(totalFocusSeconds), label: "Total focus time" },
     { value: todayCompleted.length, label: "Completed today" },
-    { value: fmtDuration(sessionSeconds), label: "Session time" },
+    { value: fmtDurationHuman(sessionSeconds), label: "Session time" },
     { value: activeTasks.length, label: "Active tasks" },
     { value: deferredTasks.length, label: "Deferred tasks" },
   ]

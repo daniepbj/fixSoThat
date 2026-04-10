@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { useMainTask } from "../context/MainTaskContext"
 import { parseStepRaw, buildRenderTree, getDepth } from "../utils/stepUtils"
+import { fmtLocalDate } from "../utils/timeUtils"
 
 const REASON_LABELS = {
   know_why: "I know why it didn't work",
@@ -574,7 +575,7 @@ export default function MainTaskCard({ task }) {
                             </span>
                             <span className="mtask-retry-history-date">
                               {entry.createdAt
-                                ? new Date(entry.createdAt).toLocaleDateString()
+                                ? fmtLocalDate(entry.createdAt)
                                 : ""}
                             </span>
                           </div>

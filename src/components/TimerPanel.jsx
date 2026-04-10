@@ -1,10 +1,5 @@
 import { useTimerContext } from "../context/TimerContext"
-
-function fmtDisplay(seconds) {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-}
+import { fmtTimerDisplay } from "../utils/timeUtils"
 
 export default function TimerPanel() {
   const {
@@ -16,7 +11,7 @@ export default function TimerPanel() {
     stopAlarm,
   } = useTimerContext()
   const remaining = currentTask?.remainingSeconds ?? 0
-  const total = (currentTask?.estimatedMinutes ?? 60) * 60
+  const total = 60 * 60
   const progress = Math.max(0, Math.min(1, remaining / total))
 
   // SVG ring
@@ -61,7 +56,7 @@ export default function TimerPanel() {
           00
         </div>
         <div className="timer-ring__center">
-          <div className="timer-display">{fmtDisplay(remaining)}</div>
+          <div className="timer-display">{fmtTimerDisplay(remaining)}</div>
           {currentTask && (
             <div className="timer-task-label">
               {currentTask.emoji} {currentTask.title}

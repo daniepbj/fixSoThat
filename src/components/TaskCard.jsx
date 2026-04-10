@@ -1,21 +1,7 @@
 import { useState } from "react"
 import { useTimerContext } from "../context/TimerContext"
 import { useMainTask } from "../context/MainTaskContext"
-
-function fmtSeconds(s) {
-  const m = Math.floor(s / 60)
-  const sec = s % 60
-  return `${m}:${String(sec).padStart(2, "0")}`
-}
-
-function fmtTime(date) {
-  if (!date) return "—"
-  return date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
-}
+import { fmtDuration, projectedEndTimeLocal } from "../utils/timeUtils"
 
 export default function TaskCard({
   task,
@@ -37,7 +23,6 @@ export default function TaskCard({
   const { addSubstep } = useMainTask()
   const [showSubstepInput, setShowSubstepInput] = useState(false)
   const [substepRaw, setSubstepRaw] = useState("")
-  const projectedEnd = new Date(Date.now() + task.remainingSeconds * 1000)
   const flags = {
     needsSteps: false,
     needsTime: false,
@@ -120,9 +105,9 @@ export default function TaskCard({
         <div className="task-card__info">
           <span className="task-card__title">{task.title}</span>
           <span className="task-card__times">
-            {fmtSeconds(task.remainingSeconds)} left &nbsp;·&nbsp;
-            {fmtSeconds(task.spentSeconds)} spent &nbsp;·&nbsp;→{" "}
-            {fmtTime(projectedEnd)}
+            {fmtDuration(task.remainingSeconds)} left &nbsp;·&nbsp;
+            {fmtDuration(task.spentSeconds)} spent &nbsp;·&nbsp;→{" "}
+            {projectedEndTimeLocal(task.remainingSeconds)}
           </span>
         </div>
         <div

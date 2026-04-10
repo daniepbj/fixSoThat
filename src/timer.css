@@ -979,6 +979,25 @@
   text-align: center;
 }
 
+.settings-text-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--ta-input);
+  border: 1px solid var(--ta-border);
+  border-radius: 8px;
+  color: var(--ta-text);
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.tz-override-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
 /* Alarm-mode radio cards */
 .settings-row--block {
   flex-direction: column;
