@@ -8,9 +8,9 @@ function fmtSeconds(s) {
   return `${m}:${String(sec).padStart(2, "0")}`
 }
 
-function fmtTime(iso) {
-  if (!iso) return "—"
-  return new Date(iso).toLocaleTimeString([], {
+function fmtTime(date) {
+  if (!date) return "—"
+  return date.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -122,7 +122,7 @@ export default function TaskCard({
           <span className="task-card__times">
             {fmtSeconds(task.remainingSeconds)} left &nbsp;·&nbsp;
             {fmtSeconds(task.spentSeconds)} spent &nbsp;·&nbsp;→{" "}
-            {fmtTime(projectedEnd.toISOString())}
+            {fmtTime(projectedEnd)}
           </span>
         </div>
         <div

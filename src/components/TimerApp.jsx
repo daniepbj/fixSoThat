@@ -157,7 +157,9 @@ export default function TimerApp({ sidebarMode = false }) {
   }
 
   // One-time data normalization for older localStorage schemas.
+  // Also reset timerRunning on mount — prevents ghost timers from persisted state.
   useEffect(() => {
+    setTimerRunning(false)
     setActiveTasks((prev) => prev.map(normalizeTask))
     setDeferredTasks((prev) => prev.map(normalizeTask))
     setSettings((prev) => ({
@@ -166,7 +168,7 @@ export default function TimerApp({ sidebarMode = false }) {
       matchMainPageStyle: Boolean(prev.matchMainPageStyle),
       alarmMode: prev.alarmMode ?? (prev.soundEnabled ? "nag" : "silent"),
     }))
-  }, [setActiveTasks, setDeferredTasks, setSettings])
+  }, [setActiveTasks, setDeferredTasks, setSettings, setTimerRunning])
 
   // Keep timer tasks synced with the currently active main task.
   useEffect(() => {
@@ -230,10 +232,12 @@ export default function TimerApp({ sidebarMode = false }) {
   useEffect(() => {
     if (!timerRunning) return
     const id = setInterval(() => {
+      let ticked = false
       setActiveTasks((prev) => {
         if (!prev.length) return prev
         const [head, ...tail] = prev
         if (head.remainingSeconds <= 0) return prev
+        ticked = true
         return [
           {
             ...head,
@@ -243,10 +247,18 @@ export default function TimerApp({ sidebarMode = false }) {
           ...tail,
         ]
       })
-      setSessionSeconds((s) => s + 1)
+      // Only count session time when a task actually ticked
+      if (ticked) setSessionSeconds((s) => s + 1)
     }, 1000)
     return () => clearInterval(id)
   }, [timerRunning])
+
+  // ── Stop timer when there are no active tasks ────────────────────────────
+  useEffect(() => {
+    if (timerRunning && activeTasks.length === 0) {
+      setTimerRunning(false)
+    }
+  }, [activeTasks.length, timerRunning, setTimerRunning])
 
   // ── Alarm ────────────────────────────────────────────────────────────────
   function triggerAlarm() {
@@ -667,10 +679,13 @@ export default function TimerApp({ sidebarMode = false }) {
       const steps = toAdd.map((d) => {
         // Parse trailing number from title: "example task 3" → text="example task", minutes=3
         const parsed = parseStepRaw(d.title || "New Task")
-        const mins = parsed.minutes > 0
-          ? parsed.minutes
-          : clampMinutes(d.estimatedMinutes, settings.defaultTaskDuration)
-        return { raw: formatStepRaw(parsed.text || d.title || "New Task", mins) }
+        const mins =
+          parsed.minutes > 0
+            ? parsed.minutes
+            : clampMinutes(d.estimatedMinutes, settings.defaultTaskDuration)
+        return {
+          raw: formatStepRaw(parsed.text || d.title || "New Task", mins),
+        }
       })
       const firstParsed = parseStepRaw(toAdd[0].title || "New Task")
       const title =

@@ -16,7 +16,7 @@ export default function TimerPanel() {
     stopAlarm,
   } = useTimerContext()
   const remaining = currentTask?.remainingSeconds ?? 0
-  const total = 60 * 60
+  const total = (currentTask?.estimatedMinutes ?? 60) * 60
   const progress = Math.max(0, Math.min(1, remaining / total))
 
   // SVG ring
