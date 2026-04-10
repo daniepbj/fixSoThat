@@ -2,6 +2,15 @@ import { useState, useEffect } from "react"
 import { useMainTask } from "../context/MainTaskContext"
 import { parseStepRaw, buildRenderTree, getDepth } from "../utils/stepUtils"
 
+const REASON_LABELS = {
+  know_why: "I know why it didn't work",
+  stuck_unknown: "I don't know why I'm stuck",
+  needs_smaller_steps: "I need smaller steps",
+  needs_different_order: "I need a different order",
+  interrupted: "Interrupted / waiting",
+  needs_simplification: "Need to simplify",
+}
+
 function StatusBadge({ label, isGreen }) {
   return (
     <span
@@ -61,6 +70,7 @@ export default function MainTaskCard({ task }) {
   const [newSubstepRaw, setNewSubstepRaw] = useState("")
   const [draggedStepId, setDraggedStepId] = useState(null)
   const [dropTarget, setDropTarget] = useState(null) // { id, zone: "before"|"after"|"into" }
+  const [retryHistoryOpen, setRetryHistoryOpen] = useState(false)
 
   // Keep draft values in sync with task prop updates (e.g. external edits)
   useEffect(() => {
@@ -532,6 +542,83 @@ export default function MainTaskCard({ task }) {
               + attempt
             </button>
           </div>
+
+          {/* Retry history */}
+          {Array.isArray(task.retryReflections) &&
+            task.retryReflections.length > 0 && (
+              <div className="mtask-retry-history">
+                <button
+                  type="button"
+                  className="mtask-retry-history-toggle"
+                  onClick={() => setRetryHistoryOpen((v) => !v)}
+                >
+                  <span>{retryHistoryOpen ? "▾" : "▸"}</span>
+                  <span>
+                    Retry reflections ({task.retryReflections.length})
+                  </span>
+                </button>
+                {retryHistoryOpen && (
+                  <div className="mtask-retry-history-entries">
+                    {task.retryReflections.map((entry, idx) => {
+                      const addedStepNames = (entry.addedStepIds || [])
+                        .map((sid) => {
+                          const s = flatSteps.find((st) => st.id === sid)
+                          return s ? parseStepRaw(s.raw).text || s.raw : null
+                        })
+                        .filter(Boolean)
+                      return (
+                        <div key={idx} className="mtask-retry-history-entry">
+                          <div className="mtask-retry-history-entry-header">
+                            <span className="mtask-retry-history-attempt">
+                              Attempt #{entry.atTry}
+                            </span>
+                            <span className="mtask-retry-history-date">
+                              {entry.createdAt
+                                ? new Date(entry.createdAt).toLocaleDateString()
+                                : ""}
+                            </span>
+                          </div>
+                          {entry.reasons?.length > 0 && (
+                            <div className="mtask-retry-history-reasons">
+                              {entry.reasons.map((r) => (
+                                <span
+                                  key={r}
+                                  className="mtask-retry-history-reason"
+                                >
+                                  {REASON_LABELS[r] || r}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {entry.freeText && (
+                            <p className="mtask-retry-history-freetext">
+                              "{entry.freeText}"
+                            </p>
+                          )}
+                          {addedStepNames.length > 0 && (
+                            <div>
+                              <span className="mtask-retry-history-steps-label">
+                                Steps added:
+                              </span>
+                              <div className="mtask-retry-history-steps-list">
+                                {addedStepNames.map((name, si) => (
+                                  <span
+                                    key={si}
+                                    className="mtask-retry-history-step-name"
+                                  >
+                                    • {name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
           {/* Actions */}
           <div className="mtask-card__actions">

@@ -6,7 +6,8 @@ import StructuredTaskBuilder from "./components/StructuredTaskBuilder"
 import MainTaskList from "./components/MainTaskList"
 import FixaPresetPanel from "./components/FixaPresetPanel"
 import SaveLoadPanel from "./components/SaveLoadPanel"
-import { MainTaskProvider } from "./context/MainTaskContext"
+import RetryReflectionModal from "./components/RetryReflectionModal"
+import { MainTaskProvider, useMainTask } from "./context/MainTaskContext"
 import { playClickSound } from "./utils/soundEffects"
 
 export default function App() {
@@ -20,6 +21,16 @@ export default function App() {
 
   return (
     <MainTaskProvider>
+      <AppContent />
+    </MainTaskProvider>
+  )
+}
+
+function AppContent() {
+  const { retryReflectionTaskId } = useMainTask()
+
+  return (
+    <>
       <div className="app-layout">
         {/* ── Left sidebar: focus timer ── */}
         <aside className="app-sidebar">
@@ -36,6 +47,7 @@ export default function App() {
           <SaveLoadPanel />
         </main>
       </div>
-    </MainTaskProvider>
+      {retryReflectionTaskId && <RetryReflectionModal />}
+    </>
   )
 }

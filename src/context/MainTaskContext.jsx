@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect } from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 import { playPowerUpSound, playCompletionSound } from "../utils/soundEffects"
 import confetti from "canvas-confetti"
 import { useLocalStorage } from "../hooks/useLocalStorage"
@@ -149,6 +149,9 @@ function normalizeTask(task) {
     priority: task?.priority || "",
     status: deriveTaskStatus({ ...task, steps: flatSteps }),
     tries: Math.max(0, Number(task?.tries) || 0),
+    retryReflections: Array.isArray(task?.retryReflections)
+      ? task.retryReflections
+      : [],
     createdAt: task?.createdAt || new Date().toISOString(),
     updatedAt: task?.updatedAt || new Date().toISOString(),
   }
@@ -180,6 +183,7 @@ export function MainTaskProvider({ children }) {
     "fst_active_main_task",
     "",
   )
+  const [retryReflectionTaskId, setRetryReflectionTaskId] = useState(null)
 
   useEffect(() => {
     setMainTasks((prev) => prev.map((task) => normalizeTask(task)))
@@ -265,17 +269,24 @@ export function MainTaskProvider({ children }) {
   }
 
   function incrementTries(id) {
+    let newTries = 0
     setMainTasks((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              tries: (t.tries || 0) + 1,
-              updatedAt: new Date().toISOString(),
-            }
-          : t,
-      ),
+      prev.map((t) => {
+        if (t.id !== id) return t
+        newTries = (t.tries || 0) + 1
+        return {
+          ...t,
+          tries: newTries,
+          updatedAt: new Date().toISOString(),
+        }
+      }),
     )
+    // Trigger reflection modal at every multiple of 3
+    setTimeout(() => {
+      if (newTries > 0 && newTries % 3 === 0) {
+        setRetryReflectionTaskId(id)
+      }
+    }, 0)
   }
 
   function decrementTries(id) {
@@ -645,6 +656,59 @@ export function MainTaskProvider({ children }) {
     return applied
   }
 
+  // ── Retry reflection ────────────────────────────────────────────────────
+
+  function saveRetryReflection(taskId, reflectionData) {
+    const {
+      reasons = [],
+      freeText = "",
+      newSteps = [],
+      parentStepId = null,
+    } = reflectionData
+    const addedStepIds = []
+    const now = new Date().toISOString()
+
+    setMainTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t
+        let steps = [...t.steps]
+
+        // Create real substeps from the new steps
+        for (const stepRaw of newSteps) {
+          const raw = (stepRaw || "").trim()
+          if (!raw) continue
+          const effectiveParent = parentStepId ?? null
+          const order = maxSiblingOrder(steps, effectiveParent) + 1
+          const newStep = makeStep(raw, order, effectiveParent)
+          addedStepIds.push(newStep.id)
+          steps = [...steps, newStep]
+        }
+
+        const reflection = {
+          atTry: t.tries || 0,
+          reasons,
+          freeText: freeText || "",
+          addedStepIds,
+          createdAt: now,
+        }
+
+        return normalizeTask({
+          ...t,
+          steps,
+          retryReflections: [...(t.retryReflections || []), reflection],
+          updatedAt: now,
+        })
+      }),
+    )
+
+    setRetryReflectionTaskId(null)
+    return addedStepIds
+  }
+
+  function dismissRetryReflection() {
+    setRetryReflectionTaskId(null)
+  }
+
   // ── Save/load slots ─────────────────────────────────────────────────────
 
   function saveSlot(index, name) {
@@ -756,6 +820,8 @@ export function MainTaskProvider({ children }) {
     fixaPresets,
     activeMainTaskId,
     setActiveMainTaskId,
+    retryReflectionTaskId,
+    setRetryReflectionTaskId,
     addMainTask,
     addMainTaskAndActivate,
     updateMainTask,
@@ -778,6 +844,8 @@ export function MainTaskProvider({ children }) {
     addStepToTask,
     removeStepFromTask,
     breakDownStepWithFixa,
+    saveRetryReflection,
+    dismissRetryReflection,
     saveSlot,
     loadSlot,
     clearSlot,
