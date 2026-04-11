@@ -2088,6 +2088,263 @@ body {
   font-size: 0.9rem;
 }
 
+/* ── ADHD Bridge Builder (new separate card) ── */
+.adhd-bridge-card {
+  width: min(900px, 100%);
+  border: 1px solid var(--card-border);
+  border-radius: 24px;
+  padding: clamp(20px, 4vw, 28px);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+}
+
+.adhd-bridge-title {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.8vw, 1.6rem);
+}
+
+.adhd-bridge-help {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+
+.adhd-bridge-stages {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  margin-bottom: 18px;
+  overflow-x: auto;
+}
+
+.adhd-bridge-stage-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 72px;
+}
+
+.adhd-bridge-stage-dot-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.adhd-bridge-stage-dot-label {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.adhd-bridge-stage-dot--active .adhd-bridge-stage-dot-num {
+  border-color: rgba(52, 209, 149, 0.8);
+  background: rgba(52, 209, 149, 0.22);
+  color: #d8fff0;
+}
+
+.adhd-bridge-stage-dot--done .adhd-bridge-stage-dot-num {
+  border-color: rgba(52, 209, 149, 0.55);
+  background: rgba(52, 209, 149, 0.14);
+  color: #b8ffd9;
+}
+
+.adhd-bridge-stage-dot--active .adhd-bridge-stage-dot-label {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.adhd-bridge-content {
+  display: grid;
+  gap: 8px;
+}
+
+.adhd-bridge-label {
+  margin-top: 6px;
+  font-size: 0.92rem;
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.adhd-bridge-helper {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.86rem;
+}
+
+.adhd-bridge-examples {
+  margin: 4px 0 4px 18px;
+  color: var(--text-soft);
+  font-size: 0.86rem;
+}
+
+.adhd-bridge-input {
+  width: 100%;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  padding: 9px 11px;
+  font: inherit;
+}
+
+.adhd-bridge-textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
+.adhd-bridge-input--minutes {
+  width: 96px;
+}
+
+.adhd-bridge-summary {
+  border: 1px solid rgba(173, 255, 209, 0.3);
+  background: rgba(52, 209, 149, 0.08);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.adhd-bridge-summary p {
+  margin: 0;
+  color: #d8fff0;
+  font-size: 0.88rem;
+}
+
+.adhd-bridge-steps {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.adhd-bridge-step-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.adhd-bridge-step-index {
+  min-width: 20px;
+  text-align: center;
+  color: var(--text-soft);
+  font-weight: 700;
+  font-size: 0.84rem;
+}
+
+.adhd-bridge-add-btn,
+.adhd-bridge-remove-btn,
+.adhd-bridge-nav-btn {
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-main);
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.adhd-bridge-remove-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-color: rgba(255, 145, 145, 0.58);
+  background: rgba(127, 29, 29, 0.34);
+}
+
+.adhd-bridge-add-btn {
+  margin-top: 2px;
+  justify-self: start;
+}
+
+.adhd-bridge-budget {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.adhd-bridge-budget-label {
+  color: var(--text-soft);
+  font-size: 0.86rem;
+}
+
+.adhd-bridge-budget--ok {
+  border-color: rgba(173, 255, 209, 0.4);
+  background: rgba(52, 209, 149, 0.12);
+  color: #d8fff0;
+}
+
+.adhd-bridge-budget--over {
+  border-color: rgba(255, 125, 125, 0.55);
+  background: rgba(127, 29, 29, 0.32);
+  color: #ffbaba;
+}
+
+.adhd-bridge-budget-warning {
+  margin: 4px 0 0;
+  color: #ff9f9f;
+  font-weight: 700;
+}
+
+.adhd-bridge-error {
+  margin: 8px 0 0;
+  color: #ffa0a0;
+  font-weight: 700;
+}
+
+.adhd-bridge-success {
+  margin: 8px 0 0;
+  color: #9effc9;
+  font-weight: 700;
+}
+
+.adhd-bridge-nav {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+}
+
+.adhd-bridge-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.adhd-bridge-nav-btn--next {
+  margin-left: auto;
+  border-color: rgba(173, 255, 209, 0.4);
+  background: rgba(52, 209, 149, 0.12);
+  color: #d7ffe9;
+}
+
+@media (max-width: 640px) {
+  .adhd-bridge-step-row {
+    flex-wrap: wrap;
+  }
+
+  .adhd-bridge-step-row .adhd-bridge-input {
+    width: 100%;
+  }
+
+  .adhd-bridge-input--minutes {
+    width: 100%;
+  }
+
+  .adhd-bridge-remove-btn {
+    margin-left: auto;
+  }
+}
+
 @media (max-width: 1100px) {
   .app-layout {
     grid-template-columns: 1fr;
@@ -2096,5 +2353,690 @@ body {
   .app-sidebar {
     position: static;
     height: auto;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════ */
+/* GSI: Guided Small Improvement Builder (Redesigned 6-Stage)    */
+/* ════════════════════════════════════════════════════════════ */
+
+.gsi-card {
+  width: min(680px, 100%);
+  border: 1px solid var(--card-border);
+  border-radius: 24px;
+  padding: clamp(20px, 4vw, 32px);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gsi-header {
+  text-align: center;
+  margin-bottom: 2px;
+}
+
+.gsi-hero-kicker {
+  margin: 0 0 4px;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  color: #adffed;
+}
+
+.gsi-title {
+  margin: 0;
+  font-size: clamp(1.3rem, 3.5vw, 1.8rem);
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+/* Progress bar with 6 stages */
+.gsi-progress-bar {
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin: 12px 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(173, 255, 209, 0.06);
+  border: 1px solid rgba(173, 255, 209, 0.12);
+}
+
+.gsi-progress-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.gsi-progress-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #adffed;
+  transition: all 0.2s ease;
+}
+
+.gsi-progress-dot--active .gsi-progress-num {
+  background: rgba(52, 209, 149, 0.24);
+  border-color: rgba(173, 255, 209, 0.6);
+}
+
+.gsi-progress-dot--done .gsi-progress-num {
+  opacity: 0.7;
+}
+
+.gsi-progress-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* Stage content */
+.gsi-content {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gsi-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gsi-stage-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Compact summary visible in stages 3+ */
+.gsi-stage-compact-summary {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(173, 255, 209, 0.06);
+  border: 1px solid rgba(173, 255, 209, 0.12);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.gsi-summary-line {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-soft);
+}
+
+.gsi-summary-line strong {
+  color: #adffed;
+  font-weight: 700;
+  min-width: 60px;
+}
+
+.gsi-summary-line span {
+  flex: 1;
+  word-break: break-word;
+}
+
+/* Proof list in summary */
+.gsi-stage-compact-proof {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(173, 255, 209, 0.04);
+  border: 1px solid rgba(173, 255, 209, 0.1);
+  font-size: 0.75rem;
+}
+
+.gsi-stage-compact-proof strong {
+  color: #adffed;
+  font-weight: 700;
+}
+
+.gsi-proof-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 0 0 8px;
+  color: var(--text-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gsi-proof-list li {
+  margin: 0;
+  padding-left: 8px;
+  position: relative;
+}
+
+.gsi-proof-list li:before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #adffed;
+}
+
+/* Labels and hints */
+.gsi-label {
+  display: block;
+  margin: 4px 0 2px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #f8fbff;
+}
+
+.gsi-label--top {
+  margin-top: 8px;
+}
+
+.gsi-hint {
+  margin: 2px 0;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+  line-height: 1.25;
+}
+
+.gsi-example-block {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gsi-example-title {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #adffed;
+}
+
+.gsi-example-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+.gsi-example-list li {
+  position: relative;
+  padding-left: 10px;
+}
+
+.gsi-example-list li:before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #adffed;
+}
+
+/* Inputs */
+.gsi-input {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.86rem;
+  transition: all 0.15s ease;
+}
+
+.gsi-input:focus {
+  outline: none;
+  border-color: rgba(173, 255, 209, 0.5);
+  box-shadow: 0 0 0 2px rgba(173, 255, 209, 0.1);
+}
+
+.gsi-input--number {
+  width: 60px;
+  text-align: center;
+}
+
+.gsi-textarea {
+  resize: vertical;
+  min-height: 55px;
+  padding: 8px 10px;
+}
+
+.gsi-time-input-wrapper {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.gsi-time-unit {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+}
+
+/* Two-field pair (now + good enough) */
+.gsi-two-field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.gsi-two-field-pair > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Proof rows */
+.gsi-proof-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gsi-proof-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.gsi-proof-input {
+  flex: 1;
+}
+
+.gsi-proof-remove-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 100, 100, 0.25);
+  border-radius: 4px;
+  background: rgba(255, 100, 100, 0.08);
+  color: #ffb3b3;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  flex-shrink: 0;
+}
+
+.gsi-proof-remove-btn:hover {
+  background: rgba(255, 100, 100, 0.16);
+}
+
+.gsi-add-proof-btn {
+  margin-top: 2px;
+  padding: 7px 12px;
+  border: 1px solid rgba(173, 255, 209, 0.25);
+  border-radius: 6px;
+  background: rgba(173, 255, 209, 0.08);
+  color: #d7ffe9;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  align-self: flex-start;
+}
+
+.gsi-add-proof-btn:hover {
+  background: rgba(173, 255, 209, 0.14);
+}
+
+/* Step rows - Brainstorm mode (simpler) */
+.gsi-step-rows--brainstorm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gsi-step-row--brainstorm {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.gsi-step-input {
+  flex: 1;
+}
+
+.gsi-step-minutes {
+  width: 50px;
+}
+
+.gsi-step-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fbff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gsi-step-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.gsi-step-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.gsi-step-remove-btn {
+  border-color: rgba(255, 100, 100, 0.25);
+  background: rgba(255, 100, 100, 0.08);
+  color: #ffb3b3;
+}
+
+.gsi-step-remove-btn:hover:not(:disabled) {
+  background: rgba(255, 100, 100, 0.16);
+}
+
+/* Step rows - Order mode (with index and controls) */
+.gsi-step-rows--order {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gsi-step-row--order {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.gsi-step-index {
+  min-width: 20px;
+  text-align: center;
+  font-weight: 700;
+  color: #adffed;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.gsi-step-up-btn,
+.gsi-step-down-btn {
+  font-size: 0.9rem;
+}
+
+.gsi-add-step-btn {
+  margin-top: 2px;
+  padding: 7px 12px;
+  border: 1px solid rgba(173, 255, 209, 0.25);
+  border-radius: 6px;
+  background: rgba(173, 255, 209, 0.08);
+  color: #d7ffe9;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  align-self: flex-start;
+}
+
+.gsi-add-step-btn:hover {
+  background: rgba(173, 255, 209, 0.14);
+}
+
+/* Budget display */
+.gsi-budget-display {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(173, 255, 209, 0.2);
+  background: rgba(173, 255, 209, 0.06);
+  margin-top: 6px;
+}
+
+.gsi-budget-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #adffed;
+}
+
+.gsi-budget-value {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #d7ffe9;
+  margin-left: auto;
+}
+
+.gsi-budget-display--over {
+  border-color: rgba(255, 100, 100, 0.3);
+  background: rgba(255, 100, 100, 0.08);
+}
+
+.gsi-budget-display--over .gsi-budget-label,
+.gsi-budget-display--over .gsi-budget-value {
+  color: #ffb3b3;
+}
+
+.gsi-budget-warning {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(255, 100, 100, 0.08);
+  color: #ffb3b3;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+/* Review page (stage 5) */
+.gsi-save-review {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gsi-review-title {
+  margin: 0 0 2px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.gsi-review-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(173, 255, 209, 0.2);
+  border-radius: 8px;
+  background: rgba(173, 255, 209, 0.05);
+}
+
+.gsi-review-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gsi-review-item strong {
+  font-size: 0.82rem;
+  color: #adffed;
+}
+
+.gsi-review-item p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  line-height: 1.35;
+}
+
+.gsi-review-proof-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.gsi-review-proof-list li {
+  margin: 2px 0;
+  padding-left: 10px;
+  position: relative;
+}
+
+.gsi-review-proof-list li:before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #adffed;
+}
+
+.gsi-review-steps-list {
+  list-style: decimal;
+  list-style-position: inside;
+  margin: 4px 0 0;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.gsi-review-steps-list li {
+  margin: 2px 0;
+  padding-left: 0;
+}
+
+.gsi-review-time {
+  color: #b8ffd9;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+/* Messages */
+.gsi-error {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(255, 100, 100, 0.08);
+  color: #ffb3b3;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.gsi-success {
+  margin-top: 8px;
+  color: #9effc9;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+/* Navigation */
+.gsi-nav {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.gsi-btn {
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gsi-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.gsi-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.gsi-btn--back {
+  color: var(--text-soft);
+}
+
+.gsi-btn--next,
+.gsi-btn--save {
+  margin-left: auto;
+  border-color: rgba(173, 255, 209, 0.35);
+  background: rgba(52, 209, 149, 0.14);
+  color: #d7ffe9;
+}
+
+.gsi-btn--next:hover,
+.gsi-btn--save:hover {
+  background: rgba(52, 209, 149, 0.22);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .gsi-progress-bar {
+    gap: 4px;
+  }
+
+  .gsi-progress-dot {
+    gap: 2px;
+  }
+
+  .gsi-progress-num {
+    width: 20px;
+    height: 20px;
+    font-size: 0.6rem;
+  }
+
+  .gsi-progress-label {
+    font-size: 0.55rem;
+  }
+
+  .gsi-two-field-pair {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .gsi-step-row--brainstorm,
+  .gsi-step-row--order {
+    flex-wrap: wrap;
+  }
+
+  .gsi-step-input {
+    width: 100%;
+    order: 2;
+  }
+
+  .gsi-step-index {
+    order: 1;
+  }
+
+  .gsi-step-minutes {
+    order: 3;
+  }
+
+  .gsi-step-btn {
+    order: 4;
   }
 }
