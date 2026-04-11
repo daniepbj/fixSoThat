@@ -177,10 +177,11 @@ export default function TimerApp({ sidebarMode = false }) {
     taskMusicRef.current.preload = "auto"
   }
   if (!beachAudioRef.current && typeof Audio !== "undefined") {
-    const ba = new Audio("/sounds/beach.mp3")
+    const ba = new Audio(`${import.meta.env.BASE_URL}sounds/beach.mp3`)
     ba.loop = true
     ba.volume = 0
     ba.preload = "auto"
+    ba.load()
     beachAudioRef.current = ba
   }
 
@@ -189,12 +190,13 @@ export default function TimerApp({ sidebarMode = false }) {
   useEffect(() => {
     const audio = beachAudioRef.current
     if (!audio) return
+    if (onBreak) return // BreakOverlay controls audio during break
     if (timerRunning && currentTask && pomoEnabled) {
       // Start playing at volume 0 — this runs during user-gesture context
       // on first timer start, which unlocks the element for later
       audio.volume = 0
       audio.play().catch(() => {})
-    } else if (!onBreak) {
+    } else {
       audio.pause()
       audio.currentTime = 0
     }
