@@ -4,6 +4,8 @@ import AppLinks from "./components/AppLinks"
 import TimerApp from "./components/TimerApp"
 import StructuredTaskBuilder from "./components/StructuredTaskBuilder"
 import GuidedCategoryBuilder from "./components/GuidedCategoryBuilder"
+import AdhdBridgeBuilder from "./components/AdhdBridgeBuilder"
+import GuidedSmallImprovementBuilder from "./components/GuidedSmallImprovementBuilder"
 import MainTaskList from "./components/MainTaskList"
 import FixaPresetPanel from "./components/FixaPresetPanel"
 import SaveLoadPanel from "./components/SaveLoadPanel"
@@ -44,6 +46,8 @@ function AppContent() {
           <AppLinks />
           <StructuredTaskBuilder />
           <GuidedCategoryBuilder />
+          <AdhdBridgeBuilder />
+          <GuidedSmallImprovementBuilder />
           <MainTaskList />
           <FixaPresetPanel />
           <SaveLoadPanel />
