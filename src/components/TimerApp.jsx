@@ -158,6 +158,7 @@ export default function TimerApp({ sidebarMode = false }) {
   const alarmIntervalRef = useRef(null)
   const taskMusicRef = useRef(null)
   const taskMusicUrlRef = useRef("")
+  const beachAudioRef = useRef(null)
   const previewAudioRef = useRef(null)
   const previewUrlRef = useRef("")
   const confettiTimerRef = useRef(null)
@@ -174,6 +175,11 @@ export default function TimerApp({ sidebarMode = false }) {
   if (!taskMusicRef.current && typeof Audio !== "undefined") {
     taskMusicRef.current = new Audio()
     taskMusicRef.current.preload = "auto"
+  }
+  if (!beachAudioRef.current && typeof Audio !== "undefined") {
+    beachAudioRef.current = new Audio("/sounds/beach.mp3")
+    beachAudioRef.current.loop = true
+    beachAudioRef.current.preload = "auto"
   }
 
   // One-time data normalization for older localStorage schemas.
@@ -1142,6 +1148,7 @@ export default function TimerApp({ sidebarMode = false }) {
           onSkip={skipBreak}
           taskMusicRef={taskMusicRef}
           musicVolume={musicVolume}
+          beachAudioRef={beachAudioRef}
         />
       )}
     </div>
