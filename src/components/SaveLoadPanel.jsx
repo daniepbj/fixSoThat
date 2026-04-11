@@ -1,4 +1,5 @@
 import { useState, useRef } from "react"
+import JSZip from "jszip"
 import { useMainTask } from "../context/MainTaskContext"
 import { fmtLocalDateTime } from "../utils/timeUtils"
 import { listTracks, getTrack, addTrackFromFile } from "../utils/musicStore"
@@ -41,38 +42,28 @@ export default function SaveLoadPanel() {
   const [exportName, setExportName] = useState("")
   const [exporting, setExporting] = useState(false)
   const importRef = useRef(null)
+  const flashTimerRef = useRef(null)
 
-  function flash(msg) {
+  function flash(msg, duration = 4000) {
+    clearTimeout(flashTimerRef.current)
     setMessage(msg)
-    setTimeout(() => setMessage(""), 2200)
+    if (duration > 0) {
+      flashTimerRef.current = setTimeout(() => setMessage(""), duration)
+    }
   }
 
-  // ── helpers: blob <-> base64 ────────────────────────────────────────────
-  function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-      const r = new FileReader()
-      r.onload = () => resolve(r.result.split(",")[1])
-      r.onerror = reject
-      r.readAsDataURL(blob)
-    })
-  }
-
-  function base64ToBlob(b64, mime) {
-    const bin = atob(b64)
-    const bytes = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-    return new Blob([bytes], { type: mime })
-  }
-
-  // ── Export: prepare blob, then show download link ────────────────────────
+  // ── Export: build zip with backup.json + music/ folder ──────────────────
   async function handlePrepareExport() {
     if (exportUrl) {
       URL.revokeObjectURL(exportUrl)
       setExportUrl(null)
     }
     setExporting(true)
-    flash("Preparing export…")
+    setMessage("Preparing export…")
     try {
+      const zip = new JSZip()
+
+      // 1. Collect all localStorage keys into backup.json
       const snapshot = {}
       for (const key of FST_KEYS) {
         const val = localStorage.getItem(key)
@@ -80,41 +71,44 @@ export default function SaveLoadPanel() {
       }
       snapshot._exportedAt = new Date().toISOString()
 
-      // Always include uploaded music
+      // 2. Add music files to music/ folder and track metadata
+      const musicMeta = []
       try {
         const tracks = await listTracks()
-        const musicData = []
         for (const meta of tracks) {
           const full = await getTrack(meta.id)
           if (full?.blob) {
-            const b64 = await blobToBase64(full.blob)
-            musicData.push({ ...meta, _b64: b64 })
+            const safeName = meta.name.replace(/[^a-zA-Z0-9._-]/g, "_")
+            const path = `music/${meta.id}_${safeName}`
+            zip.file(path, full.blob)
+            musicMeta.push({ ...meta, _file: path })
           }
         }
-        if (musicData.length) snapshot._music = musicData
-      } catch {
-        /* skip music on error */
+      } catch (e) {
+        console.warn("Could not read music tracks:", e)
       }
+      if (musicMeta.length) snapshot._musicFiles = musicMeta
 
-      const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
-        type: "application/json",
-      })
+      zip.file("backup.json", JSON.stringify(snapshot, null, 2))
+
+      // 3. Generate zip blob
+      const blob = await zip.generateAsync({ type: "blob" })
       const url = URL.createObjectURL(blob)
-      const name = `fixsothat-backup-${new Date().toISOString().slice(0, 10)}.json`
+      const name = `fixsothat-backup-${new Date().toISOString().slice(0, 10)}.zip`
       setExportUrl(url)
       setExportName(name)
-      flash(
-        snapshot._music
-          ? `Ready — ${snapshot._music.length} track(s) included. Click Download.`
-          : "Ready — click Download.",
-      )
-    } catch {
-      flash("Export failed.")
+      const msg = musicMeta.length
+        ? `Ready — ${musicMeta.length} track(s) included. Click Download.`
+        : "Ready — click Download."
+      setMessage(msg)
+    } catch (err) {
+      console.error("Export failed:", err)
+      flash("Export failed: " + (err?.message || "unknown error"))
     }
     setExporting(false)
   }
 
-  // ── Import from JSON file ──────────────────────────────────────────────
+  // ── Import: accept .zip or .json ──────────────────────────────────────
   function handleImportClick() {
     importRef.current?.click()
   }
@@ -123,9 +117,24 @@ export default function SaveLoadPanel() {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      const text = await file.text()
-      const data = JSON.parse(text)
+      let data
+      let musicFiles = null
+
+      if (file.name.endsWith(".zip")) {
+        const zip = await JSZip.loadAsync(file)
+        const jsonFile = zip.file("backup.json")
+        if (!jsonFile) throw new Error("No backup.json found in zip")
+        const text = await jsonFile.async("text")
+        data = JSON.parse(text)
+        musicFiles = zip
+      } else {
+        const text = await file.text()
+        data = JSON.parse(text)
+      }
+
       if (typeof data !== "object" || data === null) throw new Error("bad")
+
+      // Restore localStorage keys
       let count = 0
       for (const key of FST_KEYS) {
         if (key in data) {
@@ -133,22 +142,43 @@ export default function SaveLoadPanel() {
           count++
         }
       }
+
+      // Restore music from zip
       let musicCount = 0
-      if (Array.isArray(data._music)) {
+      if (musicFiles && Array.isArray(data._musicFiles)) {
+        for (const meta of data._musicFiles) {
+          if (!meta._file) continue
+          const entry = musicFiles.file(meta._file)
+          if (!entry) continue
+          const blob = await entry.async("blob")
+          const mime = meta.mimeType || "audio/mpeg"
+          const f = new File([blob], meta.name || "track", { type: mime })
+          await addTrackFromFile(f)
+          musicCount++
+        }
+      }
+
+      // Legacy: base64 embedded music from old exports
+      if (!musicCount && Array.isArray(data._music)) {
         for (const track of data._music) {
           if (track._b64 && track.mimeType && track.name) {
-            const blob = base64ToBlob(track._b64, track.mimeType)
+            const bin = atob(track._b64)
+            const bytes = new Uint8Array(bin.length)
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+            const blob = new Blob([bytes], { type: track.mimeType })
             const f = new File([blob], track.name, { type: track.mimeType })
             await addTrackFromFile(f)
             musicCount++
           }
         }
       }
+
       const parts = [`Imported ${count} keys`]
       if (musicCount) parts.push(`${musicCount} track(s)`)
       flash(`${parts.join(" + ")} — reloading…`)
       setTimeout(() => window.location.reload(), 800)
-    } catch {
+    } catch (err) {
+      console.error("Import failed:", err)
       flash("Invalid backup file.")
     }
     e.target.value = ""
@@ -286,7 +316,7 @@ export default function SaveLoadPanel() {
           <input
             ref={importRef}
             type="file"
-            accept=".json"
+            accept=".zip,.json"
             style={{ display: "none" }}
             onChange={handleImportFile}
           />
