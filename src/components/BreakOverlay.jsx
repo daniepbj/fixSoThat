@@ -46,16 +46,16 @@ export default function BreakOverlay({
     TIPS.length
   const fadeRef = useRef(null)
 
-  // Play beach.mp3 during break
+  // Turn beach audio volume up on break start, back to 0 on break end
   useEffect(() => {
     const audio = beachAudioRef?.current
     if (!audio) return
     audio.volume = 0.5
     audio.currentTime = 0
-    audio.play().catch(() => {})
+    // Ensure it's playing (should already be from silent play)
+    if (audio.paused) audio.play().catch(() => {})
     return () => {
-      audio.pause()
-      audio.currentTime = 0
+      audio.volume = 0
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

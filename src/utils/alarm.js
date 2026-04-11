@@ -31,9 +31,9 @@ export function playAlarmOnce() {
     const ctx = getCtx()
     if (ctx.state === 'suspended') ctx.resume()
     const t = ctx.currentTime
-    scheduleBeep(ctx, t,        880, 0.18)
+    scheduleBeep(ctx, t, 880, 0.18)
     scheduleBeep(ctx, t + 0.22, 1100, 0.18)
-    scheduleBeep(ctx, t + 0.44, 880,  0.28)
+    scheduleBeep(ctx, t + 0.44, 880, 0.28)
   } catch (e) {
     console.warn('Alarm audio error:', e)
   }

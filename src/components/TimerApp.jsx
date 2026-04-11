@@ -177,30 +177,28 @@ export default function TimerApp({ sidebarMode = false }) {
     taskMusicRef.current.preload = "auto"
   }
   if (!beachAudioRef.current && typeof Audio !== "undefined") {
-    beachAudioRef.current = new Audio("/sounds/beach.mp3")
-    beachAudioRef.current.loop = true
-    beachAudioRef.current.preload = "auto"
+    const ba = new Audio("/sounds/beach.mp3")
+    ba.loop = true
+    ba.volume = 0
+    ba.preload = "auto"
+    beachAudioRef.current = ba
   }
 
-  // Unlock beach audio on first user gesture so autoplay works later
+  // Keep beach audio silently playing while timer runs so browser keeps it unlocked.
+  // Volume is controlled by BreakOverlay when break starts.
   useEffect(() => {
     const audio = beachAudioRef.current
     if (!audio) return
-    function unlock() {
-      audio.play().then(() => {
-        audio.pause()
-        audio.currentTime = 0
-      }).catch(() => {})
-      document.removeEventListener("click", unlock, true)
-      document.removeEventListener("touchstart", unlock, true)
+    if (timerRunning && currentTask && pomoEnabled) {
+      // Start playing at volume 0 — this runs during user-gesture context
+      // on first timer start, which unlocks the element for later
+      audio.volume = 0
+      audio.play().catch(() => {})
+    } else if (!onBreak) {
+      audio.pause()
+      audio.currentTime = 0
     }
-    document.addEventListener("click", unlock, true)
-    document.addEventListener("touchstart", unlock, true)
-    return () => {
-      document.removeEventListener("click", unlock, true)
-      document.removeEventListener("touchstart", unlock, true)
-    }
-  }, [])
+  }, [timerRunning, currentTask?.id, pomoEnabled, onBreak])
 
   // One-time data normalization for older localStorage schemas.
   // Also reset timerRunning on first mount — prevents ghost timers from persisted state.
