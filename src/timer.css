@@ -124,10 +124,11 @@
 }
 
 .top-bar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 20px;
+  padding: 10px 20px 14px;
   background: var(--ta-top-bar);
   border-bottom: 1px solid var(--ta-top-border);
   backdrop-filter: blur(12px);
@@ -1401,4 +1402,328 @@
   color: var(--ta-text);
   padding: 5px 8px;
   font-size: 0.84rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Break Overlay — Beach Vacation Mode
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.break-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    180deg,
+    #87ceeb 0%,
+    #5bb8f5 35%,
+    #2e94c9 60%,
+    #1a6d9e 80%,
+    #f4d58d 82%,
+    #e8c36a 100%
+  );
+  animation: breakFadeIn 0.8s ease-out;
+  overflow: hidden;
+}
+
+@keyframes breakFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Ocean waves */
+.break-overlay__ocean {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 45%;
+  overflow: hidden;
+}
+
+.break-wave {
+  position: absolute;
+  width: 200%;
+  height: 100%;
+  bottom: 0;
+  left: -50%;
+  border-radius: 40% 40% 0 0;
+  animation: waveRoll 6s ease-in-out infinite;
+}
+
+.break-wave--1 {
+  background: rgba(30, 144, 200, 0.35);
+  animation-duration: 5s;
+  bottom: 5%;
+}
+.break-wave--2 {
+  background: rgba(30, 144, 200, 0.25);
+  animation-duration: 7s;
+  animation-delay: -1.5s;
+  bottom: 2%;
+}
+.break-wave--3 {
+  background: rgba(30, 144, 200, 0.18);
+  animation-duration: 9s;
+  animation-delay: -3s;
+  bottom: 0;
+}
+
+@keyframes waveRoll {
+  0%,
+  100% {
+    transform: translateX(-5%) rotate(-1deg);
+  }
+  50% {
+    transform: translateX(5%) rotate(1deg);
+  }
+}
+
+/* Sun */
+.break-overlay__sun {
+  position: absolute;
+  top: 6%;
+  right: 12%;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe066 40%, #ffb84d 100%);
+  box-shadow:
+    0 0 60px 20px rgba(255, 224, 102, 0.5),
+    0 0 120px 40px rgba(255, 184, 77, 0.2);
+  animation: sunPulse 4s ease-in-out infinite;
+}
+
+@keyframes sunPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 60px 20px rgba(255, 224, 102, 0.5);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 80px 30px rgba(255, 224, 102, 0.6);
+  }
+}
+
+/* Floating emojis */
+.break-overlay__emojis {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.break-overlay__emoji {
+  position: absolute;
+  font-size: 1.8rem;
+  animation: emojiFloat 5s ease-in-out infinite;
+  opacity: 0.7;
+}
+
+@keyframes emojiFloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-18px) rotate(8deg);
+  }
+}
+
+/* Content card */
+.break-overlay__content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  color: #1a3a4f;
+  max-width: 380px;
+  padding: 32px;
+}
+
+.break-overlay__title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  margin: 0 0 8px;
+  text-shadow: 0 2px 12px rgba(255, 255, 255, 0.5);
+  letter-spacing: -0.5px;
+}
+
+.break-overlay__subtitle {
+  font-size: 1.1rem;
+  margin: 0 0 28px;
+  opacity: 0.8;
+  font-weight: 500;
+}
+
+/* Break timer ring */
+.break-overlay__timer {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 0 auto 24px;
+}
+
+.break-ring {
+  width: 100%;
+  height: 100%;
+}
+
+.break-ring__track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 6;
+}
+
+.break-ring__fill {
+  fill: none;
+  stroke: #ffe066;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dasharray 1s linear;
+}
+
+.break-overlay__countdown {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+/* Skip button */
+.break-overlay__skip {
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  color: #1a3a4f;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.break-overlay__skip:hover {
+  background: rgba(255, 255, 255, 0.55);
+  transform: translateY(-1px);
+}
+
+/* Clouds */
+.break-overlay__clouds {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.break-cloud {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+  filter: blur(6px);
+}
+
+.break-cloud--1 {
+  width: 180px;
+  height: 60px;
+  top: 10%;
+  left: 8%;
+  animation: cloudDrift 22s linear infinite;
+}
+.break-cloud--2 {
+  width: 140px;
+  height: 45px;
+  top: 18%;
+  left: 55%;
+  animation: cloudDrift 28s linear infinite;
+  animation-delay: -8s;
+}
+.break-cloud--3 {
+  width: 200px;
+  height: 55px;
+  top: 7%;
+  left: 35%;
+  animation: cloudDrift 32s linear infinite;
+  animation-delay: -14s;
+  opacity: 0.5;
+}
+
+@keyframes cloudDrift {
+  0% {
+    transform: translateX(-20%);
+  }
+  100% {
+    transform: translateX(120vw);
+  }
+}
+
+/* Sand strip */
+.break-overlay__sand {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 22%;
+  background: linear-gradient(180deg, #f4d58d 0%, #e8c36a 40%, #d4a84a 100%);
+  z-index: 0;
+}
+
+/* Wellness tip */
+.break-overlay__tip {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0 0 20px;
+  color: #1a3a4f;
+  opacity: 0.85;
+  min-height: 1.6em;
+  transition: opacity 0.4s ease;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Pomodoro Progress Bar — TopBar
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pomo-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 6px;
+}
+
+.pomo-bar__track {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--ta-border, rgba(255, 255, 255, 0.15));
+  overflow: hidden;
+}
+
+.pomo-bar__fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ff6b6b, #ee5a24);
+  transition: width 1s linear;
+}
+
+.pomo-bar__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0.85;
+  color: var(--ta-text);
 }

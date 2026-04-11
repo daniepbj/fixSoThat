@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useLocalStorage } from "../hooks/useLocalStorage"
+import { nowISO, secondsSince } from "../utils/timeUtils"
 import { createTask, initStorageIfNew, EMOJIS, COLORS } from "../data/seedData"
 import confetti from "canvas-confetti"
 import TopBar from "./TopBar"
@@ -12,6 +13,7 @@ import PresetsView from "./PresetsView"
 import SettingsView from "./SettingsView"
 import BottomNav from "./BottomNav"
 import SidebarTaskSteps from "./SidebarTaskSteps"
+import BreakOverlay from "./BreakOverlay"
 import { TimerProvider } from "../context/TimerContext"
 import { useMainTask } from "../context/MainTaskContext"
 import "../timer.css"
@@ -137,6 +139,22 @@ export default function TimerApp({ sidebarMode = false }) {
   const [musicUiMessage, setMusicUiMessage] = useState("")
   const [audioBlockedMessage, setAudioBlockedMessage] = useState("")
   const [previewTrackId, setPreviewTrackId] = useState("")
+
+  // ── Pomodoro state ───────────────────────────────────────────────────────
+  // Timestamps stored as ISO instants via Temporal — survives refresh, no drift.
+  const [pomoWorkStart, setPomodoroWorkStart] = useLocalStorage(
+    "fst_pomo_work_start",
+    null,
+  )
+  const [breakStartISO, setBreakStartISO] = useLocalStorage(
+    "fst_pomo_break_start",
+    null,
+  )
+  const [onBreak, setOnBreak] = useState(false)
+  const [breakSecondsLeft, setBreakSecondsLeft] = useState(0)
+  const pomoEnabled = Boolean(settings.pomodoroEnabled)
+  const pomoWorkDuration = (settings.pomodoroWorkMinutes || 20) * 60
+  const pomoBreakDuration = (settings.pomodoroBreakMinutes || 5) * 60
   const alarmIntervalRef = useRef(null)
   const taskMusicRef = useRef(null)
   const taskMusicUrlRef = useRef("")
@@ -235,7 +253,7 @@ export default function TimerApp({ sidebarMode = false }) {
 
   // ── Timer tick ───────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!timerRunning) return
+    if (!timerRunning || onBreak) return
     const id = setInterval(() => {
       let ticked = false
       setActiveTasks((prev) => {
@@ -252,18 +270,91 @@ export default function TimerApp({ sidebarMode = false }) {
           ...tail,
         ]
       })
-      // Only count session time when a task actually ticked
       if (ticked) setSessionSeconds((s) => s + 1)
     }, 1000)
     return () => clearInterval(id)
-  }, [timerRunning])
+  }, [timerRunning, onBreak])
+
+  // ── Pomodoro: start work session timestamp when timer starts ─────────────
+  useEffect(() => {
+    if (!pomoEnabled || !timerRunning || onBreak) return
+    // If no work session is running, stamp the start time now
+    if (!pomoWorkStart) {
+      setPomodoroWorkStart(nowISO())
+    }
+  }, [pomoEnabled, timerRunning, onBreak, pomoWorkStart, setPomodoroWorkStart])
+
+  // ── Pomodoro: check if work session exceeded ─────────────────────────────
+  useEffect(() => {
+    if (!pomoEnabled || !timerRunning || onBreak || !pomoWorkStart) return
+    const id = setInterval(() => {
+      const elapsed = secondsSince(pomoWorkStart)
+      if (elapsed >= pomoWorkDuration) {
+        setOnBreak(true)
+        setBreakStartISO(nowISO())
+        setPomodoroWorkStart(null)
+      }
+    }, 1000)
+    return () => clearInterval(id)
+  }, [
+    pomoEnabled,
+    timerRunning,
+    onBreak,
+    pomoWorkStart,
+    pomoWorkDuration,
+    setBreakStartISO,
+    setPomodoroWorkStart,
+  ])
+
+  // ── Break countdown (Temporal-based) ─────────────────────────────────────
+  useEffect(() => {
+    if (!onBreak || !breakStartISO) return
+    function tick() {
+      const elapsed = secondsSince(breakStartISO)
+      const remaining = Math.max(0, pomoBreakDuration - elapsed)
+      setBreakSecondsLeft(remaining)
+      if (remaining <= 0) {
+        setOnBreak(false)
+        setBreakStartISO(null)
+      }
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [onBreak, breakStartISO, pomoBreakDuration, setBreakStartISO])
+
+  // ── Restore break state on mount (survives refresh) ──────────────────────
+  useEffect(() => {
+    if (!breakStartISO) return
+    const elapsed = secondsSince(breakStartISO)
+    const remaining = pomoBreakDuration - elapsed
+    if (remaining > 0) {
+      setOnBreak(true)
+      setBreakSecondsLeft(remaining)
+    } else {
+      setBreakStartISO(null)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Stop timer when there are no active tasks ────────────────────────────
   useEffect(() => {
     if (timerRunning && activeTasks.length === 0) {
       setTimerRunning(false)
     }
-  }, [activeTasks.length, timerRunning, setTimerRunning])
+    if (activeTasks.length === 0) {
+      setSessionSeconds(0)
+      setPomodoroWorkStart(null)
+      setBreakStartISO(null)
+      setOnBreak(false)
+    }
+  }, [
+    activeTasks.length,
+    timerRunning,
+    setTimerRunning,
+    setSessionSeconds,
+    setPomodoroWorkStart,
+    setBreakStartISO,
+  ])
 
   // ── Alarm ────────────────────────────────────────────────────────────────
   function triggerAlarm() {
@@ -916,6 +1007,17 @@ export default function TimerApp({ sidebarMode = false }) {
     adjustTime,
     alarmActive,
     stopAlarm,
+    onBreak,
+    breakSecondsLeft,
+    pomoEnabled,
+    pomoWorkStart,
+    pomoWorkDuration,
+  }
+
+  function skipBreak() {
+    setOnBreak(false)
+    setBreakSecondsLeft(0)
+    setBreakStartISO(null)
   }
 
   const musicProps = {
@@ -976,6 +1078,10 @@ export default function TimerApp({ sidebarMode = false }) {
         setSettings={setSettings}
         theme={theme}
         setTheme={setTheme}
+        pomoEnabled={pomoEnabled}
+        pomoWorkStart={pomoWorkStart}
+        pomoWorkDuration={pomoWorkDuration}
+        onBreak={onBreak}
       />
       <TimerProvider value={timerContextValue}>
         <div className="timer-main">
@@ -1028,6 +1134,16 @@ export default function TimerApp({ sidebarMode = false }) {
       )}
 
       <BottomNav currentView={currentView} setCurrentView={setCurrentView} />
+
+      {onBreak && (
+        <BreakOverlay
+          secondsLeft={breakSecondsLeft}
+          totalSeconds={pomoBreakDuration}
+          onSkip={skipBreak}
+          taskMusicRef={taskMusicRef}
+          musicVolume={musicVolume}
+        />
+      )}
     </div>
   )
 }

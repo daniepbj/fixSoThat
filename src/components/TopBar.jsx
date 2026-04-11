@@ -1,5 +1,12 @@
 import { useState, useEffect } from "react"
-import { fmtDuration, projectedEndTimeLocal, currentTimeLocal, getTimezone } from "../utils/timeUtils"
+import {
+  fmtDuration,
+  fmtTimerDisplay,
+  projectedEndTimeLocal,
+  currentTimeLocal,
+  getTimezone,
+  secondsSince,
+} from "../utils/timeUtils"
 
 export default function TopBar({
   sessionSeconds,
@@ -8,12 +15,35 @@ export default function TopBar({
   setSettings,
   theme,
   setTheme,
+  pomoEnabled,
+  pomoWorkStart,
+  pomoWorkDuration,
+  onBreak,
 }) {
   const [clock, setClock] = useState(currentTimeLocal())
+  const [pomoElapsed, setPomoElapsed] = useState(0)
   useEffect(() => {
-    const id = setInterval(() => setClock(currentTimeLocal()), 1000)
+    const id = setInterval(() => setClock(currentTimeLocal()), 10_000)
     return () => clearInterval(id)
   }, [])
+
+  // Live pomodoro countdown
+  useEffect(() => {
+    if (!pomoEnabled || !pomoWorkStart || onBreak) {
+      setPomoElapsed(0)
+      return
+    }
+    function tick() {
+      setPomoElapsed(secondsSince(pomoWorkStart))
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [pomoEnabled, pomoWorkStart, onBreak])
+
+  const pomoRemaining = Math.max(0, pomoWorkDuration - pomoElapsed)
+  const pomoProgress =
+    pomoWorkDuration > 0 ? Math.min(1, pomoElapsed / pomoWorkDuration) : 0
 
   function toggleSound() {
     setSettings((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
@@ -26,7 +56,10 @@ export default function TopBar({
         <span className="top-bar__value">{fmtDuration(sessionSeconds)}</span>
       </div>
       <div className="top-bar__center" title={getTimezone()}>
-        🕐 {clock} <span style={{fontSize:'0.65em',opacity:0.6}}>({getTimezone()})</span>
+        🕐 {clock}{" "}
+        <span style={{ fontSize: "0.65em", opacity: 0.6 }}>
+          ({getTimezone()})
+        </span>
       </div>
       <div className="top-bar__right">
         <div className="top-bar__stat top-bar__stat--right">
@@ -52,6 +85,19 @@ export default function TopBar({
           {theme === "dark" ? "☀️" : "🌙"}
         </button>
       </div>
+      {pomoEnabled && pomoWorkStart && !onBreak && (
+        <div className="pomo-bar">
+          <div className="pomo-bar__track">
+            <div
+              className="pomo-bar__fill"
+              style={{ width: `${pomoProgress * 100}%` }}
+            />
+          </div>
+          <span className="pomo-bar__label">
+            🍅 {fmtTimerDisplay(pomoRemaining)} until break
+          </span>
+        </div>
+      )}
     </header>
   )
 }

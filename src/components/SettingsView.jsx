@@ -1,5 +1,9 @@
 import { useState } from "react"
-import { getAutoTimezone, getTimezoneOverride, setTimezoneOverride } from "../utils/timeUtils"
+import {
+  getAutoTimezone,
+  getTimezoneOverride,
+  setTimezoneOverride,
+} from "../utils/timeUtils"
 
 export default function SettingsView({ settings, setSettings, music }) {
   const [tzOverride, setTzOverride] = useState(getTimezoneOverride())
@@ -47,6 +51,58 @@ export default function SettingsView({ settings, setSettings, music }) {
             onChange={(e) => update("autoStartNextTask", e.target.checked)}
           />
         </label>
+
+        <div className="settings-row settings-row--block">
+          <span className="settings-row__label">🍅 Pomodoro mode</span>
+          <label className="settings-row">
+            <span>Enable Pomodoro timer</span>
+            <input
+              type="checkbox"
+              checked={Boolean(settings.pomodoroEnabled)}
+              onChange={(e) => update("pomodoroEnabled", e.target.checked)}
+            />
+          </label>
+          {settings.pomodoroEnabled && (
+            <>
+              <label className="settings-row">
+                <span>Work session (minutes)</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="120"
+                  value={settings.pomodoroWorkMinutes || 20}
+                  onChange={(e) =>
+                    update(
+                      "pomodoroWorkMinutes",
+                      Math.max(1, Math.min(120, Number(e.target.value) || 20)),
+                    )
+                  }
+                  className="settings-number"
+                />
+              </label>
+              <label className="settings-row">
+                <span>Break duration (minutes)</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="30"
+                  value={settings.pomodoroBreakMinutes || 5}
+                  onChange={(e) =>
+                    update(
+                      "pomodoroBreakMinutes",
+                      Math.max(1, Math.min(30, Number(e.target.value) || 5)),
+                    )
+                  }
+                  className="settings-number"
+                />
+              </label>
+              <p className="settings-help-text">
+                Work for {settings.pomodoroWorkMinutes || 20} min, then enjoy a{" "}
+                {settings.pomodoroBreakMinutes || 5} min beach break. 🏖️
+              </p>
+            </>
+          )}
+        </div>
 
         <div className="settings-row settings-row--block">
           <span className="settings-row__label">Alarm when time is up</span>
@@ -125,7 +181,14 @@ export default function SettingsView({ settings, setSettings, music }) {
           <span className="settings-row__label">Timezone override</span>
           <p className="settings-help-text">
             Auto-detected: <strong>{getAutoTimezone()}</strong>.
-            {tzOverride ? <> Override: <strong>{tzOverride}</strong>.</> : " Set a manual timezone if your browser spoofs it (e.g. LibreWolf)."}
+            {tzOverride ? (
+              <>
+                {" "}
+                Override: <strong>{tzOverride}</strong>.
+              </>
+            ) : (
+              " Set a manual timezone if your browser spoofs it (e.g. LibreWolf)."
+            )}
           </p>
           <div className="tz-override-row">
             <input
@@ -137,12 +200,37 @@ export default function SettingsView({ settings, setSettings, music }) {
               list="tz-suggestions"
             />
             <datalist id="tz-suggestions">
-              {["Europe/Oslo","Europe/London","Europe/Berlin","Europe/Paris","Europe/Stockholm","America/New_York","America/Chicago","America/Denver","America/Los_Angeles","Asia/Tokyo","Asia/Shanghai","Australia/Sydney","Pacific/Auckland","UTC"].map(z => (
+              {[
+                "Europe/Oslo",
+                "Europe/London",
+                "Europe/Berlin",
+                "Europe/Paris",
+                "Europe/Stockholm",
+                "America/New_York",
+                "America/Chicago",
+                "America/Denver",
+                "America/Los_Angeles",
+                "Asia/Tokyo",
+                "Asia/Shanghai",
+                "Australia/Sydney",
+                "Pacific/Auckland",
+                "UTC",
+              ].map((z) => (
                 <option key={z} value={z} />
               ))}
             </datalist>
-            <button type="button" className="quick-btn" onClick={handleTzApply}>Apply</button>
-            {tzOverride && <button type="button" className="quick-btn quick-btn--danger" onClick={handleTzClear}>Clear</button>}
+            <button type="button" className="quick-btn" onClick={handleTzApply}>
+              Apply
+            </button>
+            {tzOverride && (
+              <button
+                type="button"
+                className="quick-btn quick-btn--danger"
+                onClick={handleTzClear}
+              >
+                Clear
+              </button>
+            )}
           </div>
           {tzError && <p className="settings-warn-text">{tzError}</p>}
         </div>

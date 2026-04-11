@@ -50,10 +50,26 @@ export function nowISO() {
 }
 
 /**
- * Current local time as "HH:mm:ss".
+ * Seconds elapsed since a given ISO instant string.
+ * Returns 0 if the string is invalid or in the future.
+ */
+export function secondsSince(isoInstant) {
+    if (!isoInstant) return 0
+    try {
+        const start = T.Instant.from(isoInstant)
+        const elapsed = T.Now.instant().since(start)
+        const secs = elapsed.total("seconds")
+        return Math.max(0, Math.floor(secs))
+    } catch {
+        return 0
+    }
+}
+
+/**
+ * Current local time as "HH:mm".
  */
 export function currentTimeLocal() {
-    return now().toPlainTime().toString({ smallestUnit: "second" })
+    return now().toPlainTime().toString({ smallestUnit: "minute" })
 }
 
 /**
