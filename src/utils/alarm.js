@@ -38,3 +38,46 @@ export function playAlarmOnce() {
     console.warn('Alarm audio error:', e)
   }
 }
+
+/* ── Beach loop (Web Audio API — same context as alarm, no autoplay issues) ── */
+
+const BASE = import.meta.env.BASE_URL ?? '/'
+let beachBuffer = null
+let beachSource = null
+let beachGain = null
+
+// Preload beach.mp3 at module load
+if (typeof window !== 'undefined') {
+  fetch(`${BASE}sounds/beach.mp3`)
+    .then(r => r.arrayBuffer())
+    .then(buf => getCtx().decodeAudioData(buf))
+    .then(decoded => { beachBuffer = decoded })
+    .catch(e => console.warn('Beach audio preload failed:', e))
+}
+
+export function startBeachLoop(volume = 0.5) {
+  try {
+    stopBeachLoop()
+    if (!beachBuffer) return
+    const ctx = getCtx()
+    if (ctx.state === 'suspended') ctx.resume()
+    beachSource = ctx.createBufferSource()
+    beachSource.buffer = beachBuffer
+    beachSource.loop = true
+    beachGain = ctx.createGain()
+    beachGain.gain.value = volume
+    beachSource.connect(beachGain)
+    beachGain.connect(ctx.destination)
+    beachSource.start(0)
+  } catch (e) {
+    console.warn('Beach audio start error:', e)
+  }
+}
+
+export function stopBeachLoop() {
+  if (beachSource) {
+    try { beachSource.stop() } catch (_) { }
+    beachSource = null
+  }
+  beachGain = null
+}

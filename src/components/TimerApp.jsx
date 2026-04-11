@@ -158,7 +158,6 @@ export default function TimerApp({ sidebarMode = false }) {
   const alarmIntervalRef = useRef(null)
   const taskMusicRef = useRef(null)
   const taskMusicUrlRef = useRef("")
-  const beachAudioRef = useRef(null)
   const previewAudioRef = useRef(null)
   const previewUrlRef = useRef("")
   const confettiTimerRef = useRef(null)
@@ -176,31 +175,6 @@ export default function TimerApp({ sidebarMode = false }) {
     taskMusicRef.current = new Audio()
     taskMusicRef.current.preload = "auto"
   }
-  if (!beachAudioRef.current && typeof Audio !== "undefined") {
-    const ba = new Audio(`${import.meta.env.BASE_URL}sounds/beach.mp3`)
-    ba.loop = true
-    ba.volume = 0
-    ba.preload = "auto"
-    ba.load()
-    beachAudioRef.current = ba
-  }
-
-  // Keep beach audio silently playing while timer runs so browser keeps it unlocked.
-  // Volume is controlled by BreakOverlay when break starts.
-  useEffect(() => {
-    const audio = beachAudioRef.current
-    if (!audio) return
-    if (onBreak) return // BreakOverlay controls audio during break
-    if (timerRunning && currentTask && pomoEnabled) {
-      // Start playing at volume 0 — this runs during user-gesture context
-      // on first timer start, which unlocks the element for later
-      audio.volume = 0
-      audio.play().catch(() => {})
-    } else {
-      audio.pause()
-      audio.currentTime = 0
-    }
-  }, [timerRunning, currentTask?.id, pomoEnabled, onBreak])
 
   // One-time data normalization for older localStorage schemas.
   // Also reset timerRunning on first mount — prevents ghost timers from persisted state.
@@ -1168,7 +1142,6 @@ export default function TimerApp({ sidebarMode = false }) {
           onSkip={skipBreak}
           taskMusicRef={taskMusicRef}
           musicVolume={musicVolume}
-          beachAudioRef={beachAudioRef}
         />
       )}
     </div>

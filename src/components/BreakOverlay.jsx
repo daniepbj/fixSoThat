@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 import { fmtTimerDisplay } from "../utils/timeUtils"
+import { startBeachLoop, stopBeachLoop } from "../utils/alarm"
 
 const BEACH_EMOJIS = [
   "🏖️",
@@ -37,7 +38,6 @@ export default function BreakOverlay({
   onSkip,
   taskMusicRef,
   musicVolume,
-  beachAudioRef,
 }) {
   const progress =
     totalSeconds > 0 ? Math.max(0, 1 - secondsLeft / totalSeconds) : 1
@@ -46,18 +46,11 @@ export default function BreakOverlay({
     TIPS.length
   const fadeRef = useRef(null)
 
-  // Turn beach audio volume up on break start, back to 0 on break end
+  // Play beach.mp3 loop via Web Audio API (same context as alarm — no autoplay issues)
   useEffect(() => {
-    const audio = beachAudioRef?.current
-    if (!audio) return
-    audio.volume = 0.5
-    audio.currentTime = 0
-    // Ensure it's playing (should already be from silent play)
-    if (audio.paused) audio.play().catch(() => {})
-    return () => {
-      audio.volume = 0
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    startBeachLoop(0.5)
+    return () => stopBeachLoop()
+  }, [])
 
   // Fade music out on mount, restore on unmount
   useEffect(() => {
