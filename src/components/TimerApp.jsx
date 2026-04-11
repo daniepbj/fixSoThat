@@ -285,8 +285,10 @@ export default function TimerApp({ sidebarMode = false }) {
   }, [pomoEnabled, timerRunning, onBreak, pomoWorkStart, setPomodoroWorkStart])
 
   // ── Pomodoro: check if work session exceeded ─────────────────────────────
+  // NOTE: intentionally no timerRunning guard — the pomo clock is wall-time
+  // based (secondsSince) and must keep running even when a task timer stops.
   useEffect(() => {
-    if (!pomoEnabled || !timerRunning || onBreak || !pomoWorkStart) return
+    if (!pomoEnabled || onBreak || !pomoWorkStart) return
     const id = setInterval(() => {
       const elapsed = secondsSince(pomoWorkStart)
       if (elapsed >= pomoWorkDuration) {
@@ -298,7 +300,6 @@ export default function TimerApp({ sidebarMode = false }) {
     return () => clearInterval(id)
   }, [
     pomoEnabled,
-    timerRunning,
     onBreak,
     pomoWorkStart,
     pomoWorkDuration,
