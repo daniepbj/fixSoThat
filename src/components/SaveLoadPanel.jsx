@@ -37,6 +37,9 @@ export default function SaveLoadPanel() {
   const { saveSlots, saveSlot, loadSlot, clearSlot, mainTasks } = useMainTask()
   const [slotNames, setSlotNames] = useState(["", "", "", "", ""])
   const [message, setMessage] = useState("")
+  const [exportUrl, setExportUrl] = useState(null)
+  const [exportName, setExportName] = useState("")
+  const [exporting, setExporting] = useState(false)
   const importRef = useRef(null)
 
   function flash(msg) {
@@ -61,49 +64,54 @@ export default function SaveLoadPanel() {
     return new Blob([bytes], { type: mime })
   }
 
-  // ── Export everything as JSON file ──────────────────────────────────────
-  async function handleExport() {
+  // ── Export: prepare blob, then show download link ────────────────────────
+  async function handlePrepareExport() {
+    if (exportUrl) {
+      URL.revokeObjectURL(exportUrl)
+      setExportUrl(null)
+    }
+    setExporting(true)
     flash("Preparing export…")
-    const snapshot = {}
-    for (const key of FST_KEYS) {
-      const val = localStorage.getItem(key)
-      if (val !== null) snapshot[key] = JSON.parse(val)
-    }
-    snapshot._exportedAt = new Date().toISOString()
-
-    // Always include uploaded music
     try {
-      const tracks = await listTracks()
-      const musicData = []
-      for (const meta of tracks) {
-        const full = await getTrack(meta.id)
-        if (full?.blob) {
-          const b64 = await blobToBase64(full.blob)
-          musicData.push({ ...meta, _b64: b64 })
-        }
+      const snapshot = {}
+      for (const key of FST_KEYS) {
+        const val = localStorage.getItem(key)
+        if (val !== null) snapshot[key] = JSON.parse(val)
       }
-      if (musicData.length) snapshot._music = musicData
-    } catch {
-      /* skip music on error */
-    }
+      snapshot._exportedAt = new Date().toISOString()
 
-    const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
-      type: "application/json",
-    })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `fixsothat-backup-${new Date().toISOString().slice(0, 10)}.json`
-    a.style.display = "none"
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    flash(
-      snapshot._music
-        ? `Exported with ${snapshot._music.length} track(s) ✓`
-        : "Exported ✓",
-    )
+      // Always include uploaded music
+      try {
+        const tracks = await listTracks()
+        const musicData = []
+        for (const meta of tracks) {
+          const full = await getTrack(meta.id)
+          if (full?.blob) {
+            const b64 = await blobToBase64(full.blob)
+            musicData.push({ ...meta, _b64: b64 })
+          }
+        }
+        if (musicData.length) snapshot._music = musicData
+      } catch {
+        /* skip music on error */
+      }
+
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
+        type: "application/json",
+      })
+      const url = URL.createObjectURL(blob)
+      const name = `fixsothat-backup-${new Date().toISOString().slice(0, 10)}.json`
+      setExportUrl(url)
+      setExportName(name)
+      flash(
+        snapshot._music
+          ? `Ready — ${snapshot._music.length} track(s) included. Click Download.`
+          : "Ready — click Download.",
+      )
+    } catch {
+      flash("Export failed.")
+    }
+    setExporting(false)
   }
 
   // ── Import from JSON file ──────────────────────────────────────────────
@@ -248,10 +256,26 @@ export default function SaveLoadPanel() {
           <button
             type="button"
             className="save-slot-btn save-slot-btn--save"
-            onClick={handleExport}
+            onClick={handlePrepareExport}
+            disabled={exporting}
           >
-            Export All
+            {exporting ? "Preparing…" : "Export All"}
           </button>
+          {exportUrl && (
+            <a
+              href={exportUrl}
+              download={exportName}
+              className="save-slot-btn save-slot-btn--load"
+              onClick={() => {
+                setTimeout(() => {
+                  URL.revokeObjectURL(exportUrl)
+                  setExportUrl(null)
+                }, 1000)
+              }}
+            >
+              Download
+            </a>
+          )}
           <button
             type="button"
             className="save-slot-btn save-slot-btn--load"
