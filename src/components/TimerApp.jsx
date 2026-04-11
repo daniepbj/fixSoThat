@@ -182,6 +182,26 @@ export default function TimerApp({ sidebarMode = false }) {
     beachAudioRef.current.preload = "auto"
   }
 
+  // Unlock beach audio on first user gesture so autoplay works later
+  useEffect(() => {
+    const audio = beachAudioRef.current
+    if (!audio) return
+    function unlock() {
+      audio.play().then(() => {
+        audio.pause()
+        audio.currentTime = 0
+      }).catch(() => {})
+      document.removeEventListener("click", unlock, true)
+      document.removeEventListener("touchstart", unlock, true)
+    }
+    document.addEventListener("click", unlock, true)
+    document.addEventListener("touchstart", unlock, true)
+    return () => {
+      document.removeEventListener("click", unlock, true)
+      document.removeEventListener("touchstart", unlock, true)
+    }
+  }, [])
+
   // One-time data normalization for older localStorage schemas.
   // Also reset timerRunning on first mount — prevents ghost timers from persisted state.
   useEffect(() => {
