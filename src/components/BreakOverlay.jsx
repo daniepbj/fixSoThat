@@ -44,6 +44,21 @@ export default function BreakOverlay({
     Math.floor((1 - secondsLeft / Math.max(1, totalSeconds)) * TIPS.length) %
     TIPS.length
   const fadeRef = useRef(null)
+  const beachAudioRef = useRef(null)
+
+  // Play beach.mp3 during break
+  useEffect(() => {
+    const audio = new Audio("/sounds/beach.mp3")
+    audio.loop = true
+    audio.volume = 0.5
+    beachAudioRef.current = audio
+    audio.play().catch(() => {})
+    return () => {
+      audio.pause()
+      audio.currentTime = 0
+      beachAudioRef.current = null
+    }
+  }, [])
 
   // Fade music out on mount, restore on unmount
   useEffect(() => {
