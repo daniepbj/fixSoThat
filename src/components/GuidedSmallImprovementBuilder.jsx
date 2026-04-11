@@ -25,30 +25,86 @@ function parsePositiveInt(value, fallback = 0) {
 function inferAreaExamples(area) {
   const normalizedArea = area.trim().toLowerCase()
 
-  if (normalizedArea.includes("essay") || normalizedArea.includes("writing") || normalizedArea.includes("paper")) {
+  if (
+    normalizedArea.includes("essay") ||
+    normalizedArea.includes("writing") ||
+    normalizedArea.includes("paper")
+  ) {
     return {
-      now: ["blank document", "only the title is written", "notes are open but no paragraph exists"],
-      target: ["one rough paragraph drafted", "an outline with the intro started", "the next section has a messy first pass"],
-      proof: ["there is one real paragraph on the page", "the document has an outline plus a draft section", "I can point to text instead of just notes"],
-      steps: ["open the essay document", "turn notes into a 3-bullet outline", "draft the first rough paragraph"],
+      now: [
+        "blank document",
+        "only the title is written",
+        "notes are open but no paragraph exists",
+      ],
+      target: [
+        "one rough paragraph drafted",
+        "an outline with the intro started",
+        "the next section has a messy first pass",
+      ],
+      proof: [
+        "there is one real paragraph on the page",
+        "the document has an outline plus a draft section",
+        "I can point to text instead of just notes",
+      ],
+      steps: [
+        "open the essay document",
+        "turn notes into a 3-bullet outline",
+        "draft the first rough paragraph",
+      ],
     }
   }
 
-  if (normalizedArea.includes("kitchen") || normalizedArea.includes("dishes") || normalizedArea.includes("clean")) {
+  if (
+    normalizedArea.includes("kitchen") ||
+    normalizedArea.includes("dishes") ||
+    normalizedArea.includes("clean")
+  ) {
     return {
-      now: ["dirty dishes are stacked up", "the counter is covered", "there are a few things out in different spots"],
-      target: ["the counter is usable", "the sink is mostly cleared", "the obvious mess is gone"],
-      proof: ["the counter is wiped", "dirty dishes are no longer piled up", "there is one clear work surface"],
-      steps: ["throw away visible trash", "stack dishes by the sink", "wipe one section of counter"],
+      now: [
+        "dirty dishes are stacked up",
+        "the counter is covered",
+        "there are a few things out in different spots",
+      ],
+      target: [
+        "the counter is usable",
+        "the sink is mostly cleared",
+        "the obvious mess is gone",
+      ],
+      proof: [
+        "the counter is wiped",
+        "dirty dishes are no longer piled up",
+        "there is one clear work surface",
+      ],
+      steps: [
+        "throw away visible trash",
+        "stack dishes by the sink",
+        "wipe one section of counter",
+      ],
     }
   }
 
   if (normalizedArea.includes("email") || normalizedArea.includes("inbox")) {
     return {
-      now: ["the inbox feels overloaded", "important messages are mixed with noise", "I keep avoiding opening it"],
-      target: ["the urgent emails are handled", "the inbox is sorted into a few clear groups", "the top priority replies are sent"],
-      proof: ["the urgent emails are answered", "the inbox has fewer open decisions", "the messages I was avoiding are no longer unread"],
-      steps: ["open the inbox", "star the urgent messages", "reply to the first important email"],
+      now: [
+        "the inbox feels overloaded",
+        "important messages are mixed with noise",
+        "I keep avoiding opening it",
+      ],
+      target: [
+        "the urgent emails are handled",
+        "the inbox is sorted into a few clear groups",
+        "the top priority replies are sent",
+      ],
+      proof: [
+        "the urgent emails are answered",
+        "the inbox has fewer open decisions",
+        "the messages I was avoiding are no longer unread",
+      ],
+      steps: [
+        "open the inbox",
+        "star the urgent messages",
+        "reply to the first important email",
+      ],
     }
   }
 
@@ -120,7 +176,10 @@ export default function GuidedSmallImprovementBuilder() {
 
   const trimmedArea = area.trim()
   const areaLabel = trimmedArea || "this area"
-  const areaExamples = useMemo(() => inferAreaExamples(trimmedArea || "this area"), [trimmedArea])
+  const areaExamples = useMemo(
+    () => inferAreaExamples(trimmedArea || "this area"),
+    [trimmedArea],
+  )
 
   const maxTotal = parsePositiveInt(maxMinutes, 0)
   const overBudget = maxTotal > 0 && plannedTotal > maxTotal
@@ -141,7 +200,7 @@ export default function GuidedSmallImprovementBuilder() {
   // Proof management
   function updateProofText(id, text) {
     setProofs((prev) =>
-      prev.map((proof) => (proof.id === id ? { ...proof, text } : proof))
+      prev.map((proof) => (proof.id === id ? { ...proof, text } : proof)),
     )
   }
 
@@ -159,7 +218,7 @@ export default function GuidedSmallImprovementBuilder() {
   // Step management
   function updateStepText(id, text) {
     setSteps((prev) =>
-      prev.map((step) => (step.id === id ? { ...step, text } : step))
+      prev.map((step) => (step.id === id ? { ...step, text } : step)),
     )
   }
 
@@ -167,8 +226,8 @@ export default function GuidedSmallImprovementBuilder() {
     const normalizedMinutes = parsePositiveInt(minutes, 0)
     setSteps((prev) =>
       prev.map((step) =>
-        step.id === id ? { ...step, minutes: normalizedMinutes } : step
-      )
+        step.id === id ? { ...step, minutes: normalizedMinutes } : step,
+      ),
     )
   }
 
@@ -311,7 +370,8 @@ export default function GuidedSmallImprovementBuilder() {
           <div className="gsi-stage">
             <div className="gsi-stage-body">
               <label className="gsi-label" htmlFor="gsi-area">
-                What area would make life easier if I improved it a little right now?
+                What area would make life easier if I improved it a little right
+                now?
               </label>
               <p className="gsi-hint">Pick one area, not your whole life.</p>
               <input
@@ -322,7 +382,10 @@ export default function GuidedSmallImprovementBuilder() {
                 placeholder="kitchen"
               />
 
-              <label className="gsi-label gsi-label--top" htmlFor="gsi-max-time">
+              <label
+                className="gsi-label gsi-label--top"
+                htmlFor="gsi-max-time"
+              >
                 Max time I want to spend on this
               </label>
               <div className="gsi-time-input-wrapper">
@@ -356,7 +419,9 @@ export default function GuidedSmallImprovementBuilder() {
                   <label className="gsi-label" htmlFor="gsi-now">
                     What is the current state of {areaLabel} right now?
                   </label>
-                  <p className="gsi-hint">Keep it tied to {areaLabel}, not a different area.</p>
+                  <p className="gsi-hint">
+                    Keep it tied to {areaLabel}, not a different area.
+                  </p>
                   <textarea
                     id="gsi-now"
                     className="gsi-input gsi-textarea"
@@ -372,7 +437,9 @@ export default function GuidedSmallImprovementBuilder() {
                   <label className="gsi-label" htmlFor="gsi-good-enough">
                     What would be good enough for {areaLabel} right now?
                   </label>
-                  <p className="gsi-hint">Not perfect. Just better for {areaLabel}.</p>
+                  <p className="gsi-hint">
+                    Not perfect. Just better for {areaLabel}.
+                  </p>
                   <textarea
                     id="gsi-good-enough"
                     className="gsi-input gsi-textarea"
@@ -381,7 +448,10 @@ export default function GuidedSmallImprovementBuilder() {
                     onChange={(e) => setGoodEnough(e.target.value)}
                     placeholder={`What would make ${areaLabel} feel meaningfully better?`}
                   />
-                  <ExampleList title="Examples" examples={areaExamples.target} />
+                  <ExampleList
+                    title="Examples"
+                    examples={areaExamples.target}
+                  />
                 </div>
               </div>
             </div>
@@ -403,7 +473,10 @@ export default function GuidedSmallImprovementBuilder() {
               <label className="gsi-label" htmlFor="gsi-proof-0">
                 How will I know {areaLabel} reached good enough?
               </label>
-              <p className="gsi-hint">Add proof one checkpoint at a time so you can see progress in {areaLabel}.</p>
+              <p className="gsi-hint">
+                Add proof one checkpoint at a time so you can see progress in{" "}
+                {areaLabel}.
+              </p>
               <ExampleList title="Examples" examples={areaExamples.proof} />
 
               <div className="gsi-proof-rows">
@@ -413,7 +486,9 @@ export default function GuidedSmallImprovementBuilder() {
                       className="gsi-input gsi-proof-input"
                       type="text"
                       value={proof.text}
-                      onChange={(e) => updateProofText(proof.id, e.target.value)}
+                      onChange={(e) =>
+                        updateProofText(proof.id, e.target.value)
+                      }
                       placeholder={`One visible sign that ${areaLabel} moved forward`}
                     />
                     <button
@@ -465,12 +540,21 @@ export default function GuidedSmallImprovementBuilder() {
               <label className="gsi-label" htmlFor="gsi-step-0">
                 What tiny steps might help move {areaLabel} forward?
               </label>
-              <p className="gsi-hint">Brainstorm fast. Keep the steps clearly about {areaLabel}. Order them next.</p>
-              <ExampleList title="Step examples" examples={areaExamples.steps} />
+              <p className="gsi-hint">
+                Brainstorm fast. Keep the steps clearly about {areaLabel}. Order
+                them next.
+              </p>
+              <ExampleList
+                title="Step examples"
+                examples={areaExamples.steps}
+              />
 
               <div className="gsi-step-rows gsi-step-rows--brainstorm">
                 {steps.map((step) => (
-                  <div className="gsi-step-row gsi-step-row--brainstorm" key={step.id}>
+                  <div
+                    className="gsi-step-row gsi-step-row--brainstorm"
+                    key={step.id}
+                  >
                     <input
                       className="gsi-input gsi-step-input"
                       type="text"
@@ -483,7 +567,9 @@ export default function GuidedSmallImprovementBuilder() {
                       type="number"
                       min="1"
                       value={step.minutes || ""}
-                      onChange={(e) => updateStepMinutes(step.id, e.target.value)}
+                      onChange={(e) =>
+                        updateStepMinutes(step.id, e.target.value)
+                      }
                       placeholder="2"
                     />
                     <button
@@ -535,11 +621,17 @@ export default function GuidedSmallImprovementBuilder() {
               <label className="gsi-label">
                 Put the steps for {areaLabel} in the order you want
               </label>
-              <p className="gsi-hint">Reorder, adjust, or remove steps until the plan for {areaLabel} feels realistic.</p>
+              <p className="gsi-hint">
+                Reorder, adjust, or remove steps until the plan for {areaLabel}{" "}
+                feels realistic.
+              </p>
 
               <div className="gsi-step-rows gsi-step-rows--order">
                 {steps.map((step, idx) => (
-                  <div className="gsi-step-row gsi-step-row--order" key={step.id}>
+                  <div
+                    className="gsi-step-row gsi-step-row--order"
+                    key={step.id}
+                  >
                     <span className="gsi-step-index">{idx + 1}</span>
                     <input
                       className="gsi-input gsi-step-input"
@@ -553,7 +645,9 @@ export default function GuidedSmallImprovementBuilder() {
                       type="number"
                       min="1"
                       value={step.minutes || ""}
-                      onChange={(e) => updateStepMinutes(step.id, e.target.value)}
+                      onChange={(e) =>
+                        updateStepMinutes(step.id, e.target.value)
+                      }
                       placeholder="2"
                     />
                     <button
@@ -588,7 +682,9 @@ export default function GuidedSmallImprovementBuilder() {
 
               <div
                 className={`gsi-budget-display ${
-                  overBudget ? "gsi-budget-display--over" : "gsi-budget-display--ok"
+                  overBudget
+                    ? "gsi-budget-display--over"
+                    : "gsi-budget-display--ok"
                 }`}
               >
                 <span className="gsi-budget-label">Planned steps total</span>
@@ -644,13 +740,18 @@ export default function GuidedSmallImprovementBuilder() {
                   </div>
                 )}
                 <div className="gsi-review-item">
-                  <strong>Steps ({steps.filter((s) => s.text.trim()).length})</strong>
+                  <strong>
+                    Steps ({steps.filter((s) => s.text.trim()).length})
+                  </strong>
                   <ol className="gsi-review-steps-list">
                     {steps
                       .filter((s) => s.text.trim())
                       .map((s) => (
                         <li key={s.id}>
-                          {s.text} <span className="gsi-review-time">({s.minutes}m)</span>
+                          {s.text}{" "}
+                          <span className="gsi-review-time">
+                            ({s.minutes}m)
+                          </span>
                         </li>
                       ))}
                   </ol>
