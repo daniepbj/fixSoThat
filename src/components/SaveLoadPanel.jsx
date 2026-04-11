@@ -1,8 +1,8 @@
 import { useState, useRef } from "react"
-import JSZip from "jszip"
 import { useMainTask } from "../context/MainTaskContext"
 import { fmtLocalDateTime } from "../utils/timeUtils"
 import { listTracks, getTrack, addTrackFromFile } from "../utils/musicStore"
+import JSZip from "jszip"
 
 function formatSavedAt(iso) {
   if (!iso) return ""
@@ -34,17 +34,41 @@ const FST_KEYS = [
   "fst_v1_init",
 ]
 
+// Build the export JSON string synchronously from localStorage
+function buildExportJSON() {
+  const snapshot = {}
+  for (const key of FST_KEYS) {
+    const val = localStorage.getItem(key)
+    if (val !== null) {
+      try {
+        snapshot[key] = JSON.parse(val)
+      } catch (e) {
+        snapshot[key] = val // fallback to raw string if not valid JSON
+      }
+    }
+  }
+  snapshot._exportedAt = new Date().toISOString()
+  return JSON.stringify(snapshot, null, 2)
+}
+
 export default function SaveLoadPanel() {
   const { saveSlots, saveSlot, loadSlot, clearSlot, mainTasks } = useMainTask()
   const [slotNames, setSlotNames] = useState(["", "", "", "", ""])
   const [message, setMessage] = useState("")
-  const [exportUrl, setExportUrl] = useState(null)
-  const [exportName, setExportName] = useState("")
-  const [exporting, setExporting] = useState(false)
+  const [musicMsg, setMusicMsg] = useState("")
+  const [includeMusic, setIncludeMusic] = useState(true)
   const importRef = useRef(null)
   const flashTimerRef = useRef(null)
 
-  function flash(msg, duration = 4000) {
+  // Fallback JSON export for privacy browsers
+  const exportFileName = `fixsothat-backup-${new Date().toISOString().slice(0, 10)}.json`
+  const exportJSON = buildExportJSON()
+  const exportBlob = new Blob([exportJSON], { type: "application/json" })
+  const exportHref = URL.createObjectURL(exportBlob)
+  // Clean up URL on unmount
+  // (no useMemo/useEffect to keep it always fresh, since it's only fallback)
+
+  function flash(msg, duration = 3000) {
     clearTimeout(flashTimerRef.current)
     setMessage(msg)
     if (duration > 0) {
@@ -52,63 +76,41 @@ export default function SaveLoadPanel() {
     }
   }
 
-  // ── Export: build zip with backup.json + music/ folder ──────────────────
-  async function handlePrepareExport() {
-    if (exportUrl) {
-      URL.revokeObjectURL(exportUrl)
-      setExportUrl(null)
-    }
-    setExporting(true)
-    setMessage("Preparing export…")
+  // ── Export everything as ZIP (tasks/settings + music) ──
+  async function handleExportZip() {
+    setMusicMsg("Preparing zip…")
     try {
       const zip = new JSZip()
-
-      // 1. Collect all localStorage keys into backup.json
-      const snapshot = {}
-      for (const key of FST_KEYS) {
-        const val = localStorage.getItem(key)
-        if (val !== null) snapshot[key] = JSON.parse(val)
-      }
-      snapshot._exportedAt = new Date().toISOString()
-
-      // 2. Add music files to music/ folder and track metadata
-      const musicMeta = []
-      try {
+      // Add settings/tasks
+      zip.file("backup.json", buildExportJSON())
+      // Optionally add music
+      if (includeMusic) {
         const tracks = await listTracks()
         for (const meta of tracks) {
           const full = await getTrack(meta.id)
           if (full?.blob) {
-            const safeName = meta.name.replace(/[^a-zA-Z0-9._-]/g, "_")
-            const path = `music/${meta.id}_${safeName}`
-            zip.file(path, full.blob)
-            musicMeta.push({ ...meta, _file: path })
+            zip.file(`music/${meta.name || meta.id}`, full.blob)
           }
         }
-      } catch (e) {
-        console.warn("Could not read music tracks:", e)
       }
-      if (musicMeta.length) snapshot._musicFiles = musicMeta
-
-      zip.file("backup.json", JSON.stringify(snapshot, null, 2))
-
-      // 3. Generate zip blob
       const blob = await zip.generateAsync({ type: "blob" })
       const url = URL.createObjectURL(blob)
-      const name = `fixsothat-backup-${new Date().toISOString().slice(0, 10)}.zip`
-      setExportUrl(url)
-      setExportName(name)
-      const msg = musicMeta.length
-        ? `Ready — ${musicMeta.length} track(s) included. Click Download.`
-        : "Ready — click Download."
-      setMessage(msg)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `fixsothat-backup-${new Date().toISOString().slice(0, 10)}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 2000)
+      setMusicMsg("Zip download started ✓")
+      setTimeout(() => setMusicMsg(""), 2000)
     } catch (err) {
-      console.error("Export failed:", err)
-      flash("Export failed: " + (err?.message || "unknown error"))
+      setMusicMsg("Zip export failed.")
+      setTimeout(() => setMusicMsg(""), 3000)
     }
-    setExporting(false)
   }
 
-  // ── Import: accept .zip or .json ──────────────────────────────────────
+  // ── Import from JSON file ──────────────────────────────────────────────
   function handleImportClick() {
     importRef.current?.click()
   }
@@ -117,24 +119,9 @@ export default function SaveLoadPanel() {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      let data
-      let musicFiles = null
-
-      if (file.name.endsWith(".zip")) {
-        const zip = await JSZip.loadAsync(file)
-        const jsonFile = zip.file("backup.json")
-        if (!jsonFile) throw new Error("No backup.json found in zip")
-        const text = await jsonFile.async("text")
-        data = JSON.parse(text)
-        musicFiles = zip
-      } else {
-        const text = await file.text()
-        data = JSON.parse(text)
-      }
-
+      const text = await file.text()
+      const data = JSON.parse(text)
       if (typeof data !== "object" || data === null) throw new Error("bad")
-
-      // Restore localStorage keys
       let count = 0
       for (const key of FST_KEYS) {
         if (key in data) {
@@ -142,43 +129,66 @@ export default function SaveLoadPanel() {
           count++
         }
       }
+      flash(`Imported ${count} keys — reloading…`)
+      setTimeout(() => window.location.reload(), 800)
+    } catch {
+      flash("Invalid backup file.")
+    }
+    e.target.value = ""
+  }
 
-      // Restore music from zip
-      let musicCount = 0
-      if (musicFiles && Array.isArray(data._musicFiles)) {
-        for (const meta of data._musicFiles) {
-          if (!meta._file) continue
-          const entry = musicFiles.file(meta._file)
-          if (!entry) continue
-          const blob = await entry.async("blob")
-          const mime = meta.mimeType || "audio/mpeg"
-          const f = new File([blob], meta.name || "track", { type: mime })
-          await addTrackFromFile(f)
-          musicCount++
-        }
-      }
-
-      // Legacy: base64 embedded music from old exports
-      if (!musicCount && Array.isArray(data._music)) {
-        for (const track of data._music) {
-          if (track._b64 && track.mimeType && track.name) {
-            const bin = atob(track._b64)
-            const bytes = new Uint8Array(bin.length)
-            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-            const blob = new Blob([bytes], { type: track.mimeType })
-            const f = new File([blob], track.name, { type: track.mimeType })
-            await addTrackFromFile(f)
-            musicCount++
+  // ── Import from zip or json ──
+  async function handleImportFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      if (file.name.endsWith(".zip")) {
+        // Import from zip
+        const zip = await JSZip.loadAsync(file)
+        // Restore settings/tasks
+        const jsonFile = zip.file("backup.json")
+        if (jsonFile) {
+          const text = await jsonFile.async("text")
+          const data = JSON.parse(text)
+          let count = 0
+          for (const key of FST_KEYS) {
+            if (key in data) {
+              localStorage.setItem(key, JSON.stringify(data[key]))
+              count++
+            }
           }
         }
+        // Restore music
+        const musicFiles = Object.values(zip.files).filter((f) =>
+          f.name.startsWith("music/"),
+        )
+        let musicCount = 0
+        for (const mf of musicFiles) {
+          const blob = await mf.async("blob")
+          const fileObj = new File([blob], mf.name.replace(/^music\//, ""), {
+            type: blob.type,
+          })
+          await addTrackFromFile(fileObj)
+          musicCount++
+        }
+        flash(`Imported backup and ${musicCount} track(s) — reloading…`)
+        setTimeout(() => window.location.reload(), 800)
+      } else {
+        // Import from JSON
+        const text = await file.text()
+        const data = JSON.parse(text)
+        if (typeof data !== "object" || data === null) throw new Error("bad")
+        let count = 0
+        for (const key of FST_KEYS) {
+          if (key in data) {
+            localStorage.setItem(key, JSON.stringify(data[key]))
+            count++
+          }
+        }
+        flash(`Imported ${count} keys — reloading…`)
+        setTimeout(() => window.location.reload(), 800)
       }
-
-      const parts = [`Imported ${count} keys`]
-      if (musicCount) parts.push(`${musicCount} track(s)`)
-      flash(`${parts.join(" + ")} — reloading…`)
-      setTimeout(() => window.location.reload(), 800)
-    } catch (err) {
-      console.error("Import failed:", err)
+    } catch {
       flash("Invalid backup file.")
     }
     e.target.value = ""
@@ -279,39 +289,44 @@ export default function SaveLoadPanel() {
       <div className="export-import-section">
         <h3 className="export-import-title">Export / Import</h3>
         <p className="save-load-panel__help">
-          Download all tasks, settings, and music as a JSON file, or load a
-          previous backup to restore everything.
+          Download all tasks, settings, and music as a single zip file, or use
+          the fallback for privacy browsers.
         </p>
         <div className="export-import-actions">
           <button
             type="button"
             className="save-slot-btn save-slot-btn--save"
-            onClick={handlePrepareExport}
-            disabled={exporting}
+            onClick={handleExportZip}
           >
-            {exporting ? "Preparing…" : "Export All"}
+            Export Everything (.zip)
           </button>
-          {exportUrl && (
-            <a
-              href={exportUrl}
-              download={exportName}
-              className="save-slot-btn save-slot-btn--load"
-              onClick={() => {
-                setTimeout(() => {
-                  URL.revokeObjectURL(exportUrl)
-                  setExportUrl(null)
-                }, 1000)
-              }}
-            >
-              Download
-            </a>
-          )}
+          <label
+            style={{ marginLeft: 12, fontSize: "0.98em", userSelect: "none" }}
+          >
+            <input
+              type="checkbox"
+              checked={includeMusic}
+              onChange={(e) => setIncludeMusic(e.target.checked)}
+              style={{ marginRight: 4 }}
+            />
+            Include music
+          </label>
+          <a
+            href={exportHref}
+            download={exportFileName}
+            className="save-slot-btn save-slot-btn--load"
+            style={{ marginLeft: 12 }}
+          >
+            Privacy Browser Export (.json)
+          </a>
+        </div>
+        <div className="export-import-actions" style={{ marginTop: 8 }}>
           <button
             type="button"
             className="save-slot-btn save-slot-btn--load"
-            onClick={handleImportClick}
+            onClick={() => importRef.current?.click()}
           >
-            Import
+            Import (.zip or .json)
           </button>
           <input
             ref={importRef}
@@ -321,6 +336,7 @@ export default function SaveLoadPanel() {
             onChange={handleImportFile}
           />
         </div>
+        {musicMsg && <p className="save-load-msg">{musicMsg}</p>}
       </div>
     </section>
   )

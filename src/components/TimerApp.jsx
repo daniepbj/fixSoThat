@@ -1129,13 +1129,16 @@ export default function TimerApp({ sidebarMode = false }) {
         </div>
       </TimerProvider>
 
-      {showAddForm && (
-        <AddTaskForm
-          onAdd={addTask}
-          onClose={() => setShowAddForm(false)}
-          defaultDuration={settings.defaultTaskDuration}
-        />
-      )}
+      {/* Add Task Modal (scoped locally) */}
+      <div className="add-task-form-parent">
+        {showAddForm && (
+          <AddTaskForm
+            onAdd={addTask}
+            onClose={() => setShowAddForm(false)}
+            defaultDuration={settings.defaultTaskDuration}
+          />
+        )}
+      </div>
 
       <BottomNav currentView={currentView} setCurrentView={setCurrentView} />
 
