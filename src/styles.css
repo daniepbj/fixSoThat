@@ -249,7 +249,13 @@ body {
 
 .task-builder-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
+}
+
+.task-builder-clear-after-load {
+  margin-top: 16px;
 }
 
 .task-builder-copy-message {

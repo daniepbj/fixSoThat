@@ -133,8 +133,22 @@ export default function StructuredTaskBuilder() {
   const [llamaPasted, setLlamaPasted] = useState(false)
   const [copyMessage, setCopyMessage] = useState("")
   const [loadMessage, setLoadMessage] = useState("")
+  const [clearAfterLoad, setClearAfterLoad] = useState(true)
   const [draggedStepId, setDraggedStepId] = useState("")
   const stepInputRefs = useRef({})
+
+  function resetStructuredWriterForm() {
+    setGoal("")
+    setSteps([{ id: genStepId(), raw: "" }])
+    setProof("")
+    setPriority("")
+    setGeneratedText("")
+    setLlamaText("")
+    setTodoChunks([])
+    setTodoChecks([])
+    setLlamaPasted(false)
+    setCopyMessage("")
+  }
 
   function showCopyMessage(message) {
     setCopyMessage(message)
@@ -312,6 +326,9 @@ export default function StructuredTaskBuilder() {
         priority: String(priority || "").trim(),
       })
       setLoadMessage("Loaded into task list ↓")
+      if (clearAfterLoad) {
+        resetStructuredWriterForm()
+      }
     } catch {
       setLoadMessage("Could not load task. Please try again.")
     }
@@ -477,6 +494,14 @@ export default function StructuredTaskBuilder() {
           >
             Load into task list ↓
           </button>
+          <label className="task-check-label task-builder-clear-after-load">
+            <input
+              type="checkbox"
+              checked={clearAfterLoad}
+              onChange={(e) => setClearAfterLoad(e.target.checked)}
+            />
+            Clear form after loading
+          </label>
         </div>
       </form>
 
