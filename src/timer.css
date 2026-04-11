@@ -124,11 +124,10 @@
 }
 
 .top-bar {
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 20px 14px;
+  padding: 10px 20px;
   background: var(--ta-top-bar);
   border-bottom: 1px solid var(--ta-top-border);
   backdrop-filter: blur(12px);
@@ -1691,39 +1690,64 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Pomodoro Progress Bar — TopBar
+   Pomodoro Strip — dedicated bar below TopBar
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.pomo-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+.pomo-strip {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 16px 6px;
+  padding: 6px 20px;
+  background: var(--ta-top-bar);
+  border-bottom: 1px solid var(--ta-top-border);
+  flex-shrink: 0;
+  animation: pomoStripIn 0.3s ease-out;
 }
 
-.pomo-bar__track {
+@keyframes pomoStripIn {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pomo-strip__icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.pomo-strip__track {
   flex: 1;
-  height: 5px;
+  height: 6px;
   border-radius: 3px;
   background: var(--ta-border, rgba(255, 255, 255, 0.15));
   overflow: hidden;
 }
 
-.pomo-bar__fill {
+.pomo-strip__fill {
   height: 100%;
   border-radius: 3px;
   background: linear-gradient(90deg, #ff6b6b, #ee5a24);
   transition: width 1s linear;
 }
 
-.pomo-bar__label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  white-space: nowrap;
-  opacity: 0.85;
+.pomo-strip__time {
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--ta-text);
+  min-width: 3.5em;
+  text-align: right;
+}
+
+.pomo-strip__label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.6;
+  color: var(--ta-text);
+  white-space: nowrap;
 }

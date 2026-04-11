@@ -50,54 +50,60 @@ export default function TopBar({
   }
 
   return (
-    <header className="top-bar">
-      <div className="top-bar__stat">
-        <span className="top-bar__label">List time</span>
-        <span className="top-bar__value">{fmtDuration(sessionSeconds)}</span>
-      </div>
-      <div className="top-bar__center" title={getTimezone()}>
-        🕐 {clock}{" "}
-        <span style={{ fontSize: "0.65em", opacity: 0.6 }}>
-          ({getTimezone()})
-        </span>
-      </div>
-      <div className="top-bar__right">
-        <div className="top-bar__stat top-bar__stat--right">
-          <span className="top-bar__label">End time</span>
-          <span className="top-bar__value">
-            {projectedEndTimeLocal(totalRemainingSeconds)}
+    <>
+      <header className="top-bar">
+        <div className="top-bar__stat">
+          <span className="top-bar__label">List time</span>
+          <span className="top-bar__value">{fmtDuration(sessionSeconds)}</span>
+        </div>
+        <div className="top-bar__center" title={getTimezone()}>
+          🕐 {clock}{" "}
+          <span style={{ fontSize: "0.65em", opacity: 0.6 }}>
+            ({getTimezone()})
           </span>
         </div>
-        <button
-          className={`top-bar__sound ${settings.soundEnabled ? "active" : ""}`}
-          onClick={toggleSound}
-          title={settings.soundEnabled ? "Mute soundscape" : "Play soundscape"}
-        >
-          {settings.soundEnabled ? "🔊" : "🔇"}
-        </button>
-        <button
-          className="top-bar__sound"
-          onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-          title={
-            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
-          }
-        >
-          {theme === "dark" ? "☀️" : "🌙"}
-        </button>
-      </div>
+        <div className="top-bar__right">
+          <div className="top-bar__stat top-bar__stat--right">
+            <span className="top-bar__label">End time</span>
+            <span className="top-bar__value">
+              {projectedEndTimeLocal(totalRemainingSeconds)}
+            </span>
+          </div>
+          <button
+            className={`top-bar__sound ${settings.soundEnabled ? "active" : ""}`}
+            onClick={toggleSound}
+            title={
+              settings.soundEnabled ? "Mute soundscape" : "Play soundscape"
+            }
+          >
+            {settings.soundEnabled ? "🔊" : "🔇"}
+          </button>
+          <button
+            className="top-bar__sound"
+            onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+            title={
+              theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+            }
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
+        </div>
+      </header>
       {pomoEnabled && pomoWorkStart && !onBreak && (
-        <div className="pomo-bar">
-          <div className="pomo-bar__track">
+        <div className="pomo-strip">
+          <span className="pomo-strip__icon">🍅</span>
+          <div className="pomo-strip__track">
             <div
-              className="pomo-bar__fill"
+              className="pomo-strip__fill"
               style={{ width: `${pomoProgress * 100}%` }}
             />
           </div>
-          <span className="pomo-bar__label">
-            🍅 {fmtTimerDisplay(pomoRemaining)} until break
+          <span className="pomo-strip__time">
+            {fmtTimerDisplay(pomoRemaining)}
           </span>
+          <span className="pomo-strip__label">until break</span>
         </div>
       )}
-    </header>
+    </>
   )
 }
