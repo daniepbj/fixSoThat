@@ -37,7 +37,6 @@ export default function SaveLoadPanel() {
   const { saveSlots, saveSlot, loadSlot, clearSlot, mainTasks } = useMainTask()
   const [slotNames, setSlotNames] = useState(["", "", "", "", ""])
   const [message, setMessage] = useState("")
-  const [includeMusic, setIncludeMusic] = useState(false)
   const importRef = useRef(null)
 
   function flash(msg) {
@@ -64,6 +63,7 @@ export default function SaveLoadPanel() {
 
   // ── Export everything as JSON file ──────────────────────────────────────
   async function handleExport() {
+    flash("Preparing export…")
     const snapshot = {}
     for (const key of FST_KEYS) {
       const val = localStorage.getItem(key)
@@ -71,21 +71,20 @@ export default function SaveLoadPanel() {
     }
     snapshot._exportedAt = new Date().toISOString()
 
-    if (includeMusic) {
-      try {
-        const tracks = await listTracks()
-        const musicData = []
-        for (const meta of tracks) {
-          const full = await getTrack(meta.id)
-          if (full?.blob) {
-            const b64 = await blobToBase64(full.blob)
-            musicData.push({ ...meta, _b64: b64 })
-          }
+    // Always include uploaded music
+    try {
+      const tracks = await listTracks()
+      const musicData = []
+      for (const meta of tracks) {
+        const full = await getTrack(meta.id)
+        if (full?.blob) {
+          const b64 = await blobToBase64(full.blob)
+          musicData.push({ ...meta, _b64: b64 })
         }
-        if (musicData.length) snapshot._music = musicData
-      } catch {
-        /* skip music on error */
       }
+      if (musicData.length) snapshot._music = musicData
+    } catch {
+      /* skip music on error */
     }
 
     const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
@@ -95,7 +94,10 @@ export default function SaveLoadPanel() {
     const a = document.createElement("a")
     a.href = url
     a.download = `fixsothat-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.style.display = "none"
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
     URL.revokeObjectURL(url)
     flash(
       snapshot._music
@@ -239,17 +241,9 @@ export default function SaveLoadPanel() {
       <div className="export-import-section">
         <h3 className="export-import-title">Export / Import</h3>
         <p className="save-load-panel__help">
-          Download all tasks and settings as a JSON file, or load a previous
-          backup.
+          Download all tasks, settings, and music as a JSON file, or load a
+          previous backup to restore everything.
         </p>
-        <label className="export-music-check">
-          <input
-            type="checkbox"
-            checked={includeMusic}
-            onChange={(e) => setIncludeMusic(e.target.checked)}
-          />
-          Include uploaded music
-        </label>
         <div className="export-import-actions">
           <button
             type="button"
