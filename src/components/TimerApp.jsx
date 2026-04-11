@@ -338,18 +338,21 @@ export default function TimerApp({ sidebarMode = false }) {
 
   // ── Stop timer when there are no active tasks ────────────────────────────
   useEffect(() => {
-    if (timerRunning && activeTasks.length === 0) {
-      setTimerRunning(false)
-    }
     if (activeTasks.length === 0) {
+      if (timerRunning && !pomoEnabled) {
+        setTimerRunning(false)
+      }
       setSessionSeconds(0)
-      setPomodoroWorkStart(null)
-      setBreakStartISO(null)
-      setOnBreak(false)
+      if (!pomoEnabled) {
+        setPomodoroWorkStart(null)
+        setBreakStartISO(null)
+        setOnBreak(false)
+      }
     }
   }, [
     activeTasks.length,
     timerRunning,
+    pomoEnabled,
     setTimerRunning,
     setSessionSeconds,
     setPomodoroWorkStart,
