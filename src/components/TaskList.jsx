@@ -78,6 +78,7 @@ export default function TaskList({
   completedTasks,
   settings,
   completeTask,
+  restoreCompletedTask,
   deleteTask,
   resetTask,
   deferTask,
@@ -218,6 +219,15 @@ export default function TaskList({
                 <span className="completed-task__time">
                   {fmtLocalTime(task.completedAt)}
                 </span>
+                <button
+                  type="button"
+                  className="completed-task__restore"
+                  onClick={() => restoreCompletedTask(task.id)}
+                  title="Move back to active"
+                  aria-label={`Restore ${task.title}`}
+                >
+                  ↺
+                </button>
               </div>
             ))}
           </div>

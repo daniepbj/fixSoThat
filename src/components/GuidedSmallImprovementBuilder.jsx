@@ -1,9 +1,13 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect, useRef } from "react"
 import { useMainTask } from "../context/MainTaskContext"
 import { useLocalStorage } from "../hooks/useLocalStorage"
 import { genStepId, formatStepRaw } from "../utils/stepUtils"
+import { fmtTimerDisplay } from "../utils/timeUtils"
 
 const STAGES = ["Area", "Target", "Proof", "Brainstorm", "Order", "Save"]
+const MAX_AREAS = 3
+const TIME_CHIPS = [3, 5, 10]
+const AREA_PLACEHOLDERS = ["cleaning", "school project", "website"]
 
 function genProofId() {
   return `proof-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -15,6 +19,29 @@ function makeStep() {
 
 function makeProof() {
   return { id: genProofId(), text: "" }
+}
+
+function makeArea() {
+  return {
+    id: genStepId(),
+    name: "",
+    minutes: "5",
+    chipValue: "5",
+  }
+}
+
+function parseAreaInput(raw, currentMinutes = "5") {
+  const text = String(raw || "")
+  const trimmed = text.trim()
+  if (!trimmed)
+    return { name: "", minutes: currentMinutes, chipValue: "custom" }
+  const match = trimmed.match(/^(.+?)\s+(\d+)$/)
+  if (!match)
+    return { name: text, minutes: currentMinutes, chipValue: "custom" }
+  const name = match[1].trim()
+  const mins = String(Math.max(1, parseInt(match[2], 10) || 1))
+  const chipValue = TIME_CHIPS.includes(Number(mins)) ? mins : "custom"
+  return { name, minutes: mins, chipValue }
 }
 
 function parsePositiveInt(value, fallback = 0) {
@@ -159,47 +186,342 @@ function ExampleList({ title, examples }) {
 }
 
 export default function GuidedSmallImprovementBuilder() {
-  const { addMainTask } = useMainTask()
+  const {
+    addMainTask,
+    addMainTaskAndActivate,
+    mainTasks,
+    activeMainTaskId,
+    setStepCompleted,
+  } = useMainTask()
   const [builderVisualStyle] = useLocalStorage(
     "fst_builder_visual_style",
     "calm",
   )
 
+  // Live timer state — poll localStorage every second so this works even
+  // though the builder lives outside TimerProvider.
+  const [liveTimerTask, setLiveTimerTask] = useState(null)
+  const [liveTimerRunning, setLiveTimerRunning] = useState(false)
+  useEffect(() => {
+    function read() {
+      try {
+        const tasks = JSON.parse(
+          window.localStorage.getItem("fst_active") || "[]",
+        )
+        const running = JSON.parse(
+          window.localStorage.getItem("fst_running") || "false",
+        )
+        setLiveTimerTask(tasks[0] ?? null)
+        setLiveTimerRunning(Boolean(running))
+      } catch {}
+    }
+    read()
+    const id = setInterval(read, 1000)
+    return () => clearInterval(id)
+  }, [])
+
   const [stage, setStage] = useState(0)
-  const [area, setArea] = useState("")
-  const [maxMinutes, setMaxMinutes] = useState("5")
+  const [areaIndex, setAreaIndex] = useState(0)
+  // Per-area saved data: { [index]: { now, goodEnough, proofs, steps } }
+  const [areaDataCache, setAreaDataCache] = useState({})
+  const [areas, setAreas] = useState([makeArea()])
   const [now, setNow] = useState("")
   const [goodEnough, setGoodEnough] = useState("")
   const [proofs, setProofs] = useState([makeProof()])
   const [steps, setSteps] = useState([makeStep()])
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
+  const [builderQueueTaskId, setBuilderQueueTaskId] = useState("")
+  const [stageStepIds, setStageStepIds] = useState({ 0: [], 1: [], 2: [] })
+  const [lastStageStepIds, setLastStageStepIds] = useState({})
+  const areaInputRefs = useRef({})
 
   const plannedTotal = useMemo(() => {
     return steps.reduce((sum, step) => sum + (step.minutes || 0), 0)
   }, [steps])
 
-  const trimmedArea = area.trim()
-  const areaLabel = trimmedArea || "this area"
+  const normalizedAreas = areas.map((a) => {
+    const parsed = parseAreaInput(a.name, a.minutes)
+    return {
+      ...a,
+      parsedName: parsed.name.trim(),
+      parsedMinutes: parsePositiveInt(parsed.minutes, 0),
+    }
+  })
+  const filledAreas = normalizedAreas.filter((a) => a.parsedName)
+  const trimmedAreas = filledAreas.map((a) => a.parsedName)
+  const trimmedArea = trimmedAreas.join(" / ")
+
+  // Per-area context used by stages 1–4
+  const currentAreaEntry = filledAreas[areaIndex] || normalizedAreas[areaIndex]
+  const currentAreaName = currentAreaEntry?.parsedName || "this area"
+  const currentAreaMaxMinutes = currentAreaEntry?.parsedMinutes || 0
+  const areaLabel =
+    filledAreas.length > 1
+      ? `${currentAreaName} (${areaIndex + 1} of ${filledAreas.length})`
+      : currentAreaName
   const areaExamples = useMemo(
-    () => inferAreaExamples(trimmedArea || "this area"),
-    [trimmedArea],
+    () => inferAreaExamples(currentAreaName),
+    [currentAreaName],
   )
 
-  const maxTotal = parsePositiveInt(maxMinutes, 0)
-  const overBudget = maxTotal > 0 && plannedTotal > maxTotal
+  const maxTotal = filledAreas
+    .map((a) => a.parsedMinutes)
+    .reduce((sum, mins) => sum + mins, 0)
+  const overBudget =
+    currentAreaMaxMinutes > 0 && plannedTotal > currentAreaMaxMinutes
   const validProofs = proofs.filter((p) => p.text.trim().length > 0)
+  const liveRemaining = liveTimerTask?.remainingSeconds ?? 0
+  const liveTotalSeconds = (liveTimerTask?.estimatedMinutes ?? 25) * 60
+  const liveProgress = Math.max(
+    0,
+    Math.min(1, liveRemaining / liveTotalSeconds),
+  )
+  const liveRingR = 10
+  const liveRingCirc = 2 * Math.PI * liveRingR
+  const liveAlarm = Boolean(liveTimerTask && liveRemaining <= 0)
+
+  // Play is always available: if details are missing, queue a starter task
+  // that begins by filling in the area.
+  const canPlay = true
+
+  function syncStageQueueStep(stageIndex, completed) {
+    const ids = stageStepIds[stageIndex] || []
+    if (!ids.length) return
+    const taskId = builderQueueTaskId || activeMainTaskId
+    if (!taskId) return
+    const task = mainTasks.find((t) => t.id === taskId)
+    if (!task) return
+    const candidates = ids
+      .map((id) => (task.steps || []).find((step) => step.id === id))
+      .filter(Boolean)
+    if (!candidates.length) return
+    let picked = null
+    const liveIsCandidate =
+      liveTimerTask?.sourceMainTaskId === taskId &&
+      ids.includes(liveTimerTask?.sourceStepId)
+    if (liveIsCandidate) {
+      picked = candidates.find((step) => step.id === liveTimerTask.sourceStepId)
+    }
+    if (!picked) {
+      if (!completed && lastStageStepIds[stageIndex]) {
+        picked = candidates.find(
+          (step) => step.id === lastStageStepIds[stageIndex],
+        )
+      }
+      if (!picked) {
+        picked = completed
+          ? candidates.find((step) => !step.completed) || candidates[0]
+          : candidates.find((step) => step.completed) || candidates[0]
+      }
+    }
+    if (!picked) return
+    setStepCompleted(task.id, picked.id, completed)
+    if (completed) {
+      setLastStageStepIds((prev) => ({ ...prev, [stageIndex]: picked.id }))
+    }
+  }
+
+  function updateArea(id, patch) {
+    setAreas((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)))
+  }
+
+  function handleAreaNameChange(id, value) {
+    setAreas((prev) =>
+      prev.map((a) => {
+        if (a.id !== id) return a
+        const parsed = parseAreaInput(value, a.minutes)
+        return {
+          ...a,
+          name: value,
+          minutes: parsed.minutes,
+          chipValue: parsed.chipValue,
+        }
+      }),
+    )
+  }
+
+  function addArea(focusNew = false) {
+    const created = makeArea()
+    setAreas((prev) => (prev.length >= MAX_AREAS ? prev : [...prev, created]))
+    if (focusNew) {
+      window.setTimeout(() => {
+        const ref = areaInputRefs.current[created.id]
+        if (ref) ref.focus()
+      }, 0)
+    }
+  }
+
+  function removeArea(id) {
+    setAreas((prev) => {
+      const next = prev.filter((a) => a.id !== id)
+      return next.length ? next : [makeArea()]
+    })
+  }
+
+  function handleAreaNameKeyDown(e, idx) {
+    if (e.key !== "Enter") return
+    e.preventDefault()
+    const next = areas[idx + 1]
+    if (next) {
+      const ref = areaInputRefs.current[next.id]
+      if (ref) ref.focus()
+      return
+    }
+    if (areas.length < MAX_AREAS) addArea(true)
+  }
+
+  // Save current area data to cache then load a different area index.
+  function advanceArea() {
+    const nextIdx = areaIndex + 1
+    const cached = areaDataCache[nextIdx]
+    setAreaDataCache((prev) => ({
+      ...prev,
+      [areaIndex]: { now, goodEnough, proofs, steps },
+    }))
+    setNow(cached?.now ?? "")
+    setGoodEnough(cached?.goodEnough ?? "")
+    setProofs(cached?.proofs ?? [makeProof()])
+    setSteps(cached?.steps ?? [makeStep()])
+    setAreaIndex(nextIdx)
+    setStage(1)
+  }
+
+  function retreatArea() {
+    const prevIdx = areaIndex - 1
+    const cached = areaDataCache[prevIdx]
+    setAreaDataCache((prev) => ({
+      ...prev,
+      [areaIndex]: { now, goodEnough, proofs, steps },
+    }))
+    setNow(cached?.now ?? "")
+    setGoodEnough(cached?.goodEnough ?? "")
+    setProofs(cached?.proofs ?? [makeProof()])
+    setSteps(cached?.steps ?? [makeStep()])
+    setAreaIndex(prevIdx)
+    setStage(4)
+  }
+
+  // Collect the per-area data snapshot for queue building / save.
+  // Each area has its own now/goodEnough/proofs/steps stored in cache;
+  // the currently-active area is in the live state variables.
+  function collectAllAreaData() {
+    return filledAreas.map((area, i) => {
+      if (i === areaIndex) {
+        return { area, now, goodEnough, proofs, steps }
+      }
+      const cached = areaDataCache[i] || {}
+      return {
+        area,
+        now: cached.now ?? "",
+        goodEnough: cached.goodEnough ?? "",
+        proofs: cached.proofs ?? [],
+        steps: cached.steps ?? [],
+      }
+    })
+  }
+
+  function handleStartInTimer() {
+    if (!canPlay) return
+    const allAreaData = collectAllAreaData()
+    const stagedSteps = []
+    const nextStageStepIds = { 0: [], 1: [], 2: [] }
+
+    function pushStep(raw, minutes, stageTag = null) {
+      const id = genStepId()
+      stagedSteps.push({ id, raw: formatStepRaw(raw, minutes) })
+      if (stageTag != null) nextStageStepIds[stageTag].push(id)
+    }
+
+    if (allAreaData.length === 0) {
+      // Nothing filled — queue starter prompts
+      pushStep("Fill out area 1", 1, 0)
+      pushStep("Fill out target", 1, 1)
+      pushStep("Add one proof checkpoint", 1, 2)
+      pushStep("Plan your first step", 5)
+    } else {
+      allAreaData.forEach(
+        ({ area, goodEnough: ge, proofs: ap, steps: as }, i) => {
+          const areaNum = i + 1
+          const mins = Math.max(1, area.parsedMinutes || 1)
+          pushStep(`Area ${areaNum}: ${area.parsedName}`, mins, 0)
+
+          if (ge.trim()) {
+            pushStep(`Target ${areaNum}: ${ge.trim()}`, 1, 1)
+          } else {
+            pushStep(`Fill out target for area ${areaNum}`, 1, 1)
+          }
+
+          const validAreaProofs = (ap || []).filter((p) => p.text?.trim())
+          if (validAreaProofs.length > 0) {
+            validAreaProofs.forEach((p) =>
+              pushStep(`Proof ${areaNum}: ${p.text.trim()}`, 1, 2),
+            )
+          } else {
+            pushStep(`Add proof for area ${areaNum}`, 1, 2)
+          }
+
+          const validAreaSteps = (as || []).filter((s) => s.text?.trim())
+          if (validAreaSteps.length > 0) {
+            validAreaSteps.forEach((s) =>
+              pushStep(s.text, Math.max(1, parsePositiveInt(s.minutes, 1))),
+            )
+          } else {
+            pushStep(`Plan steps for area ${areaNum}: ${area.parsedName}`, mins)
+          }
+        },
+      )
+    }
+
+    const titleParts = allAreaData.map((d) => d.area.parsedName).filter(Boolean)
+    const fallbackTitle =
+      titleParts.join(" / ") ||
+      goodEnough.trim() ||
+      now.trim() ||
+      "small improvement"
+    const firstGe = allAreaData[0]?.goodEnough?.trim() || ""
+
+    const createdTask = addMainTaskAndActivate({
+      title:
+        fallbackTitle +
+        (firstGe && firstGe !== fallbackTitle ? `: ${firstGe}` : ""),
+      now: (allAreaData[0]?.now || now).trim(),
+      steps: stagedSteps,
+      proof: allAreaData
+        .map((d) =>
+          (d.proofs || [])
+            .filter((p) => p.text?.trim())
+            .map((p) => p.text.trim())
+            .join(", "),
+        )
+        .filter(Boolean)
+        .join(" | "),
+      priority: "",
+    })
+    if (createdTask?.id) {
+      window.localStorage.setItem("fst_autostart_main_task", createdTask.id)
+      setBuilderQueueTaskId(createdTask.id)
+      setStageStepIds(nextStageStepIds)
+      setLastStageStepIds({})
+    }
+    setMessage("Started in timer ▶")
+    setTimeout(() => setMessage(""), 2500)
+  }
 
   function resetForm() {
     setStage(0)
-    setArea("")
-    setMaxMinutes("5")
+    setAreaIndex(0)
+    setAreaDataCache({})
+    setAreas([makeArea()])
     setNow("")
     setGoodEnough("")
     setProofs([makeProof()])
     setSteps([makeStep()])
     setError("")
     setMessage("")
+    setBuilderQueueTaskId("")
+    setStageStepIds({ 0: [], 1: [], 2: [] })
+    setLastStageStepIds({})
   }
 
   // Proof management
@@ -270,11 +592,14 @@ export default function GuidedSmallImprovementBuilder() {
   // Validation
   function validateStage(index = stage) {
     if (index === 0) {
-      if (!area.trim()) {
+      if (!trimmedAreas.length) {
         return "Pick an area."
       }
-      if (!parsePositiveInt(maxMinutes, 0)) {
-        return "Set a positive max time."
+      for (const a of normalizedAreas) {
+        if (!a.parsedName) continue
+        if (!a.parsedMinutes) {
+          return `"${a.parsedName}" needs a positive time cap.`
+        }
       }
     }
     if (index === 1) {
@@ -315,10 +640,35 @@ export default function GuidedSmallImprovementBuilder() {
       return
     }
     setError("")
-    setStage((prev) => Math.min(prev + 1, STAGES.length - 1))
+    // Pre-seed the first proof input from "good enough" so Stage 2 is a
+    // confirmation step rather than a repeat of Stage 1.
+    if (stage === 1 && proofs.length === 1 && proofs[0].text.trim() === "") {
+      setProofs([{ ...proofs[0], text: goodEnough.trim() }])
+    }
+    syncStageQueueStep(stage, true)
+    // Signal TimerApp to dismiss any active alarm so the user isn't stuck
+    // on the alarm screen when pressing Next after a stage timer runs out.
+    // (Builder lives outside TimerProvider so we use a localStorage signal.)
+    try {
+      window.localStorage.setItem("fst_stop_alarm", "1")
+    } catch {}
+    // After completing the Order stage for the current area, loop back to
+    // Target for the next area if one exists.
+    if (stage === 4 && areaIndex < filledAreas.length - 1) {
+      advanceArea()
+    } else {
+      setStage((prev) => Math.min(prev + 1, STAGES.length - 1))
+    }
   }
 
   function goBack() {
+    // At Target stage with earlier areas: go back to that area's Order stage.
+    if (stage === 1 && areaIndex > 0) {
+      retreatArea()
+      setError("")
+      return
+    }
+    syncStageQueueStep(stage - 1, false)
     setError("")
     setStage((prev) => Math.max(prev - 1, 0))
   }
@@ -330,17 +680,23 @@ export default function GuidedSmallImprovementBuilder() {
       return
     }
 
-    const validStepsArray = steps
-      .filter((s) => s.text.trim().length > 0)
-      .map((s) => ({
-        raw: formatStepRaw(s.text, s.minutes),
-      }))
-
-    const proofText = validProofs.map((p) => p.text.trim()).join("\n")
+    const allAreaData = collectAllAreaData()
+    const allSteps = allAreaData.flatMap(({ area, steps: as }, i) => {
+      const validAs = (as || []).filter((s) => s.text.trim().length > 0)
+      return validAs.map((s) => ({ raw: formatStepRaw(s.text, s.minutes) }))
+    })
+    const proofText = allAreaData
+      .flatMap((d) =>
+        (d.proofs || []).filter((p) => p.text.trim()).map((p) => p.text.trim()),
+      )
+      .join("\n")
+    const titleParts = allAreaData.map((d) => d.area.parsedName).filter(Boolean)
+    const firstGe = allAreaData[0]?.goodEnough?.trim() || ""
 
     addMainTask({
-      title: `${area.trim()}: ${goodEnough.trim()}`,
-      steps: validStepsArray,
+      title: titleParts.join(" / ") + (firstGe ? `: ${firstGe}` : ""),
+      now: (allAreaData[0]?.now || now).trim(),
+      steps: allSteps,
       proof: proofText,
       priority: "",
     })
@@ -352,12 +708,25 @@ export default function GuidedSmallImprovementBuilder() {
 
   return (
     <section
-      className={`gsi-card gcb--${builderVisualStyle === "minimal" ? "minimal" : builderVisualStyle === "match" ? "match" : "calm"}`}
+      className={`gsi-card gcb--${builderVisualStyle === "minimal" ? "minimal" : builderVisualStyle === "match" ? "match" : "calm"}${liveTimerRunning ? " gsi-card--timer-active" : ""}`}
+      style={{ "--timer-glow-color": liveTimerTask?.color ?? "#6c63ff" }}
       aria-label="Guided small improvement builder"
     >
       <div className="gsi-header">
-        <p className="gsi-hero-kicker">Experimental Builder</p>
-        <h2 className="gsi-title">Build a small improvement</h2>
+        <div className="gsi-header__text">
+          <p className="gsi-hero-kicker">Experimental Builder</p>
+          <h2 className="gsi-title">Build a small improvement</h2>
+        </div>
+        <button
+          type="button"
+          className={`gsi-play-btn${canPlay ? " gsi-play-btn--ready" : ""}`}
+          onClick={handleStartInTimer}
+          disabled={!canPlay}
+          title="Start in timer queue"
+          aria-label="Start session in timer"
+        >
+          ▶
+        </button>
       </div>
 
       <div className="gsi-progress-bar">
@@ -366,7 +735,41 @@ export default function GuidedSmallImprovementBuilder() {
             key={name}
             className={`gsi-progress-dot ${i === stage ? "gsi-progress-dot--active" : ""} ${i < stage ? "gsi-progress-dot--done" : ""}`}
           >
-            <span className="gsi-progress-num">{i + 1}</span>
+            <span
+              className={`gsi-progress-num ${i === stage && liveTimerTask ? "gsi-progress-num--timer" : ""} ${i === stage && liveAlarm ? "gsi-progress-num--alarm" : ""}`}
+            >
+              {i === stage && liveTimerTask && (
+                <svg
+                  className="gsi-progress-mini-ring"
+                  viewBox="0 0 28 28"
+                  aria-hidden="true"
+                  style={{
+                    transform: "rotate(-90deg)",
+                    transformOrigin: "center",
+                  }}
+                >
+                  <circle
+                    className="gsi-progress-mini-ring__track"
+                    cx="14"
+                    cy="14"
+                    r={liveRingR}
+                  />
+                  <circle
+                    className="gsi-progress-mini-ring__progress"
+                    cx="14"
+                    cy="14"
+                    r={liveRingR}
+                    strokeDasharray={`${liveProgress * liveRingCirc} ${liveRingCirc}`}
+                    style={{ stroke: liveTimerTask.color ?? "#6c63ff" }}
+                  />
+                </svg>
+              )}
+              <span className="gsi-progress-num__value">
+                {i === stage && liveTimerTask
+                  ? fmtTimerDisplay(liveRemaining)
+                  : i + 1}
+              </span>
+            </span>
             <span className="gsi-progress-label">{name}</span>
           </div>
         ))}
@@ -376,37 +779,116 @@ export default function GuidedSmallImprovementBuilder() {
         {/* STAGE 0: Area + Time */}
         {stage === 0 && (
           <div className="gsi-stage">
-            <div className="gsi-stage-body">
-              <label className="gsi-label" htmlFor="gsi-area">
-                What area would make life easier if I improved it a little right
-                now?
-              </label>
-              <p className="gsi-hint">Pick one area, not your whole life.</p>
-              <input
-                id="gsi-area"
-                className="gsi-input"
-                value={area}
-                onChange={(e) => setArea(e.target.value)}
-                placeholder="kitchen"
-              />
-
-              <label
-                className="gsi-label gsi-label--top"
-                htmlFor="gsi-max-time"
-              >
-                Max time I want to spend on this
-              </label>
-              <div className="gsi-time-input-wrapper">
-                <input
-                  id="gsi-max-time"
-                  className="gsi-input gsi-input--number"
-                  type="number"
-                  min="1"
-                  value={maxMinutes}
-                  onChange={(e) => setMaxMinutes(e.target.value)}
-                />
-                <span className="gsi-time-unit">min</span>
+            <div className="gsi-stage-body gcb-cat-list">
+              <div className="gsi-area-stage-head">
+                <span className="gsi-area-stage-head__label">
+                  Areas and max time
+                </span>
+                <span className="gsi-area-stage-head__max">
+                  Max {maxTotal || 0}m
+                </span>
               </div>
+              {areas.map((a, i) => (
+                <div className="gcb-cat-card" key={a.id}>
+                  <button
+                    type="button"
+                    className="gcb-card-remove"
+                    onClick={() => removeArea(a.id)}
+                    aria-label="Remove area"
+                  >
+                    ×
+                  </button>
+                  <label
+                    className="gcb-cat-prompt"
+                    htmlFor={`gsi-area-${a.id}`}
+                  >
+                    {i === 0
+                      ? "What do I want to work on right now?"
+                      : "Another area?"}
+                  </label>
+                  <span className="gcb-cat-helper">
+                    One area. Small is enough.
+                  </span>
+                  <div className="gsi-area-row">
+                    <input
+                      ref={(el) => {
+                        if (el) areaInputRefs.current[a.id] = el
+                      }}
+                      id={`gsi-area-${a.id}`}
+                      className="gcb-input gcb-input--name"
+                      value={a.name}
+                      onChange={(e) =>
+                        handleAreaNameChange(a.id, e.target.value)
+                      }
+                      onKeyDown={(e) => handleAreaNameKeyDown(e, i)}
+                      placeholder={`${AREA_PLACEHOLDERS[i % AREA_PLACEHOLDERS.length]} 5`}
+                    />
+                    <div className="gsi-area-inline-time">
+                      <span className="gsi-area-inline-time__label">Max</span>
+                      <input
+                        className="gcb-input gcb-input--mins"
+                        type="number"
+                        min="1"
+                        value={a.minutes}
+                        onChange={(e) =>
+                          updateArea(a.id, {
+                            minutes: e.target.value,
+                            chipValue: "custom",
+                          })
+                        }
+                        placeholder="min"
+                        aria-label={`Time cap for area ${i + 1}`}
+                      />
+                      <span className="gsi-area-inline-time__unit">m</span>
+                    </div>
+                  </div>
+                  <fieldset className="gcb-time-chips">
+                    <legend className="gcb-time-chips-legend">Time cap</legend>
+                    {TIME_CHIPS.map((mins) => (
+                      <button
+                        key={mins}
+                        type="button"
+                        className={`gcb-time-chip${a.chipValue === String(mins) ? " gcb-time-chip--selected" : ""}`}
+                        aria-pressed={a.chipValue === String(mins)}
+                        onClick={() =>
+                          updateArea(a.id, {
+                            chipValue: String(mins),
+                            minutes: String(mins),
+                          })
+                        }
+                      >
+                        {mins}m
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className={`gcb-time-chip${a.chipValue === "custom" ? " gcb-time-chip--selected" : ""}`}
+                      aria-pressed={a.chipValue === "custom"}
+                      onClick={() => updateArea(a.id, { chipValue: "custom" })}
+                    >
+                      Custom
+                    </button>
+                    {a.chipValue === "custom" && (
+                      <input
+                        className="gcb-input gcb-input--mins"
+                        type="number"
+                        min="1"
+                        value={a.minutes}
+                        onChange={(e) =>
+                          updateArea(a.id, { minutes: e.target.value })
+                        }
+                        placeholder="min"
+                        aria-label="Custom minutes"
+                      />
+                    )}
+                  </fieldset>
+                </div>
+              ))}
+              {areas.length < MAX_AREAS && (
+                <button type="button" className="gcb-add-btn" onClick={addArea}>
+                  + Add another area
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -417,7 +899,10 @@ export default function GuidedSmallImprovementBuilder() {
             <StageSummary
               lines={[
                 { label: "Area", value: areaLabel },
-                { label: "Time", value: `${maxTotal || 0} min max` },
+                {
+                  label: "Time",
+                  value: `${currentAreaMaxMinutes || 0} min max`,
+                },
               ]}
             />
 
@@ -697,7 +1182,7 @@ export default function GuidedSmallImprovementBuilder() {
               >
                 <span className="gsi-budget-label">Planned steps total</span>
                 <strong className="gsi-budget-value">
-                  {plannedTotal} / {maxTotal || 0} min
+                  {plannedTotal} / {currentAreaMaxMinutes || 0} min
                 </strong>
               </div>
 
@@ -727,7 +1212,7 @@ export default function GuidedSmallImprovementBuilder() {
               <div className="gsi-review-box">
                 <div className="gsi-review-item">
                   <strong>Area</strong>
-                  <p>{area}</p>
+                  <p>{trimmedArea || areaLabel}</p>
                 </div>
                 <div className="gsi-review-item">
                   <strong>Now</strong>

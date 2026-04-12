@@ -206,6 +206,23 @@ export default function SettingsView({ settings, setSettings, music }) {
           />
         </label>
 
+        <label className="settings-row">
+          <span>Idle prompt delay (seconds)</span>
+          <input
+            type="number"
+            min="5"
+            max="300"
+            value={settings.idlePromptSeconds ?? 30}
+            onChange={(e) =>
+              update(
+                "idlePromptSeconds",
+                Math.max(5, Math.min(300, Number(e.target.value) || 30)),
+              )
+            }
+            className="settings-number"
+          />
+        </label>
+
         <div className="settings-row settings-row--block">
           <span className="settings-row__label">Timezone override</span>
           <p className="settings-help-text">

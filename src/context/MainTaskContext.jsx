@@ -144,6 +144,7 @@ function normalizeTask(task) {
   return {
     id: task?.id || genTaskId(),
     title: task?.title || "",
+    now: task?.now || "",
     steps: flatSteps,
     proof: task?.proof || "",
     priority: task?.priority || "",
@@ -212,6 +213,7 @@ export function MainTaskProvider({ children }) {
     const task = normalizeTask({
       id: genTaskId(),
       title: taskData.title || "",
+      now: taskData.now || "",
       steps: Array.isArray(taskData.steps) ? taskData.steps : [],
       proof: taskData.proof || "",
       priority: taskData.priority || "",

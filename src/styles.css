@@ -151,6 +151,43 @@ body {
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
 }
 
+.task-builder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.task-builder-header-text {
+  text-align: left;
+}
+
+.task-builder-play-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(173, 255, 209, 0.6);
+  background: rgba(52, 209, 149, 0.18);
+  color: #adffed;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 0 12px rgba(52, 209, 149, 0.25);
+  transition: all 0.2s ease;
+}
+
+.task-builder-play-btn:hover,
+.task-builder-play-btn:focus-visible {
+  background: rgba(52, 209, 149, 0.3);
+  box-shadow: 0 0 20px rgba(52, 209, 149, 0.4);
+  transform: scale(1.08);
+  outline: none;
+}
+
 .task-builder-title {
   margin: 0;
   font-size: clamp(1.4rem, 3.5vw, 2.1rem);
@@ -245,6 +282,21 @@ body {
 .task-builder-textarea {
   min-height: 76px;
   resize: vertical;
+}
+
+.task-builder-focus-target {
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.task-builder-focus-target--active {
+  border-color: rgba(173, 255, 209, 0.7) !important;
+  background: rgba(52, 209, 149, 0.16) !important;
+  box-shadow:
+    0 0 0 2px rgba(173, 255, 209, 0.35),
+    0 0 18px rgba(52, 209, 149, 0.28);
 }
 
 .task-builder-actions {
@@ -2677,6 +2729,127 @@ body {
 /* GSI: Guided Small Improvement Builder (Redesigned 6-Stage)    */
 /* ════════════════════════════════════════════════════════════ */
 
+@keyframes gsi-pulse-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 30px 60px rgba(0, 0, 0, 0.25),
+      0 0 0 0
+        color-mix(in srgb, var(--timer-glow-color, #6c63ff) 0%, transparent);
+    border-color: var(--card-border);
+  }
+  50% {
+    box-shadow:
+      0 30px 60px rgba(0, 0, 0, 0.25),
+      0 0 22px 4px
+        color-mix(in srgb, var(--timer-glow-color, #6c63ff) 55%, transparent);
+    border-color: color-mix(
+      in srgb,
+      var(--timer-glow-color, #6c63ff) 70%,
+      transparent
+    );
+  }
+}
+
+/* ── Idle prompt ─────────────────────────────────────────────────────────── */
+.idle-prompt {
+  margin: 10px 12px 0;
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-card));
+  border: 1.5px solid var(--accent);
+  border-radius: 14px;
+  animation: fadeIn 0.25s ease;
+}
+
+.idle-prompt--urgent {
+  border-color: #ef4444;
+  background: color-mix(in srgb, #ef4444 10%, var(--bg-card));
+  animation: idleUrgentPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes idleUrgentPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.25);
+  }
+}
+
+.idle-prompt__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.idle-prompt__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+.idle-prompt--urgent .idle-prompt__label {
+  color: #ef4444;
+}
+
+.idle-prompt__countdown {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background 0.3s,
+    color 0.3s;
+}
+
+.idle-prompt__countdown--zero {
+  color: #ef4444;
+  background: color-mix(in srgb, #ef4444 15%, transparent);
+}
+
+.idle-prompt__row {
+  display: flex;
+  gap: 8px;
+}
+
+.idle-prompt__input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.idle-prompt__input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.idle-prompt__btn {
+  padding: 8px 14px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.idle-prompt__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── GSI card ───────────────────────────────────────────────────────────── */
 .gsi-card {
   width: min(680px, 100%);
   border: 1px solid var(--card-border);
@@ -2690,9 +2863,51 @@ body {
   gap: 16px;
 }
 
+.gsi-card--timer-active {
+  animation: gsi-pulse-glow 2.8s ease-in-out infinite;
+}
+
 .gsi-header {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 2px;
+}
+
+.gsi-header__text {
+  text-align: left;
+}
+
+.gsi-play-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(173, 255, 209, 0.2);
+  background: rgba(52, 209, 149, 0.06);
+  color: rgba(173, 255, 209, 0.35);
+  font-size: 1rem;
+  cursor: not-allowed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.gsi-play-btn--ready {
+  border-color: rgba(173, 255, 209, 0.6);
+  background: rgba(52, 209, 149, 0.18);
+  color: #adffed;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(52, 209, 149, 0.25);
+}
+
+.gsi-play-btn--ready:hover {
+  background: rgba(52, 209, 149, 0.3);
+  box-shadow: 0 0 20px rgba(52, 209, 149, 0.4);
+  transform: scale(1.08);
 }
 
 .gsi-hero-kicker {
@@ -2734,6 +2949,8 @@ body {
 }
 
 .gsi-progress-num {
+  position: relative;
+  overflow: hidden;
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -2745,6 +2962,63 @@ body {
   font-weight: 800;
   color: #adffed;
   transition: all 0.2s ease;
+}
+
+.gsi-progress-num--timer {
+  width: 38px;
+  height: 38px;
+  border-width: 1px;
+  border-color: rgba(173, 255, 209, 0.35);
+  background: rgba(10, 26, 42, 0.55);
+}
+
+.gsi-progress-num__value {
+  position: relative;
+  z-index: 2;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.gsi-progress-mini-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.gsi-progress-mini-ring__track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 2;
+}
+
+.gsi-progress-mini-ring__progress {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transition: stroke-dasharray 1s linear;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+@keyframes gsi-mini-alarm-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 97, 97, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 97, 97, 0.2);
+    transform: scale(1.06);
+  }
+}
+
+.gsi-progress-num--alarm {
+  border-color: rgba(255, 97, 97, 0.8);
+  background: rgba(86, 10, 10, 0.55);
+  animation: gsi-mini-alarm-pulse 0.8s ease-in-out infinite;
 }
 
 .gsi-progress-dot--active .gsi-progress-num {
@@ -2782,6 +3056,60 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.gsi-area-stage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+  flex-wrap: nowrap;
+}
+
+.gsi-area-stage-head__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #f8fbff;
+}
+
+.gsi-area-stage-head__max {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #adffed;
+  background: rgba(52, 209, 149, 0.12);
+  border: 1px solid rgba(173, 255, 209, 0.35);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.gsi-area-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gsi-area-row .gcb-input--name {
+  flex: 1;
+  min-width: 0;
+}
+
+.gsi-area-inline-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0;
+  align-self: auto;
+  white-space: nowrap;
+}
+
+.gsi-area-inline-time__label,
+.gsi-area-inline-time__unit {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
 }
 
 /* Compact summary visible in stages 3+ */
@@ -3266,6 +3594,7 @@ body {
 }
 
 /* Navigation */
+
 .gsi-nav {
   display: flex;
   gap: 8px;

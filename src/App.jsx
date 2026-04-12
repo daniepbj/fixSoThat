@@ -12,9 +12,12 @@ import SaveLoadPanel from "./components/SaveLoadPanel"
 import RetryReflectionModal from "./components/RetryReflectionModal"
 import { MainTaskProvider, useMainTask } from "./context/MainTaskContext"
 import { playClickSound } from "./utils/soundEffects"
+import { getTimezoneOverride, setTimezoneOverride } from "./utils/timeUtils"
 
 export default function App() {
   useEffect(() => {
+    // Default timezone to Oslo if the user has never set an override
+    if (!getTimezoneOverride()) setTimezoneOverride("Europe/Oslo")
     function handleClick(e) {
       if (e.target.closest("button")) playClickSound()
     }
@@ -42,15 +45,15 @@ function AppContent() {
 
         {/* ── Main content area ── */}
         <main className="app-main">
-          <FeatureHello />
-          <AppLinks />
           <StructuredTaskBuilder />
+          <GuidedSmallImprovementBuilder />
           <GuidedCategoryBuilder />
           <AdhdBridgeBuilder />
-          <GuidedSmallImprovementBuilder />
           <MainTaskList />
           <FixaPresetPanel />
           <SaveLoadPanel />
+          <AppLinks />
+          <FeatureHello />
         </main>
       </div>
       {retryReflectionTaskId && <RetryReflectionModal />}

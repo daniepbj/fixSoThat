@@ -1,6 +1,6 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useMainTask } from "../context/MainTaskContext"
-import { parseStepRaw, genStepId } from "../utils/stepUtils"
+import { parseStepRaw, genStepId, formatStepRaw } from "../utils/stepUtils"
 
 const MAX_CHUNK_SIZE = 250
 
@@ -120,7 +120,7 @@ function buildToDoChunks({ goal, steps, proof }, maxSize = MAX_CHUNK_SIZE) {
 }
 
 export default function StructuredTaskBuilder() {
-  const { addMainTask } = useMainTask()
+  const { addMainTask, addMainTaskAndActivate } = useMainTask()
 
   const [goal, setGoal] = useState("")
   const [steps, setSteps] = useState([{ id: genStepId(), raw: "" }])
@@ -135,7 +135,28 @@ export default function StructuredTaskBuilder() {
   const [loadMessage, setLoadMessage] = useState("")
   const [clearAfterLoad, setClearAfterLoad] = useState(true)
   const [draggedStepId, setDraggedStepId] = useState("")
+  const [builderQueueTaskId, setBuilderQueueTaskId] = useState("")
+  const [goalQueueStepId, setGoalQueueStepId] = useState("")
+  const [proofQueueStepId, setProofQueueStepId] = useState("")
+  const [liveTimerTask, setLiveTimerTask] = useState(null)
   const stepInputRefs = useRef({})
+
+  useEffect(() => {
+    function readActiveTimerTask() {
+      try {
+        const tasks = JSON.parse(
+          window.localStorage.getItem("fst_active") || "[]",
+        )
+        setLiveTimerTask(tasks[0] ?? null)
+      } catch {
+        setLiveTimerTask(null)
+      }
+    }
+
+    readActiveTimerTask()
+    const id = setInterval(readActiveTimerTask, 1000)
+    return () => clearInterval(id)
+  }, [])
 
   function resetStructuredWriterForm() {
     setGoal("")
@@ -335,6 +356,60 @@ export default function StructuredTaskBuilder() {
     setTimeout(() => setLoadMessage(""), 2200)
   }
 
+  function handleStartInTimer() {
+    const trimmedGoal = String(goal || "").trim()
+    const trimmedProof = String(proof || "").trim()
+    const validSteps = (steps || [])
+      .map((s) => ({ ...parseStepRaw(String(s?.raw || "").trim()) }))
+      .filter((s) => s.text)
+
+    const goalStepId = genStepId()
+    const proofStepId = genStepId()
+    const stagedSteps = [
+      {
+        id: goalStepId,
+        raw: formatStepRaw("Fill out: Fixa så att jag ...", 1),
+      },
+    ]
+
+    if (validSteps.length > 0) {
+      validSteps.forEach((step) => {
+        stagedSteps.push({
+          id: genStepId(),
+          raw: formatStepRaw(step.text, Math.max(1, step.minutes || 1)),
+        })
+      })
+    } else {
+      stagedSteps.push({
+        id: genStepId(),
+        raw: formatStepRaw("Plan your first step", 5),
+      })
+    }
+
+    stagedSteps.push({
+      id: proofStepId,
+      raw: formatStepRaw("Fill out proof", 1),
+    })
+
+    const createdTask = addMainTaskAndActivate({
+      title: trimmedGoal || "Fixa så att jag",
+      now: "",
+      steps: stagedSteps,
+      proof: trimmedProof,
+      priority: String(priority || "").trim(),
+    })
+
+    if (createdTask?.id) {
+      window.localStorage.setItem("fst_autostart_main_task", createdTask.id)
+      setBuilderQueueTaskId(createdTask.id)
+      setGoalQueueStepId(goalStepId)
+      setProofQueueStepId(proofStepId)
+    }
+
+    setLoadMessage("Started in timer ▶")
+    setTimeout(() => setLoadMessage(""), 2500)
+  }
+
   function toggleTodoCheck(index) {
     setTodoChecks((prev) => {
       const next = [...prev]
@@ -344,11 +419,32 @@ export default function StructuredTaskBuilder() {
   }
 
   const hasContent = goal.trim() || steps.some((s) => s.raw.trim())
+  const queueActive =
+    Boolean(liveTimerTask?.sourceMainTaskId) &&
+    liveTimerTask.sourceMainTaskId === builderQueueTaskId
+  const focusGoal =
+    queueActive && liveTimerTask?.sourceStepId === goalQueueStepId
+  const focusProof =
+    queueActive && liveTimerTask?.sourceStepId === proofQueueStepId
+  const focusSteps = queueActive && !focusGoal && !focusProof
 
   return (
     <section className="task-builder-card" aria-label="Fixa så att jag flow">
-      <p className="hero-kicker">Structured task writer</p>
-      <h2 className="task-builder-title">Fixa så att jag</h2>
+      <div className="task-builder-header">
+        <div className="task-builder-header-text">
+          <p className="hero-kicker">Structured task writer</p>
+          <h2 className="task-builder-title">Fixa så att jag</h2>
+        </div>
+        <button
+          type="button"
+          className="task-builder-play-btn"
+          onClick={handleStartInTimer}
+          title="Start in timer queue"
+          aria-label="Start in timer"
+        >
+          ▶
+        </button>
+      </div>
       <p className="task-builder-help">
         Type your goal and steps. Use <code>step name 5</code> format for
         integer minutes. Press <kbd>Enter</kbd> to add a step; paste multiple
@@ -361,14 +457,16 @@ export default function StructuredTaskBuilder() {
         </label>
         <textarea
           id="goal-input"
-          className="task-builder-input task-builder-textarea"
+          className={`task-builder-input task-builder-textarea ${focusGoal ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
           placeholder="ätit mat"
           rows={2}
         />
 
-        <fieldset className="task-builder-steps-section">
+        <fieldset
+          className={`task-builder-steps-section ${focusSteps ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
+        >
           <legend className="task-builder-legend">Steps</legend>
           <p className="task-builder-hint">
             Format: <code>Diska 10</code> · Paste a block of lines to fill all
@@ -463,7 +561,7 @@ export default function StructuredTaskBuilder() {
         </label>
         <textarea
           id="proof-input"
-          className="task-builder-input task-builder-textarea"
+          className={`task-builder-input task-builder-textarea ${focusProof ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
           value={proof}
           onChange={(e) => setProof(e.target.value)}
           placeholder="Proof att jag gjorde det jag sa: ..."

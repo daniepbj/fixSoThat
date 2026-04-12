@@ -725,6 +725,29 @@
   white-space: nowrap;
 }
 
+.completed-task__restore {
+  border: 1px solid var(--ta-border);
+  background: transparent;
+  color: var(--ta-text-soft);
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.completed-task__restore:hover {
+  color: var(--ta-text);
+  border-color: #91d9ff;
+  background: rgba(145, 217, 255, 0.15);
+}
+
 .modal-overlay {
   position: absolute;
   top: 0;
