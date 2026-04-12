@@ -137,8 +137,8 @@ export default function TimerApp({ sidebarMode = false }) {
   const [showAddForm, setShowAddForm] = useState(false)
   const [alarmActive, setAlarmActive] = useState(false)
   const [idleInputText, setIdleInputText] = useState("")
-    // null = timer running (idle inactive); number = countdown value (≥ 0)
-    const [idleCountdown, setIdleCountdown] = useState(null)
+  // null = timer running (idle inactive); number = countdown value (≥ 0)
+  const [idleCountdown, setIdleCountdown] = useState(null)
   const [uploadedTracks, setUploadedTracks] = useState([])
   const [musicUiMessage, setMusicUiMessage] = useState("")
   const [audioBlockedMessage, setAudioBlockedMessage] = useState("")
@@ -294,18 +294,18 @@ export default function TimerApp({ sidebarMode = false }) {
 
   // ── Idle prompt: show quick-add after X seconds of timer not running ──────
   useEffect(() => {
-      if (timerRunning || onBreak) {
-        setIdleCountdown(null)
-        return
-      }
-      // Start countdown when timer stops
-      const delay = Math.max(5, Number(settings.idlePromptSeconds) || 30)
-      setIdleCountdown(delay)
-      const id = setInterval(() => {
-        setIdleCountdown((prev) => (prev === null ? null : Math.max(0, prev - 1)))
-      }, 1000)
-      return () => clearInterval(id)
-    }, [timerRunning, onBreak, settings.idlePromptSeconds])
+    if (timerRunning || onBreak) {
+      setIdleCountdown(null)
+      return
+    }
+    // Start countdown when timer stops
+    const delay = Math.max(5, Number(settings.idlePromptSeconds) || 30)
+    setIdleCountdown(delay)
+    const id = setInterval(() => {
+      setIdleCountdown((prev) => (prev === null ? null : Math.max(0, prev - 1)))
+    }, 1000)
+    return () => clearInterval(id)
+  }, [timerRunning, onBreak, settings.idlePromptSeconds])
 
   // ── Timer tick (wall-clock anchored — no drift, head-change safe) ───────
   useEffect(() => {
@@ -332,7 +332,10 @@ export default function TimerApp({ sidebarMode = false }) {
         const remaining = Math.max(0, epoch.startingRemaining - elapsedSecs)
         const spent = epoch.startingSpent + elapsedSecs
         if (remaining === h.remainingSeconds) return prev
-        return [{ ...h, remainingSeconds: remaining, spentSeconds: spent }, ...tail]
+        return [
+          { ...h, remainingSeconds: remaining, spentSeconds: spent },
+          ...tail,
+        ]
       })
       setSessionSeconds(epoch.startingSpent + elapsedSecs)
     }, 500)
@@ -801,6 +804,28 @@ export default function TimerApp({ sidebarMode = false }) {
     })
   }
 
+  function restoreCompletedTask(id) {
+    const task = completedTasks.find((t) => t.id === id)
+    if (!task) return
+
+    if (task.sourceMainTaskId && task.sourceStepId) {
+      setStepCompleted(task.sourceMainTaskId, task.sourceStepId, false)
+    }
+
+    const restored = {
+      ...task,
+      remainingSeconds: clampSeconds(
+        clampMinutes(task.estimatedMinutes, settings.defaultTaskDuration) * 60,
+      ),
+      spentSeconds: 0,
+      completedAt: null,
+    }
+
+    setCompletedTasks((prev) => prev.filter((t) => t.id !== id))
+    setActiveTasks((prev) => [restored, ...prev])
+    setCurrentView("timer")
+  }
+
   function deleteTask(id) {
     setActiveTasks((prev) => prev.filter((t) => t.id !== id))
   }
@@ -887,20 +912,20 @@ export default function TimerApp({ sidebarMode = false }) {
   function handleIdleAdd() {
     const text = idleInputText.trim()
     if (!text) return
-      // Parse trailing number so "inbox 5" becomes a 5-minute task
-      const parsed = parseStepRaw(text)
-      const mins =
-        parsed.minutes > 0 ? parsed.minutes : settings.defaultTaskDuration
-      const created = addMainTaskAndActivate({
-        title: parsed.text || text,
-        steps: [{ raw: formatStepRaw(parsed.text || text, mins) }],
-      })
-      // Write autostart intent; the existing useEffect consumes it once the
-      // task is synced to activeTasks — avoids setTimerRunning before queue ready.
-      if (created?.id) {
-        window.localStorage.setItem("fst_autostart_main_task", created.id)
-      }
-      setIdleInputText("")
+    // Parse trailing number so "inbox 5" becomes a 5-minute task
+    const parsed = parseStepRaw(text)
+    const mins =
+      parsed.minutes > 0 ? parsed.minutes : settings.defaultTaskDuration
+    const created = addMainTaskAndActivate({
+      title: parsed.text || text,
+      steps: [{ raw: formatStepRaw(parsed.text || text, mins) }],
+    })
+    // Write autostart intent; the existing useEffect consumes it once the
+    // task is synced to activeTasks — avoids setTimerRunning before queue ready.
+    if (created?.id) {
+      window.localStorage.setItem("fst_autostart_main_task", created.id)
+    }
+    setIdleInputText("")
   }
 
   function adjustTime(seconds) {
@@ -1155,6 +1180,7 @@ export default function TimerApp({ sidebarMode = false }) {
     completedTasks,
     settings,
     completeTask,
+    restoreCompletedTask,
     deleteTask,
     resetTask,
     deferTask,
@@ -1201,7 +1227,9 @@ export default function TimerApp({ sidebarMode = false }) {
                   className={`idle-prompt${idleCountdown === 0 ? " idle-prompt--urgent" : ""}`}
                 >
                   <div className="idle-prompt__header">
-                    <span className="idle-prompt__label">Vad är nästa uppgift?</span>
+                    <span className="idle-prompt__label">
+                      Vad är nästa uppgift?
+                    </span>
                     {idleCountdown !== null && (
                       <span
                         className={`idle-prompt__countdown${idleCountdown === 0 ? " idle-prompt__countdown--zero" : ""}`}
