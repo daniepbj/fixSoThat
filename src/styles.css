@@ -294,7 +294,8 @@ body {
 .task-builder-focus-target--active {
   border-color: rgba(173, 255, 209, 0.7) !important;
   background: rgba(52, 209, 149, 0.16) !important;
-  box-shadow: 0 0 0 2px rgba(173, 255, 209, 0.35),
+  box-shadow:
+    0 0 0 2px rgba(173, 255, 209, 0.35),
     0 0 18px rgba(52, 209, 149, 0.28);
 }
 

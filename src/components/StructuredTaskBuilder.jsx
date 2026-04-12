@@ -144,7 +144,9 @@ export default function StructuredTaskBuilder() {
   useEffect(() => {
     function readActiveTimerTask() {
       try {
-        const tasks = JSON.parse(window.localStorage.getItem("fst_active") || "[]")
+        const tasks = JSON.parse(
+          window.localStorage.getItem("fst_active") || "[]",
+        )
         setLiveTimerTask(tasks[0] ?? null)
       } catch {
         setLiveTimerTask(null)
@@ -420,7 +422,8 @@ export default function StructuredTaskBuilder() {
   const queueActive =
     Boolean(liveTimerTask?.sourceMainTaskId) &&
     liveTimerTask.sourceMainTaskId === builderQueueTaskId
-  const focusGoal = queueActive && liveTimerTask?.sourceStepId === goalQueueStepId
+  const focusGoal =
+    queueActive && liveTimerTask?.sourceStepId === goalQueueStepId
   const focusProof =
     queueActive && liveTimerTask?.sourceStepId === proofQueueStepId
   const focusSteps = queueActive && !focusGoal && !focusProof
