@@ -2699,6 +2699,98 @@ body {
   }
 }
 
+/* ── Idle prompt ─────────────────────────────────────────────────────────── */
+.idle-prompt {
+  margin: 10px 12px 0;
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-card));
+  border: 1.5px solid var(--accent);
+  border-radius: 14px;
+  animation: fadeIn 0.25s ease;
+}
+
+.idle-prompt--urgent {
+  border-color: #ef4444;
+  background: color-mix(in srgb, #ef4444 10%, var(--bg-card));
+  animation: idleUrgentPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes idleUrgentPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.25); }
+}
+
+.idle-prompt__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.idle-prompt__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+.idle-prompt--urgent .idle-prompt__label {
+  color: #ef4444;
+}
+
+.idle-prompt__countdown {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.3s, color 0.3s;
+}
+
+.idle-prompt__countdown--zero {
+  color: #ef4444;
+  background: color-mix(in srgb, #ef4444 15%, transparent);
+}
+
+.idle-prompt__row {
+  display: flex;
+  gap: 8px;
+}
+
+.idle-prompt__input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.idle-prompt__input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.idle-prompt__btn {
+  padding: 8px 14px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.idle-prompt__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── GSI card ───────────────────────────────────────────────────────────── */
 .gsi-card {
   width: min(680px, 100%);
   border: 1px solid var(--card-border);

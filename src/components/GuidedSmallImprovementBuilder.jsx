@@ -646,6 +646,10 @@ export default function GuidedSmallImprovementBuilder() {
       setProofs([{ ...proofs[0], text: goodEnough.trim() }])
     }
     syncStageQueueStep(stage, true)
+    // Signal TimerApp to dismiss any active alarm so the user isn't stuck
+    // on the alarm screen when pressing Next after a stage timer runs out.
+    // (Builder lives outside TimerProvider so we use a localStorage signal.)
+    try { window.localStorage.setItem("fst_stop_alarm", "1") } catch {}
     // After completing the Order stage for the current area, loop back to
     // Target for the next area if one exists.
     if (stage === 4 && areaIndex < filledAreas.length - 1) {
