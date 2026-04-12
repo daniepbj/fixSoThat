@@ -2677,6 +2677,28 @@ body {
 /* GSI: Guided Small Improvement Builder (Redesigned 6-Stage)    */
 /* ════════════════════════════════════════════════════════════ */
 
+@keyframes gsi-pulse-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 30px 60px rgba(0, 0, 0, 0.25),
+      0 0 0 0
+        color-mix(in srgb, var(--timer-glow-color, #6c63ff) 0%, transparent);
+    border-color: var(--card-border);
+  }
+  50% {
+    box-shadow:
+      0 30px 60px rgba(0, 0, 0, 0.25),
+      0 0 22px 4px
+        color-mix(in srgb, var(--timer-glow-color, #6c63ff) 55%, transparent);
+    border-color: color-mix(
+      in srgb,
+      var(--timer-glow-color, #6c63ff) 70%,
+      transparent
+    );
+  }
+}
+
 .gsi-card {
   width: min(680px, 100%);
   border: 1px solid var(--card-border);
@@ -2690,9 +2712,51 @@ body {
   gap: 16px;
 }
 
+.gsi-card--timer-active {
+  animation: gsi-pulse-glow 2.8s ease-in-out infinite;
+}
+
 .gsi-header {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 2px;
+}
+
+.gsi-header__text {
+  text-align: left;
+}
+
+.gsi-play-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(173, 255, 209, 0.2);
+  background: rgba(52, 209, 149, 0.06);
+  color: rgba(173, 255, 209, 0.35);
+  font-size: 1rem;
+  cursor: not-allowed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.gsi-play-btn--ready {
+  border-color: rgba(173, 255, 209, 0.6);
+  background: rgba(52, 209, 149, 0.18);
+  color: #adffed;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(52, 209, 149, 0.25);
+}
+
+.gsi-play-btn--ready:hover {
+  background: rgba(52, 209, 149, 0.3);
+  box-shadow: 0 0 20px rgba(52, 209, 149, 0.4);
+  transform: scale(1.08);
 }
 
 .gsi-hero-kicker {
@@ -2734,6 +2798,8 @@ body {
 }
 
 .gsi-progress-num {
+  position: relative;
+  overflow: hidden;
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -2745,6 +2811,63 @@ body {
   font-weight: 800;
   color: #adffed;
   transition: all 0.2s ease;
+}
+
+.gsi-progress-num--timer {
+  width: 38px;
+  height: 38px;
+  border-width: 1px;
+  border-color: rgba(173, 255, 209, 0.35);
+  background: rgba(10, 26, 42, 0.55);
+}
+
+.gsi-progress-num__value {
+  position: relative;
+  z-index: 2;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.gsi-progress-mini-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.gsi-progress-mini-ring__track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 2;
+}
+
+.gsi-progress-mini-ring__progress {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transition: stroke-dasharray 1s linear;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+@keyframes gsi-mini-alarm-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 97, 97, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 97, 97, 0.2);
+    transform: scale(1.06);
+  }
+}
+
+.gsi-progress-num--alarm {
+  border-color: rgba(255, 97, 97, 0.8);
+  background: rgba(86, 10, 10, 0.55);
+  animation: gsi-mini-alarm-pulse 0.8s ease-in-out infinite;
 }
 
 .gsi-progress-dot--active .gsi-progress-num {
@@ -2782,6 +2905,60 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.gsi-area-stage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+  flex-wrap: nowrap;
+}
+
+.gsi-area-stage-head__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #f8fbff;
+}
+
+.gsi-area-stage-head__max {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #adffed;
+  background: rgba(52, 209, 149, 0.12);
+  border: 1px solid rgba(173, 255, 209, 0.35);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.gsi-area-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gsi-area-row .gcb-input--name {
+  flex: 1;
+  min-width: 0;
+}
+
+.gsi-area-inline-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0;
+  align-self: auto;
+  white-space: nowrap;
+}
+
+.gsi-area-inline-time__label,
+.gsi-area-inline-time__unit {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
 }
 
 /* Compact summary visible in stages 3+ */
@@ -3266,6 +3443,7 @@ body {
 }
 
 /* Navigation */
+
 .gsi-nav {
   display: flex;
   gap: 8px;

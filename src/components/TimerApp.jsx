@@ -156,6 +156,8 @@ export default function TimerApp({ sidebarMode = false }) {
   const pomoWorkDuration = (settings.pomodoroWorkMinutes || 20) * 60
   const pomoBreakDuration = (settings.pomodoroBreakMinutes || 5) * 60
   const alarmIntervalRef = useRef(null)
+  // Wall-clock anchor for drift-free timer: { startedAt: ms, startingRemaining: s, headId: string }
+  const timerEpochRef = useRef(null)
   const taskMusicRef = useRef(null)
   const taskMusicUrlRef = useRef("")
   const previewAudioRef = useRef(null)
@@ -251,29 +253,61 @@ export default function TimerApp({ sidebarMode = false }) {
     setActiveTasks,
   ])
 
-  // ── Timer tick ───────────────────────────────────────────────────────────
+  // Autostart hook for builder play: if a newly created main task is marked
+  // in localStorage, start the timer as soon as its first synced timer task
+  // is at the head of the queue.
+  useEffect(() => {
+    if (!activeMainTaskId || onBreak) return
+    try {
+      const intentId = window.localStorage.getItem("fst_autostart_main_task")
+      if (!intentId || intentId !== activeMainTaskId) return
+      const head = activeTasks[0]
+      if (!head || head.sourceMainTaskId !== activeMainTaskId) return
+      if (head.remainingSeconds <= 0) return
+      if (!timerRunning) setTimerRunning(true)
+      window.localStorage.removeItem("fst_autostart_main_task")
+    } catch {
+      // no-op
+    }
+  }, [activeMainTaskId, activeTasks, timerRunning, onBreak, setTimerRunning])
+
+  // ── Timer tick (wall-clock anchored — no drift, StrictMode safe) ─────────
   useEffect(() => {
     if (!timerRunning || onBreak) return
+    // Stamp the wall-clock start once per "run" so every tick derives
+    // remaining from real elapsed time rather than decrement-by-one.
+    const head = activeTasks[0] ?? null
+    if (!head || head.remainingSeconds <= 0) return
+    timerEpochRef.current = {
+      startedAt: Date.now(),
+      startingRemaining: head.remainingSeconds,
+      startingSpent: head.spentSeconds,
+      headId: head.id,
+    }
     const id = setInterval(() => {
-      let ticked = false
+      const epoch = timerEpochRef.current
+      if (!epoch) return
+      const elapsedSecs = Math.floor((Date.now() - epoch.startedAt) / 1000)
       setActiveTasks((prev) => {
         if (!prev.length) return prev
-        const [head, ...tail] = prev
-        if (head.remainingSeconds <= 0) return prev
-        ticked = true
+        const [h, ...tail] = prev
+        if (h.id !== epoch.headId) return prev // task changed, epoch stale
+        if (h.remainingSeconds <= 0) return prev
+        const remaining = Math.max(0, epoch.startingRemaining - elapsedSecs)
+        const spent = epoch.startingSpent + elapsedSecs
+        if (remaining === h.remainingSeconds) return prev // no visual change yet
         return [
-          {
-            ...head,
-            remainingSeconds: head.remainingSeconds - 1,
-            spentSeconds: head.spentSeconds + 1,
-          },
+          { ...h, remainingSeconds: remaining, spentSeconds: spent },
           ...tail,
         ]
       })
-      if (ticked) setSessionSeconds((s) => s + 1)
-    }, 1000)
-    return () => clearInterval(id)
-  }, [timerRunning, onBreak])
+      setSessionSeconds(epoch.startingSpent + elapsedSecs)
+    }, 500) // poll at 500ms so display updates feel responsive without drift
+    return () => {
+      clearInterval(id)
+      timerEpochRef.current = null
+    }
+  }, [timerRunning, onBreak]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Pomodoro: start work session timestamp when timer starts ─────────────
   useEffect(() => {
@@ -706,7 +740,6 @@ export default function TimerApp({ sidebarMode = false }) {
       }
     }
 
-    playClickSound(musicVolume)
     setTimerRunning((running) => !running)
   }
 
@@ -748,20 +781,30 @@ export default function TimerApp({ sidebarMode = false }) {
       }
     }
 
+    const newRemaining = clampSeconds(
+      clampMinutes(task?.estimatedMinutes, 25) * 60,
+    )
     setActiveTasks((prev) =>
       prev.map((t) =>
         t.id === id
           ? {
               ...t,
               estimatedMinutes: clampMinutes(t.estimatedMinutes, 25),
-              remainingSeconds: clampSeconds(
-                clampMinutes(t.estimatedMinutes, 25) * 60,
-              ),
+              remainingSeconds: newRemaining,
               spentSeconds: 0,
             }
           : t,
       ),
     )
+    // Re-anchor epoch so the wall-clock tick uses the reset value
+    if (timerEpochRef.current?.headId === id) {
+      timerEpochRef.current = {
+        startedAt: Date.now(),
+        startingRemaining: newRemaining,
+        startingSpent: 0,
+        headId: id,
+      }
+    }
   }
 
   function deferTask(id) {
@@ -812,10 +855,20 @@ export default function TimerApp({ sidebarMode = false }) {
     setActiveTasks((prev) => {
       if (!prev.length) return prev
       const [head, ...tail] = prev
+      const newRemaining = clampSeconds(head.remainingSeconds + seconds)
+      // Re-anchor epoch so the wall-clock tick uses the adjusted value
+      if (timerEpochRef.current?.headId === head.id) {
+        timerEpochRef.current = {
+          startedAt: Date.now(),
+          startingRemaining: newRemaining,
+          startingSpent: head.spentSeconds,
+          headId: head.id,
+        }
+      }
       return [
         {
           ...head,
-          remainingSeconds: clampSeconds(head.remainingSeconds + seconds),
+          remainingSeconds: newRemaining,
         },
         ...tail,
       ]
@@ -878,7 +931,6 @@ export default function TimerApp({ sidebarMode = false }) {
   }
 
   function playTask(id) {
-    playClickSound(musicVolume)
     setActiveTasks((prev) => {
       const idx = prev.findIndex((t) => t.id === id)
       if (idx < 0) return prev

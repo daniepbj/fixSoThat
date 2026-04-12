@@ -17,7 +17,10 @@ function parsePositiveInt(value, fallback = 0) {
 
 export default function AdhdBridgeBuilder() {
   const { addMainTask } = useMainTask()
-  const [builderVisualStyle] = useLocalStorage("fst_builder_visual_style", "calm")
+  const [builderVisualStyle] = useLocalStorage(
+    "fst_builder_visual_style",
+    "calm",
+  )
 
   const [stage, setStage] = useState(0)
   const [area, setArea] = useState("")
@@ -148,9 +151,14 @@ export default function AdhdBridgeBuilder() {
   }
 
   return (
-    <section className={`adhd-bridge-card gcb--${builderVisualStyle === "minimal" ? "minimal" : builderVisualStyle === "match" ? "match" : "calm"}`} aria-label="ADHD bridge builder">
+    <section
+      className={`adhd-bridge-card gcb--${builderVisualStyle === "minimal" ? "minimal" : builderVisualStyle === "match" ? "match" : "calm"}`}
+      aria-label="ADHD bridge builder"
+    >
       <p className="hero-kicker">New ADHD Guided Card</p>
-      <h2 className="adhd-bridge-title">Current -> Better -> Proof -> Tiny Steps</h2>
+      <h2 className="adhd-bridge-title">
+        Current to Better to Proof to Tiny Steps
+      </h2>
       <p className="adhd-bridge-help">
         Concrete, low-pressure, and action-first. Build a small bridge from how
         it is now to what would be a little better.
@@ -172,9 +180,12 @@ export default function AdhdBridgeBuilder() {
         {stage === 0 && (
           <>
             <label className="adhd-bridge-label" htmlFor="adhd-bridge-area">
-              What area would make life easier if I improved it a little right now?
+              What area would make life easier if I improved it a little right
+              now?
             </label>
-            <p className="adhd-bridge-helper">Pick one area, not your whole life.</p>
+            <p className="adhd-bridge-helper">
+              Pick one area, not your whole life.
+            </p>
             <p className="adhd-bridge-helper">Small improvement is enough.</p>
             <input
               id="adhd-bridge-area"
@@ -187,8 +198,12 @@ export default function AdhdBridgeBuilder() {
             <label className="adhd-bridge-label" htmlFor="adhd-bridge-max-time">
               Max time I want to spend on this right now
             </label>
-            <p className="adhd-bridge-helper">This is the total time budget for this area.</p>
-            <p className="adhd-bridge-helper">All steps together should fit inside this.</p>
+            <p className="adhd-bridge-helper">
+              This is the total time budget for this area.
+            </p>
+            <p className="adhd-bridge-helper">
+              All steps together should fit inside this.
+            </p>
             <input
               id="adhd-bridge-max-time"
               className="adhd-bridge-input adhd-bridge-input--minutes"
@@ -202,7 +217,10 @@ export default function AdhdBridgeBuilder() {
 
         {stage === 1 && (
           <>
-            <label className="adhd-bridge-label" htmlFor="adhd-bridge-current-state">
+            <label
+              className="adhd-bridge-label"
+              htmlFor="adhd-bridge-current-state"
+            >
               What is the current state right now?
             </label>
             <p className="adhd-bridge-helper">Describe how it is now.</p>
@@ -226,11 +244,16 @@ export default function AdhdBridgeBuilder() {
 
         {stage === 2 && (
           <>
-            <label className="adhd-bridge-label" htmlFor="adhd-bridge-better-state">
+            <label
+              className="adhd-bridge-label"
+              htmlFor="adhd-bridge-better-state"
+            >
               What would better look like after this?
             </label>
             <p className="adhd-bridge-helper">Not perfect. Just better.</p>
-            <p className="adhd-bridge-helper">What would count as an improvement here?</p>
+            <p className="adhd-bridge-helper">
+              What would count as an improvement here?
+            </p>
             <ul className="adhd-bridge-examples">
               <li>cleaner kitchen</li>
               <li>one paragraph written</li>
@@ -253,7 +276,9 @@ export default function AdhdBridgeBuilder() {
             <label className="adhd-bridge-label" htmlFor="adhd-bridge-proof">
               How will I know this improved?
             </label>
-            <p className="adhd-bridge-helper">What will be true when this is done enough?</p>
+            <p className="adhd-bridge-helper">
+              What will be true when this is done enough?
+            </p>
             <p className="adhd-bridge-helper">Use visible proof.</p>
             <ul className="adhd-bridge-examples">
               <li>counter is clear</li>
@@ -275,20 +300,32 @@ export default function AdhdBridgeBuilder() {
         {stage === 4 && (
           <>
             <div className="adhd-bridge-summary">
-              <p><strong>Current state:</strong> {currentState || "-"}</p>
-              <p><strong>Better state:</strong> {betterState || "-"}</p>
-              <p><strong>Proof:</strong> {proof || "-"}</p>
+              <p>
+                <strong>Current state:</strong> {currentState || "-"}
+              </p>
+              <p>
+                <strong>Better state:</strong> {betterState || "-"}
+              </p>
+              <p>
+                <strong>Proof:</strong> {proof || "-"}
+              </p>
             </div>
 
             <label className="adhd-bridge-label" htmlFor="adhd-bridge-step-0">
-              What specific small steps would go from the current state to the goal?
+              What specific small steps would go from the current state to the
+              goal?
             </label>
             <p className="adhd-bridge-helper">
-              Write the tiny actions between how it is now and how you want it to be.
+              Write the tiny actions between how it is now and how you want it
+              to be.
             </p>
             <p className="adhd-bridge-helper">Keep them small and realistic.</p>
-            <p className="adhd-bridge-helper">All step times together should fit inside your max time.</p>
-            <p className="adhd-bridge-helper">Make the next physical action obvious.</p>
+            <p className="adhd-bridge-helper">
+              All step times together should fit inside your max time.
+            </p>
+            <p className="adhd-bridge-helper">
+              Make the next physical action obvious.
+            </p>
             <p className="adhd-bridge-helper">Smaller is better.</p>
             <p className="adhd-bridge-helper">You can add super small steps.</p>
 
@@ -309,7 +346,9 @@ export default function AdhdBridgeBuilder() {
                       type="number"
                       min="1"
                       value={step.minutes || ""}
-                      onChange={(e) => updateStepMinutes(step.id, e.target.value)}
+                      onChange={(e) =>
+                        updateStepMinutes(step.id, e.target.value)
+                      }
                       placeholder="2"
                     />
                     <button
@@ -324,12 +363,20 @@ export default function AdhdBridgeBuilder() {
               })}
             </div>
 
-            <button type="button" className="adhd-bridge-add-btn" onClick={addStep}>
+            <button
+              type="button"
+              className="adhd-bridge-add-btn"
+              onClick={addStep}
+            >
               + Add tiny step
             </button>
 
-            <div className={`adhd-bridge-budget ${overBudget ? "adhd-bridge-budget--over" : "adhd-bridge-budget--ok"}`}>
-              <span className="adhd-bridge-budget-label">Planned steps total</span>
+            <div
+              className={`adhd-bridge-budget ${overBudget ? "adhd-bridge-budget--over" : "adhd-bridge-budget--ok"}`}
+            >
+              <span className="adhd-bridge-budget-label">
+                Planned steps total
+              </span>
               <strong>
                 {plannedTotal} / {maxTotal || 0} min
               </strong>
@@ -358,7 +405,11 @@ export default function AdhdBridgeBuilder() {
         </button>
 
         {stage < STAGES.length - 1 ? (
-          <button type="button" className="adhd-bridge-nav-btn adhd-bridge-nav-btn--next" onClick={goNext}>
+          <button
+            type="button"
+            className="adhd-bridge-nav-btn adhd-bridge-nav-btn--next"
+            onClick={goNext}
+          >
             Next
           </button>
         ) : (

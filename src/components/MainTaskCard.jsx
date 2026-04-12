@@ -66,6 +66,8 @@ export default function MainTaskCard({ task }) {
   const [proofDraft, setProofDraft] = useState(task.proof)
   const [editingPriority, setEditingPriority] = useState(false)
   const [priorityDraft, setPriorityDraft] = useState(task.priority)
+  const [editingNow, setEditingNow] = useState(false)
+  const [nowDraft, setNowDraft] = useState(task.now || "")
   const [newStepRaw, setNewStepRaw] = useState("")
   const [addingSubstepFor, setAddingSubstepFor] = useState(null) // stepId | null
   const [newSubstepRaw, setNewSubstepRaw] = useState("")
@@ -83,6 +85,9 @@ export default function MainTaskCard({ task }) {
   useEffect(() => {
     if (!editingPriority) setPriorityDraft(task.priority)
   }, [task.priority, editingPriority])
+  useEffect(() => {
+    if (!editingNow) setNowDraft(task.now || "")
+  }, [task.now, editingNow])
 
   const status = computeStatus(task)
   const isActive = activeMainTaskId === task.id
@@ -158,6 +163,11 @@ export default function MainTaskCard({ task }) {
   function savePriority() {
     updateMainTask(task.id, { priority: priorityDraft.trim() })
     setEditingPriority(false)
+  }
+
+  function saveNow() {
+    updateMainTask(task.id, { now: nowDraft.trim() })
+    setEditingNow(false)
   }
 
   function handleAddStep(e) {
@@ -423,6 +433,46 @@ export default function MainTaskCard({ task }) {
               </span>
             )}
           </div>
+
+          {/* Context (starting state recorded in builder) */}
+          {(task.now || editingNow) && (
+            <div className="mtask-card__field">
+              <span className="mtask-field-label">Context</span>
+              {editingNow ? (
+                <div className="mtask-inline-edit">
+                  <input
+                    className="mtask-edit-input"
+                    value={nowDraft}
+                    onChange={(e) => setNowDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveNow()
+                      if (e.key === "Escape") setEditingNow(false)
+                    }}
+                    autoFocus
+                  />
+                  <button className="mtask-edit-btn" onClick={saveNow}>
+                    Save
+                  </button>
+                  <button
+                    className="mtask-edit-btn mtask-edit-btn--cancel"
+                    onClick={() => setEditingNow(false)}
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <span
+                  className="mtask-field-value"
+                  onClick={() => {
+                    setNowDraft(task.now || "")
+                    setEditingNow(true)
+                  }}
+                >
+                  {task.now || <em className="mtask-empty">click to set</em>}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Steps */}
           <div className="mtask-card__steps">
