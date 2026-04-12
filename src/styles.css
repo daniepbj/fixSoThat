@@ -151,6 +151,43 @@ body {
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
 }
 
+.task-builder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.task-builder-header-text {
+  text-align: left;
+}
+
+.task-builder-play-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(173, 255, 209, 0.6);
+  background: rgba(52, 209, 149, 0.18);
+  color: #adffed;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 0 12px rgba(52, 209, 149, 0.25);
+  transition: all 0.2s ease;
+}
+
+.task-builder-play-btn:hover,
+.task-builder-play-btn:focus-visible {
+  background: rgba(52, 209, 149, 0.3);
+  box-shadow: 0 0 20px rgba(52, 209, 149, 0.4);
+  transform: scale(1.08);
+  outline: none;
+}
+
 .task-builder-title {
   margin: 0;
   font-size: clamp(1.4rem, 3.5vw, 2.1rem);
@@ -245,6 +282,20 @@ body {
 .task-builder-textarea {
   min-height: 76px;
   resize: vertical;
+}
+
+.task-builder-focus-target {
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.task-builder-focus-target--active {
+  border-color: rgba(173, 255, 209, 0.7) !important;
+  background: rgba(52, 209, 149, 0.16) !important;
+  box-shadow: 0 0 0 2px rgba(173, 255, 209, 0.35),
+    0 0 18px rgba(52, 209, 149, 0.28);
 }
 
 .task-builder-actions {
@@ -2716,8 +2767,13 @@ body {
 }
 
 @keyframes idleUrgentPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.25); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.25);
+  }
 }
 
 .idle-prompt__header {
@@ -2746,7 +2802,9 @@ body {
   padding: 2px 8px;
   border-radius: 20px;
   font-variant-numeric: tabular-nums;
-  transition: background 0.3s, color 0.3s;
+  transition:
+    background 0.3s,
+    color 0.3s;
 }
 
 .idle-prompt__countdown--zero {

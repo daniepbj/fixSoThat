@@ -45,15 +45,15 @@ function AppContent() {
 
         {/* ── Main content area ── */}
         <main className="app-main">
-          <FeatureHello />
-          <AppLinks />
           <StructuredTaskBuilder />
+          <GuidedSmallImprovementBuilder />
           <GuidedCategoryBuilder />
           <AdhdBridgeBuilder />
-          <GuidedSmallImprovementBuilder />
           <MainTaskList />
           <FixaPresetPanel />
           <SaveLoadPanel />
+          <AppLinks />
+          <FeatureHello />
         </main>
       </div>
       {retryReflectionTaskId && <RetryReflectionModal />}
