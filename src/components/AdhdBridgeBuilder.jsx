@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { useMainTask } from "../context/MainTaskContext"
+import { useLocalStorage } from "../hooks/useLocalStorage"
 import { genStepId, parseStepRaw, formatStepRaw } from "../utils/stepUtils"
 
 const STAGES = ["Area", "Current", "Better", "Proof", "Steps"]
@@ -16,6 +17,7 @@ function parsePositiveInt(value, fallback = 0) {
 
 export default function AdhdBridgeBuilder() {
   const { addMainTask } = useMainTask()
+  const [builderVisualStyle] = useLocalStorage("fst_builder_visual_style", "calm")
 
   const [stage, setStage] = useState(0)
   const [area, setArea] = useState("")
@@ -146,7 +148,7 @@ export default function AdhdBridgeBuilder() {
   }
 
   return (
-    <section className="adhd-bridge-card" aria-label="ADHD bridge builder">
+    <section className={`adhd-bridge-card gcb--${builderVisualStyle === "minimal" ? "minimal" : builderVisualStyle === "match" ? "match" : "calm"}`} aria-label="ADHD bridge builder">
       <p className="hero-kicker">New ADHD Guided Card</p>
       <h2 className="adhd-bridge-title">Current -> Better -> Proof -> Tiny Steps</h2>
       <p className="adhd-bridge-help">

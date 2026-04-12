@@ -1,28 +1,54 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useContext } from "react"
 import { useMainTask } from "../context/MainTaskContext"
+import { useLocalStorage } from "../hooks/useLocalStorage"
 import { genStepId, parseStepRaw } from "../utils/stepUtils"
+import { TimerContext } from "../context/TimerContext"
 
 const MAX_CATEGORIES = 5
-const STAGES = ["Categories", "Goals", "Proof", "Steps", "Review"]
+const STAGES = ["Areas", "Goals", "Proof", "Steps", "Review"]
+const TIME_CHIPS = [3, 5, 10]
+const PLACEHOLDERS = ["cleaning", "school project", "website", "kitchen", "essay"]
 
 function makeCat() {
   return {
     id: genStepId(),
     name: "",
-    minutes: "",
+    minutes: "5",
+    chipValue: "5",
     goal: "",
     proof: "",
     steps: [{ id: genStepId(), raw: "" }],
   }
 }
 
+function ContextBar({ categories, stage }) {
+  if (stage < 1) return null
+  return (
+    <div className="gcb-context-bar">
+      {categories.map((c) => (
+        <span key={c.id} className="gcb-context-chip">
+          {c.name || "…"}
+          <span className="gcb-context-chip-time">·{c.minutes}m</span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function GuidedCategoryBuilder() {
   const { addMainTask } = useMainTask()
+  const timerCtx = useContext(TimerContext)
+  const timerRunning = timerCtx?.timerRunning ?? false
+
   const [open, setOpen] = useState(false)
   const [stage, setStage] = useState(0)
   const [categories, setCategories] = useState([makeCat()])
   const [error, setError] = useState("")
   const [loadMsg, setLoadMsg] = useState("")
+  const [builderVisualStyle, setBuilderVisualStyle] = useLocalStorage(
+    "fst_builder_visual_style",
+    "calm",
+  )
   const stepRefs = useRef({})
 
   // ── helpers ──
@@ -45,7 +71,6 @@ export default function GuidedCategoryBuilder() {
     setCategories((prev) => [...prev, makeCat()])
   }
 
-  // step helpers per category
   function updateStep(catId, stepId, raw) {
     setCategories((prev) =>
       prev.map((c) =>
@@ -141,15 +166,15 @@ export default function GuidedCategoryBuilder() {
   function validate() {
     if (stage === 0) {
       for (const c of categories) {
-        if (!c.name.trim()) return "Every category needs a name."
+        if (!c.name.trim()) return "Every area needs a name."
         const mins = parseInt(c.minutes, 10)
         if (!mins || mins <= 0)
-          return `"${c.name}" needs a positive time in minutes.`
+          return `"${c.name}" needs a positive time cap.`
       }
     }
     if (stage === 1) {
       for (const c of categories) {
-        if (!c.goal.trim()) return `"${c.name}" needs an end goal.`
+        if (!c.goal.trim()) return `"${c.name}" needs a goal.`
       }
     }
     if (stage === 2) {
@@ -186,7 +211,6 @@ export default function GuidedCategoryBuilder() {
   function loadAll() {
     for (const c of categories) {
       const mins = parseInt(c.minutes, 10) || 0
-      // Parent step wrapping user steps: "name minutes"
       const parentId = genStepId()
       const parentRaw = `${c.name.trim()} ${mins}`
       const childSteps = c.steps
@@ -209,7 +233,6 @@ export default function GuidedCategoryBuilder() {
       `Loaded ${categories.length} task${categories.length > 1 ? "s" : ""} ✓`,
     )
     setTimeout(() => setLoadMsg(""), 2500)
-    // reset
     setStage(0)
     setCategories([makeCat()])
     setError("")
@@ -219,58 +242,96 @@ export default function GuidedCategoryBuilder() {
 
   function renderStage0() {
     return (
-      <>
-        <p className="gcb-stage-desc">
-          Name your categories and set a time cap (minutes) for each.
-        </p>
-        <div className="gcb-cat-list">
-          {categories.map((c, i) => (
-            <div className="gcb-cat-row" key={c.id}>
-              <span className="gcb-cat-num">{i + 1}</span>
-              <input
-                className="gcb-input gcb-input--name"
-                value={c.name}
-                onChange={(e) => updateCat(c.id, { name: e.target.value })}
-                placeholder="Category name"
-              />
-              <input
-                className="gcb-input gcb-input--mins"
-                type="number"
-                min="1"
-                value={c.minutes}
-                onChange={(e) => updateCat(c.id, { minutes: e.target.value })}
-                placeholder="min"
-              />
+      <div className="gcb-cat-list">
+        {categories.map((c, i) => (
+          <div className="gcb-cat-card" key={c.id}>
+            <button
+              type="button"
+              className="gcb-card-remove"
+              onClick={() => removeCat(c.id)}
+              aria-label="Remove area"
+            >
+              ×
+            </button>
+            <label className="gcb-cat-prompt" htmlFor={`gcb-name-${c.id}`}>
+              {i === 0
+                ? "What do I want to work on right now?"
+                : "Another area?"}
+            </label>
+            <span className="gcb-cat-helper">One area. Small is enough.</span>
+            <input
+              id={`gcb-name-${c.id}`}
+              className="gcb-input gcb-input--name"
+              value={c.name}
+              onChange={(e) => updateCat(c.id, { name: e.target.value })}
+              placeholder={PLACEHOLDERS[i % PLACEHOLDERS.length]}
+              aria-required="true"
+            />
+            <fieldset className="gcb-time-chips">
+              <legend className="gcb-time-chips-legend">Time cap</legend>
+              {TIME_CHIPS.map((mins) => (
+                <button
+                  key={mins}
+                  type="button"
+                  className={`gcb-time-chip${c.chipValue === String(mins) ? " gcb-time-chip--selected" : ""}`}
+                  aria-pressed={c.chipValue === String(mins)}
+                  onClick={() =>
+                    updateCat(c.id, {
+                      chipValue: String(mins),
+                      minutes: String(mins),
+                    })
+                  }
+                >
+                  {mins}m
+                </button>
+              ))}
               <button
                 type="button"
-                className="gcb-remove-btn"
-                onClick={() => removeCat(c.id)}
-                title="Remove"
+                className={`gcb-time-chip${c.chipValue === "custom" ? " gcb-time-chip--selected" : ""}`}
+                aria-pressed={c.chipValue === "custom"}
+                onClick={() => updateCat(c.id, { chipValue: "custom" })}
               >
-                ×
+                Custom
               </button>
-            </div>
-          ))}
-        </div>
+              {c.chipValue === "custom" && (
+                <input
+                  className="gcb-input gcb-input--mins"
+                  type="number"
+                  min="1"
+                  value={c.minutes}
+                  onChange={(e) =>
+                    updateCat(c.id, { minutes: e.target.value })
+                  }
+                  placeholder="min"
+                  aria-label="Custom minutes"
+                />
+              )}
+            </fieldset>
+          </div>
+        ))}
         {categories.length < MAX_CATEGORIES && (
           <button type="button" className="gcb-add-btn" onClick={addCat}>
-            + Add category
+            + Add another area
           </button>
         )}
-      </>
+      </div>
     )
   }
 
   function renderStage1() {
     return (
-      <>
-        <p className="gcb-stage-desc">What's the end goal for each category?</p>
+      <div className="gcb-field-list">
         {categories.map((c) => (
           <div className="gcb-field-card" key={c.id}>
             <div className="gcb-field-header">
-              {c.name} <span className="gcb-field-time">{c.minutes} min</span>
+              {c.name} <span className="gcb-field-time">{c.minutes}m</span>
             </div>
+            <label className="gcb-field-prompt" htmlFor={`gcb-goal-${c.id}`}>
+              What would count as good enough?
+            </label>
+            <span className="gcb-field-hint">Short. One sentence max.</span>
             <textarea
+              id={`gcb-goal-${c.id}`}
               className="gcb-textarea"
               value={c.goal}
               onChange={(e) => updateCat(c.id, { goal: e.target.value })}
@@ -279,23 +340,27 @@ export default function GuidedCategoryBuilder() {
             />
           </div>
         ))}
-      </>
+      </div>
     )
   }
 
   function renderStage2() {
     return (
-      <>
-        <p className="gcb-stage-desc">
-          How will you prove you completed each category?
-        </p>
+      <div className="gcb-field-list">
         {categories.map((c) => (
           <div className="gcb-field-card" key={c.id}>
             <div className="gcb-field-header">
-              {c.name} <span className="gcb-field-time">{c.minutes} min</span>
+              {c.name} <span className="gcb-field-time">{c.minutes}m</span>
             </div>
             <p className="gcb-field-goal">{c.goal}</p>
+            <label className="gcb-field-prompt" htmlFor={`gcb-proof-${c.id}`}>
+              How will I know it&rsquo;s done enough?
+            </label>
+            <span className="gcb-field-hint">
+              Something I can see or check off.
+            </span>
             <textarea
+              id={`gcb-proof-${c.id}`}
               className="gcb-textarea"
               value={c.proof}
               onChange={(e) => updateCat(c.id, { proof: e.target.value })}
@@ -304,21 +369,25 @@ export default function GuidedCategoryBuilder() {
             />
           </div>
         ))}
-      </>
+      </div>
     )
   }
 
   function renderStage3() {
     return (
-      <>
+      <div className="gcb-field-list">
         <p className="gcb-stage-desc">
-          Add steps for each category. Use <code>step name 5</code> for minutes.
-          Press <kbd>Enter</kbd> to add a step.
+          What tiny steps come first?
+          <span className="gcb-stage-hint">
+            {" "}
+            · end a step with a number for minutes, e.g.{" "}
+            <code>dishes 5</code>
+          </span>
         </p>
         {categories.map((c) => (
           <div className="gcb-field-card" key={c.id}>
             <div className="gcb-field-header">
-              {c.name} <span className="gcb-field-time">{c.minutes} min</span>
+              {c.name} <span className="gcb-field-time">{c.minutes}m</span>
             </div>
             <p className="gcb-field-goal">{c.goal}</p>
             <div className="gcb-step-list">
@@ -338,7 +407,7 @@ export default function GuidedCategoryBuilder() {
                       }
                       onKeyDown={(e) => handleStepKeyDown(e, c.id, step.id)}
                       onPaste={(e) => handleStepPaste(e, c.id, step.id)}
-                      placeholder="Step name 5"
+                      placeholder="e.g. stack dishes 5"
                     />
                     {parsed.minutes > 0 && (
                       <span className="task-step-time-badge">
@@ -359,16 +428,14 @@ export default function GuidedCategoryBuilder() {
             </div>
           </div>
         ))}
-      </>
+      </div>
     )
   }
 
   function renderStage4() {
     return (
       <>
-        <p className="gcb-stage-desc">
-          Review your categories, then load them as tasks.
-        </p>
+        <p className="gcb-stage-desc">Ready to go?</p>
         {categories.map((c) => {
           const validSteps = c.steps.filter((s) => s.raw.trim())
           const totalMins = validSteps.reduce(
@@ -379,7 +446,7 @@ export default function GuidedCategoryBuilder() {
             <div className="gcb-summary-card" key={c.id}>
               <div className="gcb-summary-header">
                 <strong>{c.name}</strong>
-                <span className="gcb-field-time">{c.minutes} min cap</span>
+                <span className="gcb-field-time">{c.minutes}m cap</span>
               </div>
               <p className="gcb-summary-goal">
                 <strong>Goal:</strong> {c.goal}
@@ -389,7 +456,7 @@ export default function GuidedCategoryBuilder() {
               </p>
               <p className="gcb-summary-steps-title">
                 Steps ({validSteps.length})
-                {totalMins > 0 && ` · ${totalMins} min total`}
+                {totalMins > 0 && ` · ${totalMins}m total`}
               </p>
               <ol className="gcb-summary-steps">
                 {validSteps.map((s) => {
@@ -421,6 +488,13 @@ export default function GuidedCategoryBuilder() {
     renderStage4,
   ]
 
+  const styleClass =
+    builderVisualStyle === "minimal"
+      ? "gcb--minimal"
+      : builderVisualStyle === "match"
+        ? "gcb--match"
+        : "gcb--calm"
+
   if (!open) {
     return (
       <section className="task-builder-card gcb-collapsed">
@@ -438,36 +512,91 @@ export default function GuidedCategoryBuilder() {
 
   return (
     <section
-      className="task-builder-card gcb"
+      className={`task-builder-card gcb ${styleClass}`}
       aria-label="Guided Category Builder"
     >
-      <button
-        type="button"
-        className="gcb-toggle-btn gcb-toggle-btn--open"
-        onClick={() => setOpen(false)}
-      >
-        Guided Category Builder
-        <span className="gcb-toggle-arrow">▾</span>
-      </button>
+      {/* Header row: title + style toggle */}
+      <div className="gcb-header-row">
+        <button
+          type="button"
+          className="gcb-toggle-btn gcb-toggle-btn--open"
+          onClick={() => setOpen(false)}
+        >
+          Guided Category Builder
+          <span className="gcb-toggle-arrow">▾</span>
+        </button>
+        <div className="gcb-style-toggle" role="group" aria-label="Card style">
+          <button
+            type="button"
+            className={`gcb-style-btn${builderVisualStyle === "calm" ? " gcb-style-btn--active" : ""}`}
+            aria-pressed={builderVisualStyle === "calm"}
+            title="Calm motion"
+            onClick={() => setBuilderVisualStyle("calm")}
+          >
+            🌊
+          </button>
+          <button
+            type="button"
+            className={`gcb-style-btn${builderVisualStyle === "minimal" ? " gcb-style-btn--active" : ""}`}
+            aria-pressed={builderVisualStyle === "minimal"}
+            title="Minimal"
+            onClick={() => setBuilderVisualStyle("minimal")}
+          >
+            ○
+          </button>
+          <button
+            type="button"
+            className={`gcb-style-btn${builderVisualStyle === "match" ? " gcb-style-btn--active" : ""}`}
+            aria-pressed={builderVisualStyle === "match"}
+            title="Match main style"
+            onClick={() => setBuilderVisualStyle("match")}
+          >
+            ✦
+          </button>
+        </div>
+      </div>
+
+      {/* Timer badge */}
+      {timerRunning && (
+        <div className="gcb-timer-badge">
+          <span className="gcb-timer-badge-dot" aria-hidden="true" />
+          Running under timer
+        </div>
+      )}
 
       {/* Stage indicator */}
       <div className="gcb-stages">
         {STAGES.map((label, i) => (
           <div
             key={label}
-            className={`gcb-stage-dot ${i === stage ? "gcb-stage-dot--active" : ""} ${i < stage ? "gcb-stage-dot--done" : ""}`}
+            className={[
+              "gcb-stage-dot",
+              i === stage ? "gcb-stage-dot--active" : "",
+              i < stage ? "gcb-stage-dot--done" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
-            <span className="gcb-stage-dot-num">{i < stage ? "✓" : i + 1}</span>
+            <span className="gcb-stage-dot-num">
+              {i < stage ? "✓" : i + 1}
+            </span>
             <span className="gcb-stage-dot-label">{label}</span>
           </div>
         ))}
       </div>
 
+      {/* Context bar (stage 1+) */}
+      <ContextBar categories={categories} stage={stage} />
+
       {/* Stage content */}
       <div className="gcb-content">{stageRenderers[stage]()}</div>
 
       {/* Error */}
-      {error && <p className="gcb-error">{error}</p>}
+      {error && (
+        <p className="gcb-error" role="alert" aria-live="assertive">
+          {error}
+        </p>
+      )}
 
       {/* Navigation */}
       <div className="gcb-nav">
@@ -491,7 +620,7 @@ export default function GuidedCategoryBuilder() {
             className="task-builder-load-btn"
             onClick={loadAll}
           >
-            Load All ({categories.length})
+            Load and Start → ({categories.length})
           </button>
         )}
       </div>

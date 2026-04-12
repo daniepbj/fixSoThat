@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react"
 
-const TimerContext = createContext(null)
+export const TimerContext = createContext(null)
 
 export function TimerProvider({ value, children }) {
   return <TimerContext.Provider value={value}>{children}</TimerContext.Provider>
