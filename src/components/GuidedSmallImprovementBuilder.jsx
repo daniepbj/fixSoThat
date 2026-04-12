@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { useMainTask } from "../context/MainTaskContext"
+import { useLocalStorage } from "../hooks/useLocalStorage"
 import { genStepId, formatStepRaw } from "../utils/stepUtils"
 
 const STAGES = ["Area", "Target", "Proof", "Brainstorm", "Order", "Save"]
@@ -159,6 +160,10 @@ function ExampleList({ title, examples }) {
 
 export default function GuidedSmallImprovementBuilder() {
   const { addMainTask } = useMainTask()
+  const [builderVisualStyle] = useLocalStorage(
+    "fst_builder_visual_style",
+    "calm",
+  )
 
   const [stage, setStage] = useState(0)
   const [area, setArea] = useState("")
@@ -346,7 +351,10 @@ export default function GuidedSmallImprovementBuilder() {
   }
 
   return (
-    <section className="gsi-card" aria-label="Guided small improvement builder">
+    <section
+      className={`gsi-card gcb--${builderVisualStyle === "minimal" ? "minimal" : builderVisualStyle === "match" ? "match" : "calm"}`}
+      aria-label="Guided small improvement builder"
+    >
       <div className="gsi-header">
         <p className="gsi-hero-kicker">Experimental Builder</p>
         <h2 className="gsi-title">Build a small improvement</h2>

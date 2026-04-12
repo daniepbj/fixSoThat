@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useLocalStorage } from "../hooks/useLocalStorage"
 import {
   getAutoTimezone,
   getTimezoneOverride,
@@ -9,6 +10,10 @@ export default function SettingsView({ settings, setSettings, music }) {
   const [tzOverride, setTzOverride] = useState(getTimezoneOverride())
   const [tzInput, setTzInput] = useState(tzOverride)
   const [tzError, setTzError] = useState("")
+  const [builderVisualStyle, setBuilderVisualStyle] = useLocalStorage(
+    "fst_builder_visual_style",
+    "calm",
+  )
 
   function update(key, value) {
     setSettings((s) => ({ ...s, [key]: value }))
@@ -159,6 +164,30 @@ export default function SettingsView({ settings, setSettings, music }) {
             onChange={(e) => update("matchMainPageStyle", e.target.checked)}
           />
         </label>
+
+        <div className="settings-row settings-row--block">
+          <span className="settings-row__label">Builder card style</span>
+          <p className="settings-help-text">
+            Controls the visual style of guided builder cards.
+          </p>
+          <div className="gcb-style-toggle settings-style-toggle">
+            {[
+              { v: "calm", icon: "🌊", label: "Calm Motion" },
+              { v: "minimal", icon: "○", label: "Minimal" },
+              { v: "match", icon: "✦", label: "Match Main" },
+            ].map(({ v, icon, label }) => (
+              <button
+                key={v}
+                type="button"
+                className={`gcb-style-btn settings-style-btn${builderVisualStyle === v ? " gcb-style-btn--active" : ""}`}
+                aria-pressed={builderVisualStyle === v}
+                onClick={() => setBuilderVisualStyle(v)}
+              >
+                {icon} {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <label className="settings-row">
           <span>Default task duration (minutes)</span>
