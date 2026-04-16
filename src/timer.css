@@ -326,9 +326,7 @@
   color: var(--ta-text-soft);
   max-width: 130px;
   text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-word;
   padding: 0 4px;
 }
 
@@ -542,9 +540,7 @@
   display: block;
   font-weight: 600;
   font-size: 0.92rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-word;
 }
 
 .task-card__times {
