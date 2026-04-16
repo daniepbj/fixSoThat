@@ -153,6 +153,15 @@ export default function TaskCard({
         </div>
         <div className="task-card__order">
           <button
+            type="button"
+            className="task-card__header-delete"
+            onClick={() => deleteTask(task.id)}
+            title="Delete task"
+            aria-label={`Delete ${task.title}`}
+          >
+            Delete
+          </button>
+          <button
             className="task-card__icon-btn"
             onClick={() => moveToTop(task.id)}
             disabled={index === 0}
@@ -212,12 +221,6 @@ export default function TaskCard({
           onClick={() => deferTask(task.id)}
         >
           ⏭ Not now
-        </button>
-        <button
-          className="task-card__btn task-card__btn--delete"
-          onClick={() => deleteTask(task.id)}
-        >
-          ✕
         </button>
       </div>
 

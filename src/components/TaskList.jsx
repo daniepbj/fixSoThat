@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { fmtLocalTime } from "../utils/timeUtils"
+import { fmtLocalDateTime, fmtLocalTime } from "../utils/timeUtils"
 import {
   DndContext,
   PointerSensor,
@@ -76,10 +76,13 @@ function SortableTaskRow({
 export default function TaskList({
   activeTasks,
   completedTasks,
+  deletedTasks,
   settings,
   completeTask,
   restoreCompletedTask,
   deleteTask,
+  undoDeleteTask,
+  clearDeletedTasks,
   resetTask,
   deferTask,
   moveUp,
@@ -100,6 +103,7 @@ export default function TaskList({
   const [showCompleted, setShowCompleted] = useState(
     settings.showCompletedByDefault,
   )
+  const [showDeleted, setShowDeleted] = useState(false)
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -227,6 +231,54 @@ export default function TaskList({
                   aria-label={`Restore ${task.title}`}
                 >
                   ↺
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="deleted-section">
+        <div className="deleted-section__header">
+          <button
+            className="toggle-btn"
+            onClick={() => setShowDeleted((s) => !s)}
+          >
+            {showDeleted ? "▲" : "▼"} Deleted ({deletedTasks.length})
+          </button>
+          {deletedTasks.length > 0 && (
+            <button
+              type="button"
+              className="deleted-task__clear"
+              onClick={clearDeletedTasks}
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+        {showDeleted && (
+          <div className="deleted-list">
+            {deletedTasks.length === 0 && (
+              <p className="list-empty">No deleted tasks.</p>
+            )}
+            {[...deletedTasks].reverse().map((task) => (
+              <div key={task.id} className="deleted-task">
+                <span>{task.emoji}</span>
+                <span className="deleted-task__title">{task.title}</span>
+                <span className="deleted-task__meta">
+                  {task.estimatedMinutes}m est
+                </span>
+                <span className="deleted-task__time">
+                  {fmtLocalDateTime(task.deletedAt)}
+                </span>
+                <button
+                  type="button"
+                  className="deleted-task__undo"
+                  onClick={() => undoDeleteTask(task.id)}
+                  title="Restore task"
+                  aria-label={`Undo delete for ${task.title}`}
+                >
+                  Undo
                 </button>
               </div>
             ))}

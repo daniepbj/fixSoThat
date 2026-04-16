@@ -44,26 +44,6 @@ function normalizeStep(step, order) {
   }
 }
 
-// Bottom-up completion propagation: if all children done → parent done
-function normalizeCompletionFlat(flatSteps) {
-  const steps = flatSteps.map((s) => ({ ...s }))
-  let changed = true
-  let maxPasses = steps.length + 2
-  while (changed && maxPasses-- > 0) {
-    changed = false
-    for (const step of steps) {
-      const children = steps.filter((s) => s.parentId === step.id)
-      if (children.length === 0) continue
-      const allDone = children.every((c) => c.completed)
-      if (step.completed !== allDone) {
-        step.completed = allDone
-        changed = true
-      }
-    }
-  }
-  return steps
-}
-
 function countTreeStats(flatSteps) {
   let total = 0
   let completed = 0
@@ -106,13 +86,14 @@ function findStepById(flatSteps, stepId) {
 }
 
 function deriveTaskStatus(task) {
-  const { total: totalSteps, completed: completedSteps } = countTreeStats(
-    task.steps,
-  )
-  if (totalSteps > 0 && completedSteps === totalSteps) return "completed"
-  return task.status === "completed" && completedSteps !== totalSteps
-    ? "active"
-    : task.status || "active"
+  const status = task?.status || "active"
+  // Keep completion explicit: only explicit complete action marks a task completed.
+  // If a completed task later gets an unchecked step, move it back to active.
+  if (status === "completed") {
+    const hasIncomplete = (task.steps || []).some((s) => !s.completed)
+    return hasIncomplete ? "active" : "completed"
+  }
+  return status
 }
 
 function normalizeTask(task) {
@@ -137,9 +118,6 @@ function normalizeTask(task) {
     parentId:
       s.parentId != null && validIds.has(s.parentId) ? s.parentId : null,
   }))
-
-  // Bottom-up completion normalization
-  flatSteps = normalizeCompletionFlat(flatSteps)
 
   return {
     id: task?.id || genTaskId(),
@@ -172,6 +150,15 @@ export function MainTaskProvider({ children }) {
     [],
     (raw) => (Array.isArray(raw) ? raw : []).map((t) => normalizeTask(t)),
   )
+  const [deletedMainTasks, setDeletedMainTasks] = useLocalStorage(
+    "fst_deleted_main",
+    [],
+    (raw) =>
+      (Array.isArray(raw) ? raw : []).map((t) => ({
+        ...normalizeTask(t),
+        deletedAt: t?.deletedAt || t?.updatedAt || new Date().toISOString(),
+      })),
+  )
   const [saveSlots, setSaveSlots] = useLocalStorage("fst_save_slots", [
     null,
     null,
@@ -188,6 +175,13 @@ export function MainTaskProvider({ children }) {
 
   useEffect(() => {
     setMainTasks((prev) => prev.map((task) => normalizeTask(task)))
+    setDeletedMainTasks((prev) =>
+      prev.map((task) => ({
+        ...normalizeTask(task),
+        deletedAt:
+          task?.deletedAt || task?.updatedAt || new Date().toISOString(),
+      })),
+    )
     setSaveSlots((prev) =>
       prev.map((slot) =>
         slot
@@ -198,7 +192,7 @@ export function MainTaskProvider({ children }) {
           : slot,
       ),
     )
-  }, [setMainTasks, setSaveSlots])
+  }, [setDeletedMainTasks, setMainTasks, setSaveSlots])
 
   useEffect(() => {
     if (!activeMainTaskId) return
@@ -241,15 +235,45 @@ export function MainTaskProvider({ children }) {
   }
 
   function deleteMainTask(id) {
+    const task = mainTasks.find((t) => t.id === id)
+    if (!task) return
+
+    setDeletedMainTasks((prev) => [
+      ...prev,
+      { ...task, deletedAt: new Date().toISOString() },
+    ])
     setMainTasks((prev) => prev.filter((t) => t.id !== id))
     if (activeMainTaskId === id) setActiveMainTaskId("")
+  }
+
+  function undoDeleteMainTask(id) {
+    const task = deletedMainTasks.find((t) => t.id === id)
+    if (!task) return
+
+    setDeletedMainTasks((prev) => prev.filter((t) => t.id !== id))
+    setMainTasks((prev) => {
+      const { deletedAt, ...restored } = task
+      return [...prev, restored]
+    })
+  }
+
+  function clearDeletedMainTasks() {
+    setDeletedMainTasks([])
   }
 
   function completeMainTask(id) {
     setMainTasks((prev) =>
       prev.map((t) =>
         t.id === id
-          ? { ...t, status: "completed", updatedAt: new Date().toISOString() }
+          ? normalizeTask({
+              ...t,
+              status: "completed",
+              steps: (t.steps || []).map((step) => ({
+                ...step,
+                completed: true,
+              })),
+              updatedAt: new Date().toISOString(),
+            })
           : t,
       ),
     )
@@ -308,7 +332,6 @@ export function MainTaskProvider({ children }) {
   // ── Step operations ─────────────────────────────────────────────────────
 
   function toggleStepComplete(taskId, stepId) {
-    let becameCompleted = false
     setMainTasks((prev) =>
       prev.map((t) =>
         t.id === taskId
@@ -321,26 +344,18 @@ export function MainTaskProvider({ children }) {
                 stepId,
                 nextCompleted,
               )
-              const next = normalizeTask({
+              return normalizeTask({
                 ...t,
                 steps: branchedSteps,
                 updatedAt: new Date().toISOString(),
               })
-              becameCompleted =
-                t.status !== "completed" && next.status === "completed"
-              return next
             })()
           : t,
       ),
     )
-    if (becameCompleted) {
-      if (activeMainTaskId === taskId) setActiveMainTaskId("")
-      triggerBigCelebration()
-    }
   }
 
   function setStepCompleted(taskId, stepId, completed) {
-    let becameCompleted = false
     setMainTasks((prev) =>
       prev.map((t) =>
         t.id === taskId
@@ -352,22 +367,15 @@ export function MainTaskProvider({ children }) {
                 stepId,
                 completed,
               )
-              const next = normalizeTask({
+              return normalizeTask({
                 ...t,
                 steps: branchedSteps,
                 updatedAt: new Date().toISOString(),
               })
-              becameCompleted =
-                t.status !== "completed" && next.status === "completed"
-              return next
             })()
           : t,
       ),
     )
-    if (becameCompleted) {
-      if (activeMainTaskId === taskId) setActiveMainTaskId("")
-      triggerBigCelebration()
-    }
   }
 
   function updateStep(taskId, stepId, raw) {
@@ -818,6 +826,7 @@ export function MainTaskProvider({ children }) {
 
   const value = {
     mainTasks,
+    deletedMainTasks,
     saveSlots,
     fixaPresets,
     activeMainTaskId,
@@ -828,6 +837,8 @@ export function MainTaskProvider({ children }) {
     addMainTaskAndActivate,
     updateMainTask,
     deleteMainTask,
+    undoDeleteMainTask,
+    clearDeletedMainTasks,
     completeMainTask,
     restoreMainTask,
     incrementTries,

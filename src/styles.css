@@ -738,6 +738,46 @@ body {
   gap: 12px;
 }
 
+.mtask-deleted-section {
+  margin-top: 16px;
+}
+
+.mtask-deleted-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mtask-deleted-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.mtask-deleted-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.mtask-deleted-item__title {
+  flex: 1;
+  color: var(--text-soft);
+  text-decoration: line-through;
+  min-width: 0;
+}
+
+.mtask-deleted-item__meta {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
 .mtask-card {
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 14px;
@@ -790,6 +830,17 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.mtask-card__header-delete {
+  border: 1px solid rgba(255, 145, 145, 0.45);
+  background: rgba(127, 29, 29, 0.24);
+  color: #ffd4d4;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .mtask-card__step-progress {

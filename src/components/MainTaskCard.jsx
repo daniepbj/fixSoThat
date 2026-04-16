@@ -390,6 +390,16 @@ export default function MainTaskCard({ task }) {
             <StatusBadge label="Proof" isGreen={status.hasProof} />
             <StatusBadge label="Priority" isGreen={status.hasPriority} />
           </div>
+          <button
+            type="button"
+            className="mtask-card__header-delete"
+            onClick={(e) => {
+              e.stopPropagation()
+              deleteMainTask(task.id)
+            }}
+          >
+            Delete
+          </button>
         </div>
       </div>
 
@@ -700,15 +710,6 @@ export default function MainTaskCard({ task }) {
                 ↩ Restore
               </button>
             )}
-            <button
-              type="button"
-              className="mtask-action-btn mtask-action-btn--danger"
-              onClick={() => {
-                if (window.confirm("Delete this task?")) deleteMainTask(task.id)
-              }}
-            >
-              Delete
-            </button>
           </div>
         </div>
       )}

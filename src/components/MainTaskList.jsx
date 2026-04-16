@@ -1,10 +1,17 @@
 import { useState } from "react"
 import { useMainTask } from "../context/MainTaskContext"
+import { fmtLocalDateTime } from "../utils/timeUtils"
 import MainTaskCard from "./MainTaskCard"
 
 export default function MainTaskList() {
-  const { mainTasks } = useMainTask()
+  const {
+    deletedMainTasks,
+    mainTasks,
+    undoDeleteMainTask,
+    clearDeletedMainTasks,
+  } = useMainTask()
   const [filter, setFilter] = useState("active")
+  const [showDeleted, setShowDeleted] = useState(false)
 
   const filtered = mainTasks.filter((t) => {
     if (filter === "active") return t.status === "active"
@@ -58,6 +65,49 @@ export default function MainTaskList() {
         {filtered.map((task) => (
           <MainTaskCard key={task.id} task={task} />
         ))}
+      </div>
+
+      <div className="mtask-deleted-section">
+        <div className="mtask-deleted-section__header">
+          <button
+            type="button"
+            className="mtask-filter-btn"
+            onClick={() => setShowDeleted((open) => !open)}
+          >
+            {showDeleted ? "▲" : "▼"} Deleted ({deletedMainTasks.length})
+          </button>
+          {deletedMainTasks.length > 0 && (
+            <button
+              type="button"
+              className="mtask-action-btn mtask-action-btn--danger"
+              onClick={clearDeletedMainTasks}
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+        {showDeleted && (
+          <div className="mtask-deleted-list">
+            {deletedMainTasks.length === 0 && (
+              <p className="mtask-empty-state">No deleted main tasks.</p>
+            )}
+            {[...deletedMainTasks].reverse().map((task) => (
+              <div key={task.id} className="mtask-deleted-item">
+                <span className="mtask-deleted-item__title">{task.title}</span>
+                <span className="mtask-deleted-item__meta">
+                  {fmtLocalDateTime(task.deletedAt)}
+                </span>
+                <button
+                  type="button"
+                  className="mtask-action-btn"
+                  onClick={() => undoDeleteMainTask(task.id)}
+                >
+                  Undo
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )

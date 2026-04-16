@@ -71,19 +71,35 @@ function normalizeTask(task) {
   }
 }
 
+function buildMainTaskStepIndex(mainTasks) {
+  return new Map(
+    (mainTasks || []).map((task) => [
+      task.id,
+      new Set((task.steps || []).map((step) => step.id)),
+    ]),
+  )
+}
+
+function filterValidLinkedTasks(tasks, stepIndex) {
+  return (tasks || []).filter((task) => {
+    if (!task?.sourceMainTaskId) return true
+    const sourceStepIds = stepIndex.get(task.sourceMainTaskId)
+    if (!sourceStepIds) return false
+    if (!task.sourceStepId) return true
+    return sourceStepIds.has(task.sourceStepId)
+  })
+}
+
 function flattenActionableSteps(steps) {
   // Flat model: steps is a flat array with parentId + order.
-  // DFS through hierarchy, collecting leaf steps.
+  // DFS through hierarchy, collecting all steps so parent/sibling visibility
+  // remains stable when children are inserted from the queue UI.
   const flattened = []
   const visit = (parentId) => {
     const children = getChildren(steps, parentId)
     for (const step of children) {
-      const grandchildren = getChildren(steps, step.id)
-      if (grandchildren.length === 0) {
-        flattened.push(step)
-      } else {
-        visit(step.id)
-      }
+      flattened.push(step)
+      visit(step.id)
     }
   }
   visit(null)
@@ -95,6 +111,7 @@ export default function TimerApp({ sidebarMode = false }) {
     mainTasks,
     activeMainTaskId,
     addMainTaskAndActivate,
+    removeStepFromTask,
     setStepCompleted,
     incrementTries,
     incrementStepTries,
@@ -106,6 +123,10 @@ export default function TimerApp({ sidebarMode = false }) {
   const [activeTasks, setActiveTasks] = useLocalStorage("fst_active", [])
   const [completedTasks, setCompletedTasks] = useLocalStorage(
     "fst_completed",
+    [],
+  )
+  const [deletedTasks, setDeletedTasks] = useLocalStorage(
+    "fst_deleted_active",
     [],
   )
   const [deferredTasks, setDeferredTasks] = useLocalStorage("fst_deferred", [])
@@ -190,6 +211,7 @@ export default function TimerApp({ sidebarMode = false }) {
       setTimerRunning(false)
     }
     setActiveTasks((prev) => prev.map(normalizeTask))
+    setDeletedTasks((prev) => prev.map(normalizeTask))
     setDeferredTasks((prev) => prev.map(normalizeTask))
     setSettings((prev) => ({
       ...prev,
@@ -197,7 +219,29 @@ export default function TimerApp({ sidebarMode = false }) {
       matchMainPageStyle: Boolean(prev.matchMainPageStyle),
       alarmMode: prev.alarmMode ?? (prev.soundEnabled ? "nag" : "silent"),
     }))
-  }, [setActiveTasks, setDeferredTasks, setSettings, setTimerRunning])
+  }, [
+    setActiveTasks,
+    setDeletedTasks,
+    setDeferredTasks,
+    setSettings,
+    setTimerRunning,
+  ])
+
+  // When a main task or one of its source steps is deleted, remove all mirrored
+  // timer entries so the left queue and report views cannot drift out of sync.
+  useEffect(() => {
+    const stepIndex = buildMainTaskStepIndex(mainTasks)
+    setActiveTasks((prev) => filterValidLinkedTasks(prev, stepIndex))
+    setCompletedTasks((prev) => filterValidLinkedTasks(prev, stepIndex))
+    setDeferredTasks((prev) => filterValidLinkedTasks(prev, stepIndex))
+    setDeletedTasks((prev) => filterValidLinkedTasks(prev, stepIndex))
+  }, [
+    mainTasks,
+    setActiveTasks,
+    setCompletedTasks,
+    setDeferredTasks,
+    setDeletedTasks,
+  ])
 
   // Keep timer tasks synced with the currently active main task.
   useEffect(() => {
@@ -826,8 +870,40 @@ export default function TimerApp({ sidebarMode = false }) {
     setCurrentView("timer")
   }
 
-  function deleteTask(id) {
+  function softDeleteTask(id) {
+    stopAlarm()
+    const task = activeTasks.find((t) => t.id === id)
+    if (!task) return
+
+    // Linked timer subtasks map to main-task steps; deleting them from the
+    // timer queue must also remove the source step to stay in sync everywhere.
+    if (task.sourceMainTaskId && task.sourceStepId) {
+      removeStepFromTask(task.sourceMainTaskId, task.sourceStepId)
+      setActiveTasks((prev) => prev.filter((t) => t.id !== id))
+      return
+    }
+
+    setDeletedTasks((prev) => [
+      ...prev,
+      { ...task, deletedAt: new Date().toISOString() },
+    ])
     setActiveTasks((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  function undoDeleteTask(id) {
+    const task = deletedTasks.find((t) => t.id === id)
+    if (!task) return
+
+    setDeletedTasks((prev) => prev.filter((t) => t.id !== id))
+    setActiveTasks((prev) => {
+      const { deletedAt, ...restored } = task
+      return [...prev, restored]
+    })
+    setCurrentView("timer")
+  }
+
+  function clearDeletedTasks() {
+    setDeletedTasks([])
   }
 
   function resetTask(id) {
@@ -1178,10 +1254,13 @@ export default function TimerApp({ sidebarMode = false }) {
   const taskProps = {
     activeTasks,
     completedTasks,
+    deletedTasks,
     settings,
     completeTask,
     restoreCompletedTask,
-    deleteTask,
+    deleteTask: softDeleteTask,
+    undoDeleteTask,
+    clearDeletedTasks,
     resetTask,
     deferTask,
     adjustTime,
@@ -1272,8 +1351,10 @@ export default function TimerApp({ sidebarMode = false }) {
             <ReportView
               activeTasks={activeTasks}
               completedTasks={completedTasks}
+              deletedTasks={deletedTasks}
               deferredTasks={deferredTasks}
               sessionSeconds={sessionSeconds}
+              undoDeleteTask={undoDeleteTask}
             />
           )}
           {currentView === "presets" && (
