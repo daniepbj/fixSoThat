@@ -145,6 +145,14 @@ export default function SettingsView({ settings, setSettings, music }) {
               </label>
             ))}
           </div>
+          <label className="settings-row">
+            <span>Auto-scroll to active task when alarm starts</span>
+            <input
+              type="checkbox"
+              checked={settings.autoScrollOnAlarm !== false}
+              onChange={(e) => update("autoScrollOnAlarm", e.target.checked)}
+            />
+          </label>
         </div>
 
         <label className="settings-row">

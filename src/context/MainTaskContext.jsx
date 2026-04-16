@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react"
 import { playPowerUpSound, playCompletionSound } from "../utils/soundEffects"
 import confetti from "canvas-confetti"
 import { useLocalStorage } from "../hooks/useLocalStorage"
+import { COLORS } from "../data/seedData"
 import {
   genStepId,
   parseStepBlockTree,
@@ -96,6 +97,19 @@ function deriveTaskStatus(task) {
   return status
 }
 
+function deriveTaskColor(task) {
+  if (typeof task?.color === "string" && task.color.trim()) {
+    return task.color
+  }
+
+  const seed = String(task?.id || task?.title || "main-task")
+  let hash = 0
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0
+  }
+  return COLORS[hash % COLORS.length] || "#10b981"
+}
+
 function normalizeTask(task) {
   const rawSteps = Array.isArray(task?.steps) ? task.steps : []
 
@@ -122,6 +136,7 @@ function normalizeTask(task) {
   return {
     id: task?.id || genTaskId(),
     title: task?.title || "",
+    color: deriveTaskColor(task),
     now: task?.now || "",
     steps: flatSteps,
     proof: task?.proof || "",

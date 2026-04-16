@@ -74,6 +74,13 @@ export default function MainTaskCard({ task }) {
   const [draggedStepId, setDraggedStepId] = useState(null)
   const [dropTarget, setDropTarget] = useState(null) // { id, zone: "before"|"after"|"into" }
   const [retryHistoryOpen, setRetryHistoryOpen] = useState(false)
+  const status = computeStatus(task)
+  const isActive = activeMainTaskId === task.id
+  const isCompleted = task.status === "completed"
+  const flatSteps = Array.isArray(task?.steps) ? task.steps : []
+  const completedSteps = flatSteps.filter((s) => s.completed).length
+  const totalSteps = flatSteps.length
+  const renderTree = buildRenderTree(flatSteps)
 
   // Keep draft values in sync with task prop updates (e.g. external edits)
   useEffect(() => {
@@ -88,14 +95,9 @@ export default function MainTaskCard({ task }) {
   useEffect(() => {
     if (!editingNow) setNowDraft(task.now || "")
   }, [task.now, editingNow])
-
-  const status = computeStatus(task)
-  const isActive = activeMainTaskId === task.id
-  const isCompleted = task.status === "completed"
-  const flatSteps = Array.isArray(task?.steps) ? task.steps : []
-  const completedSteps = flatSteps.filter((s) => s.completed).length
-  const totalSteps = flatSteps.length
-  const renderTree = buildRenderTree(flatSteps)
+  useEffect(() => {
+    if (isActive) setExpanded(true)
+  }, [isActive])
 
   function handleAddSubstep(parentStepId) {
     if (!newSubstepRaw.trim()) return
@@ -205,8 +207,12 @@ export default function MainTaskCard({ task }) {
     return (
       <div key={node.id} className="mtask-step-tree-node">
         <div
-          className={`mtask-step-row ${isDragged ? "mtask-step-row--dragging" : ""} ${dropClass}`}
-          style={{ marginLeft: `${depth * 18}px` }}
+          data-main-step-id={node.id}
+          className={`mtask-step-row mtask-step-row--accent ${isDragged ? "mtask-step-row--dragging" : ""} ${dropClass}`}
+          style={{
+            marginLeft: `${depth * 18}px`,
+            "--step-accent": task.color,
+          }}
           onDragOver={(event) => handleDragOver(node.id, event)}
           onDragLeave={() => handleDragLeave(node.id)}
           onDrop={(event) => handleDrop(node.id, event)}
@@ -361,7 +367,14 @@ export default function MainTaskCard({ task }) {
 
   return (
     <article
+      data-main-task-id={task.id}
       className={`mtask-card ${isCompleted ? "mtask-card--completed" : "mtask-card--active"} ${isActive ? "mtask-card--is-active" : ""}`}
+      style={{
+        borderLeft: `4px solid ${task.color}`,
+        background: isCompleted
+          ? undefined
+          : `linear-gradient(135deg, ${task.color}22 0%, rgba(255, 255, 255, 0.06) 58%)`,
+      }}
     >
       {/* Header */}
       <div
