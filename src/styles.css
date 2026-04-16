@@ -817,9 +817,7 @@ body {
 
 .mtask-card__title {
   font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 .mtask-card__done-mark {
