@@ -1,7 +1,12 @@
 import { useState, useRef } from "react"
 import { useMainTask } from "../context/MainTaskContext"
 import { fmtLocalDateTime } from "../utils/timeUtils"
-import { listTracks, getTrack, addTrackFromFile } from "../utils/musicStore"
+import {
+  listTracks,
+  getTrack,
+  addTrackFromFile,
+  clearAllTracks,
+} from "../utils/musicStore"
 import JSZip from "jszip"
 
 function formatSavedAt(iso) {
@@ -57,6 +62,7 @@ export default function SaveLoadPanel() {
   const [message, setMessage] = useState("")
   const [musicMsg, setMusicMsg] = useState("")
   const [includeMusic, setIncludeMusic] = useState(true)
+  const [clearMusic, setClearMusic] = useState(true)
   const importRef = useRef(null)
   const flashTimerRef = useRef(null)
 
@@ -108,33 +114,6 @@ export default function SaveLoadPanel() {
       setMusicMsg("Zip export failed.")
       setTimeout(() => setMusicMsg(""), 3000)
     }
-  }
-
-  // ── Import from JSON file ──────────────────────────────────────────────
-  function handleImportClick() {
-    importRef.current?.click()
-  }
-
-  async function handleImportFile(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    try {
-      const text = await file.text()
-      const data = JSON.parse(text)
-      if (typeof data !== "object" || data === null) throw new Error("bad")
-      let count = 0
-      for (const key of FST_KEYS) {
-        if (key in data) {
-          localStorage.setItem(key, JSON.stringify(data[key]))
-          count++
-        }
-      }
-      flash(`Imported ${count} keys — reloading…`)
-      setTimeout(() => window.location.reload(), 800)
-    } catch {
-      flash("Invalid backup file.")
-    }
-    e.target.value = ""
   }
 
   // ── Import from zip or json ──
@@ -210,6 +189,33 @@ export default function SaveLoadPanel() {
     if (window.confirm(`Clear save slot ${index + 1}?`)) {
       clearSlot(index)
       flash(`Slot ${index + 1} cleared.`)
+    }
+  }
+
+  async function handleClearAllData() {
+    const ok = window.confirm(
+      "Clear all app data now? This permanently removes tasks, settings, saves, and queue state.",
+    )
+    if (!ok) return
+
+    try {
+      if (clearMusic) {
+        await clearAllTracks()
+      }
+
+      const keys = Object.keys(window.localStorage).filter((key) =>
+        key.startsWith("fst_"),
+      )
+      for (const key of keys) {
+        window.localStorage.removeItem(key)
+      }
+
+      flash(
+        `Cleared ${keys.length} data key(s)${clearMusic ? " + music" : ""} — reloading…`,
+      )
+      setTimeout(() => window.location.reload(), 350)
+    } catch {
+      flash("Failed to clear all data. Please try again.")
     }
   }
 
@@ -337,6 +343,34 @@ export default function SaveLoadPanel() {
           />
         </div>
         {musicMsg && <p className="save-load-msg">{musicMsg}</p>}
+      </div>
+
+      <div className="save-load-danger-zone">
+        <h3 className="export-import-title">Danger Zone</h3>
+        <p className="save-load-panel__help">
+          Use this before trying a new version to avoid legacy-data bugs. This
+          action is permanent.
+        </p>
+        <div className="export-import-actions" style={{ marginTop: 8 }}>
+          <label
+            style={{ marginRight: 12, fontSize: "0.98em", userSelect: "none" }}
+          >
+            <input
+              type="checkbox"
+              checked={clearMusic}
+              onChange={(e) => setClearMusic(e.target.checked)}
+              style={{ marginRight: 4 }}
+            />
+            Also clear uploaded music
+          </label>
+          <button
+            type="button"
+            className="save-slot-btn save-slot-btn--danger"
+            onClick={handleClearAllData}
+          >
+            Clear All Data
+          </button>
+        </div>
       </div>
     </section>
   )

@@ -1853,6 +1853,22 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+.save-load-danger-zone {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 148, 148, 0.4);
+}
+
+.save-slot-btn--danger {
+  color: #ffe5e5;
+  border-color: rgba(255, 130, 130, 0.55);
+  background: rgba(140, 28, 28, 0.45);
+}
+
+.save-slot-btn--danger:hover {
+  background: rgba(173, 35, 35, 0.56);
+}
+
 .export-import-title {
   margin: 0 0 6px;
   font-size: 1rem;

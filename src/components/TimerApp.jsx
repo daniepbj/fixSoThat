@@ -1131,7 +1131,38 @@ export default function TimerApp({ sidebarMode = false }) {
 
   // ── Reordering ───────────────────────────────────────────────────────────
 
+  function syncLinkedQueueMove(dragId, targetId, zone) {
+    if (!dragId || !targetId || dragId === targetId) return
+
+    const fromTask = activeTasks.find((t) => t.id === dragId)
+    const toTask = activeTasks.find((t) => t.id === targetId)
+
+    if (
+      !fromTask?.sourceMainTaskId ||
+      !fromTask?.sourceStepId ||
+      !toTask?.sourceMainTaskId ||
+      !toTask?.sourceStepId
+    ) {
+      return
+    }
+
+    if (toTask.sourceMainTaskId === fromTask.sourceMainTaskId) {
+      reorderMainTaskStep(
+        fromTask.sourceMainTaskId,
+        fromTask.sourceStepId,
+        toTask.sourceStepId,
+        zone,
+      )
+    } else {
+      reorderMainTask(fromTask.sourceMainTaskId, toTask.sourceMainTaskId)
+    }
+  }
+
   function moveUp(id) {
+    const idx = activeTasks.findIndex((t) => t.id === id)
+    if (idx <= 0) return
+    const targetId = activeTasks[idx - 1]?.id
+
     setActiveTasks((prev) => {
       const idx = prev.findIndex((t) => t.id === id)
       if (idx <= 0) return prev
@@ -1139,9 +1170,17 @@ export default function TimerApp({ sidebarMode = false }) {
       ;[copy[idx - 1], copy[idx]] = [copy[idx], copy[idx - 1]]
       return copy
     })
+
+    if (targetId) {
+      syncLinkedQueueMove(id, targetId, "before")
+    }
   }
 
   function moveDown(id) {
+    const idx = activeTasks.findIndex((t) => t.id === id)
+    if (idx < 0 || idx >= activeTasks.length - 1) return
+    const targetId = activeTasks[idx + 1]?.id
+
     setActiveTasks((prev) => {
       const idx = prev.findIndex((t) => t.id === id)
       if (idx < 0 || idx >= prev.length - 1) return prev
@@ -1149,9 +1188,17 @@ export default function TimerApp({ sidebarMode = false }) {
       ;[copy[idx], copy[idx + 1]] = [copy[idx + 1], copy[idx]]
       return copy
     })
+
+    if (targetId) {
+      syncLinkedQueueMove(id, targetId, "after")
+    }
   }
 
   function moveToTop(id) {
+    const idx = activeTasks.findIndex((t) => t.id === id)
+    if (idx <= 0) return
+    const targetId = activeTasks[0]?.id
+
     setActiveTasks((prev) => {
       const idx = prev.findIndex((t) => t.id === id)
       if (idx <= 0) return prev
@@ -1159,9 +1206,17 @@ export default function TimerApp({ sidebarMode = false }) {
       const [item] = copy.splice(idx, 1)
       return [item, ...copy]
     })
+
+    if (targetId) {
+      syncLinkedQueueMove(id, targetId, "before")
+    }
   }
 
   function moveToBottom(id) {
+    const idx = activeTasks.findIndex((t) => t.id === id)
+    if (idx < 0 || idx >= activeTasks.length - 1) return
+    const targetId = activeTasks[activeTasks.length - 1]?.id
+
     setActiveTasks((prev) => {
       const idx = prev.findIndex((t) => t.id === id)
       if (idx < 0 || idx >= prev.length - 1) return prev
@@ -1169,12 +1224,17 @@ export default function TimerApp({ sidebarMode = false }) {
       const [item] = copy.splice(idx, 1)
       return [...copy, item]
     })
+
+    if (targetId) {
+      syncLinkedQueueMove(id, targetId, "after")
+    }
   }
 
   function reorderTask(dragId, targetId) {
     if (!dragId || !targetId || dragId === targetId) return
-    const fromTask = activeTasks.find((t) => t.id === dragId)
-    const toTask = activeTasks.find((t) => t.id === targetId)
+    const fromIndex = activeTasks.findIndex((t) => t.id === dragId)
+    const toIndex = activeTasks.findIndex((t) => t.id === targetId)
+
     setActiveTasks((prev) => {
       const from = prev.findIndex((t) => t.id === dragId)
       const to = prev.findIndex((t) => t.id === targetId)
@@ -1185,27 +1245,8 @@ export default function TimerApp({ sidebarMode = false }) {
       return copy
     })
 
-    if (
-      fromTask?.sourceMainTaskId &&
-      fromTask?.sourceStepId &&
-      toTask?.sourceMainTaskId &&
-      toTask?.sourceStepId
-    ) {
-      const fromIndex = activeTasks.findIndex((t) => t.id === dragId)
-      const toIndex = activeTasks.findIndex((t) => t.id === targetId)
-      const zone = fromIndex < toIndex ? "after" : "before"
-
-      if (toTask.sourceMainTaskId === fromTask.sourceMainTaskId) {
-        reorderMainTaskStep(
-          fromTask.sourceMainTaskId,
-          fromTask.sourceStepId,
-          toTask.sourceStepId,
-          zone,
-        )
-      } else {
-        reorderMainTask(fromTask.sourceMainTaskId, toTask.sourceMainTaskId)
-      }
-    }
+    const zone = fromIndex < toIndex ? "after" : "before"
+    syncLinkedQueueMove(dragId, targetId, zone)
   }
 
   function playTask(id) {

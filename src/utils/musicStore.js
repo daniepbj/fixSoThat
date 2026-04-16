@@ -68,3 +68,7 @@ export async function getTrack(id) {
     if (!id) return null
     return withStore("readonly", (store) => store.get(id))
 }
+
+export async function clearAllTracks() {
+    await withStore("readwrite", (store) => store.clear())
+}
