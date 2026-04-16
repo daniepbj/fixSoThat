@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useMainTask } from "../context/MainTaskContext"
 import { fmtLocalDateTime } from "../utils/timeUtils"
 import MainTaskCard from "./MainTaskCard"
@@ -7,11 +7,18 @@ export default function MainTaskList() {
   const {
     deletedMainTasks,
     mainTasks,
+    activeMainTaskId,
     undoDeleteMainTask,
     clearDeletedMainTasks,
   } = useMainTask()
   const [filter, setFilter] = useState("active")
   const [showDeleted, setShowDeleted] = useState(false)
+
+  useEffect(() => {
+    if (activeMainTaskId && filter === "completed") {
+      setFilter("active")
+    }
+  }, [activeMainTaskId, filter])
 
   const filtered = mainTasks.filter((t) => {
     if (filter === "active") return t.status === "active"

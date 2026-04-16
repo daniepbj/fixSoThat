@@ -60,6 +60,7 @@ export default function TaskCard({
 
   return (
     <div
+      data-task-id={task.id}
       className={`task-card ${isFirst ? "task-card--current" : ""}`}
       style={{
         borderLeftColor: task.color,

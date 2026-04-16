@@ -106,15 +106,39 @@ function flattenActionableSteps(steps) {
   return flattened
 }
 
+function pickNextColor(currentColor) {
+  if (COLORS.length <= 1) return COLORS[0] || currentColor || "#10b981"
+
+  let nextColor = currentColor
+  for (
+    let attempt = 0;
+    attempt < 4 && nextColor === currentColor;
+    attempt += 1
+  ) {
+    nextColor = COLORS[Math.floor(Math.random() * COLORS.length)]
+  }
+
+  if (nextColor !== currentColor) return nextColor
+
+  const currentIndex = COLORS.indexOf(currentColor)
+  if (currentIndex >= 0) {
+    return COLORS[(currentIndex + 1) % COLORS.length]
+  }
+
+  return COLORS[0]
+}
+
 export default function TimerApp({ sidebarMode = false }) {
   const {
     mainTasks,
     activeMainTaskId,
+    setActiveMainTaskId,
     addMainTaskAndActivate,
     removeStepFromTask,
     setStepCompleted,
     incrementTries,
     incrementStepTries,
+    updateMainTask,
   } = useMainTask()
 
   const mountedRef = useRef(false)
@@ -134,6 +158,7 @@ export default function TimerApp({ sidebarMode = false }) {
   const [settings, setSettings] = useLocalStorage("fst_settings", {
     soundEnabled: false,
     autoStartNextTask: true,
+    autoScrollOnAlarm: true,
     defaultTaskDuration: 25,
     showCompletedByDefault: false,
     matchMainPageStyle: false,
@@ -188,6 +213,7 @@ export default function TimerApp({ sidebarMode = false }) {
   const previewAudioRef = useRef(null)
   const previewUrlRef = useRef("")
   const confettiTimerRef = useRef(null)
+  const colorFrameRef = useRef(0)
   const lastConfettiAtRef = useRef(0)
   const lastTryIncrementKeyRef = useRef("")
 
@@ -217,6 +243,7 @@ export default function TimerApp({ sidebarMode = false }) {
       ...prev,
       defaultTaskDuration: clampMinutes(prev.defaultTaskDuration, 25),
       matchMainPageStyle: Boolean(prev.matchMainPageStyle),
+      autoScrollOnAlarm: prev.autoScrollOnAlarm ?? true,
       alarmMode: prev.alarmMode ?? (prev.soundEnabled ? "nag" : "silent"),
     }))
   }, [
@@ -226,6 +253,49 @@ export default function TimerApp({ sidebarMode = false }) {
     setSettings,
     setTimerRunning,
   ])
+
+  function scrollToElement(
+    selector,
+    options = { behavior: "smooth", block: "center" },
+  ) {
+    if (typeof document === "undefined") return false
+    const el = document.querySelector(selector)
+    if (!el) return false
+    el.scrollIntoView(options)
+    return true
+  }
+
+  function focusAlarmTarget(task) {
+    if (!task?.sourceMainTaskId) return
+
+    setCurrentView("timer")
+    setActiveMainTaskId(task.sourceMainTaskId)
+
+    const stepSelector = task.sourceStepId
+      ? `[data-main-step-id="${task.sourceStepId}"]`
+      : ""
+    const mainTaskSelector = `[data-main-task-id="${task.sourceMainTaskId}"]`
+    const timerTaskSelector = `[data-task-id="${task.id}"]`
+
+    let attempts = 0
+    const maxAttempts = 8
+
+    const runFocus = () => {
+      attempts += 1
+      const foundTimerTask = scrollToElement(timerTaskSelector, {
+        behavior: "smooth",
+        block: "nearest",
+      })
+      const foundMainTask = scrollToElement(mainTaskSelector)
+      const foundStep = stepSelector ? scrollToElement(stepSelector) : true
+
+      const done = foundMainTask && foundStep && foundTimerTask
+      if (done || attempts >= maxAttempts) return
+      window.setTimeout(runFocus, 120)
+    }
+
+    window.setTimeout(runFocus, 20)
+  }
 
   // When a main task or one of its source steps is deleted, remove all mirrored
   // timer entries so the left queue and report views cannot drift out of sync.
@@ -276,6 +346,7 @@ export default function TimerApp({ sidebarMode = false }) {
               ...existing,
               title: parsed.text || step.raw || "Step",
               estimatedMinutes: safeMinutes,
+              color: activeMainTask.color,
               sourceMainTaskId: activeMainTask.id,
               sourceStepId: step.id,
             }
@@ -287,7 +358,7 @@ export default function TimerApp({ sidebarMode = false }) {
             sourceMainTaskId: activeMainTask.id,
             sourceStepId: step.id,
             emoji: "✅",
-            color: "#10b981",
+            color: activeMainTask.color,
           })
         })
 
@@ -478,6 +549,11 @@ export default function TimerApp({ sidebarMode = false }) {
   function triggerAlarm() {
     const mode = settingsRef.current.alarmMode ?? "silent"
     setAlarmActive(true)
+
+    if (settingsRef.current.autoScrollOnAlarm !== false && currentTask) {
+      focusAlarmTarget(currentTask)
+    }
+
     clearInterval(alarmIntervalRef.current)
     if (mode === "silent") return
     playAlarmOnce()
@@ -549,6 +625,14 @@ export default function TimerApp({ sidebarMode = false }) {
 
     return () => {
       alive = false
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (colorFrameRef.current && typeof window !== "undefined") {
+        window.cancelAnimationFrame(colorFrameRef.current)
+      }
     }
   }, [])
 
@@ -1126,13 +1210,31 @@ export default function TimerApp({ sidebarMode = false }) {
   }
 
   function colorMe() {
-    setActiveTasks((prev) => {
-      if (!prev.length) return prev
-      const [head, ...tail] = prev
-      return [
-        { ...head, color: COLORS[Math.floor(Math.random() * COLORS.length)] },
-        ...tail,
-      ]
+    if (!currentTask || typeof window === "undefined") return
+    if (colorFrameRef.current) return
+
+    colorFrameRef.current = window.requestAnimationFrame(() => {
+      colorFrameRef.current = 0
+
+      const nextColor = pickNextColor(currentTask.color)
+
+      if (currentTask.sourceMainTaskId) {
+        updateMainTask(currentTask.sourceMainTaskId, { color: nextColor })
+        setActiveTasks((prev) =>
+          prev.map((task) =>
+            task.sourceMainTaskId === currentTask.sourceMainTaskId
+              ? { ...task, color: nextColor }
+              : task,
+          ),
+        )
+        return
+      }
+
+      setActiveTasks((prev) =>
+        prev.map((task) =>
+          task.id === currentTask.id ? { ...task, color: nextColor } : task,
+        ),
+      )
     })
   }
 

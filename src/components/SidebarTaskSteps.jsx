@@ -46,7 +46,14 @@ export default function SidebarTaskSteps() {
 
     return (
       <div key={node.id}>
-        <div className="sidebar-step" style={{ marginLeft: `${depth * 16}px` }}>
+        <div
+          data-sidebar-step-id={node.id}
+          className="sidebar-step sidebar-step--accent"
+          style={{
+            marginLeft: `${depth * 16}px`,
+            "--step-accent": task.color,
+          }}
+        >
           <input
             type="checkbox"
             checked={node.completed}

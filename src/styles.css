@@ -953,6 +953,10 @@ body {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.mtask-step-row--accent {
+  border-left: 3px solid var(--step-accent, rgba(255, 255, 255, 0.28));
+}
+
 .mtask-step-row--dragging {
   opacity: 0.55;
 }
