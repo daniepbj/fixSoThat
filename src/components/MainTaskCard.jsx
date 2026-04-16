@@ -14,7 +14,7 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { useMainTask } from "../context/MainTaskContext"
 import { parseStepRaw, buildRenderTree, getDepth } from "../utils/stepUtils"
-import { fmtLocalDate } from "../utils/timeUtils"
+import { fmtDuration, fmtLocalDate } from "../utils/timeUtils"
 
 const REASON_LABELS = {
   know_why: "I know why it didn't work",
@@ -119,6 +119,8 @@ export default function MainTaskCard({ task }) {
   const [newStepRaw, setNewStepRaw] = useState("")
   const [addingSubstepFor, setAddingSubstepFor] = useState(null) // stepId | null
   const [newSubstepRaw, setNewSubstepRaw] = useState("")
+  const [queueByStepId, setQueueByStepId] = useState(() => new Map())
+  const [taskHeadQueueItem, setTaskHeadQueueItem] = useState(null)
   const [retryHistoryOpen, setRetryHistoryOpen] = useState(false)
   const status = computeStatus(task)
   const isActive = activeMainTaskId === task.id
@@ -152,6 +154,36 @@ export default function MainTaskCard({ task }) {
   useEffect(() => {
     setExpanded(isActive)
   }, [isActive])
+
+  useEffect(() => {
+    function syncQueueSnapshot() {
+      try {
+        const raw = window.localStorage.getItem("fst_active") || "[]"
+        const tasks = JSON.parse(raw)
+        if (!Array.isArray(tasks)) return
+
+        const linked = tasks.filter(
+          (entry) => entry?.sourceMainTaskId && entry?.sourceStepId,
+        )
+
+        const nextMap = new Map(
+          linked.map((entry) => [entry.sourceStepId, entry]),
+        )
+
+        setQueueByStepId(nextMap)
+        setTaskHeadQueueItem(
+          linked.find((entry) => entry.sourceMainTaskId === task.id) || null,
+        )
+      } catch {
+        setQueueByStepId(new Map())
+        setTaskHeadQueueItem(null)
+      }
+    }
+
+    syncQueueSnapshot()
+    const id = window.setInterval(syncQueueSnapshot, 500)
+    return () => window.clearInterval(id)
+  }, [task.id])
 
   function handleSetActive() {
     if (isActive) {
@@ -224,6 +256,8 @@ export default function MainTaskCard({ task }) {
     const parsed = parseStepRaw(node.raw)
     const stepDepth = getDepth(flatSteps, node.id)
     const hasPrevSibling = siblingIndex > 0
+    const liveQueueItem = queueByStepId.get(node.id)
+    const isLiveHead = taskHeadQueueItem?.sourceStepId === node.id
 
     return (
       <div key={node.id} className="mtask-step-tree-node">
@@ -271,6 +305,13 @@ export default function MainTaskCard({ task }) {
               />
               {parsed.minutes > 0 && (
                 <span className="mtask-step-time">{parsed.minutes}m</span>
+              )}
+              {liveQueueItem && (
+                <span
+                  className={`mtask-step-time-live ${isLiveHead ? "mtask-step-time-live--head" : ""}`}
+                >
+                  {fmtDuration(liveQueueItem.remainingSeconds)} left
+                </span>
               )}
               <div className="mtask-step-right">
                 <button
@@ -418,6 +459,11 @@ export default function MainTaskCard({ task }) {
           </span>
         </div>
         <div className="mtask-card__header-meta">
+          {taskHeadQueueItem && (
+            <span className="mtask-card__live-countdown">
+              {fmtDuration(taskHeadQueueItem.remainingSeconds)} live
+            </span>
+          )}
           {totalSteps > 0 && (
             <span className="mtask-card__step-progress">
               {completedSteps}/{totalSteps}

@@ -1164,6 +1164,19 @@ body {
   border-radius: 999px;
   padding: 2px 7px;
 }
+.mtask-step-time-live {
+  font-size: 0.74rem;
+  color: #dce7ff;
+  background: rgba(88, 101, 242, 0.24);
+  border: 1px solid rgba(161, 173, 255, 0.45);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+.mtask-step-time-live--head {
+  color: #fff5d6;
+  background: rgba(245, 158, 11, 0.26);
+  border-color: rgba(252, 211, 77, 0.55);
+}
 
 .mtask-step-remove {
   border: 1px solid rgba(255, 167, 167, 0.5);
@@ -1468,6 +1481,15 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.mtask-card__live-countdown {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff1d8;
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(252, 211, 77, 0.45);
+  border-radius: 999px;
+  padding: 2px 8px;
 }
 
 .mtask-retry-parent-select {
