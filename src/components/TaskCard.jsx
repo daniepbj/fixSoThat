@@ -1,7 +1,11 @@
 import { useState } from "react"
 import { useTimerContext } from "../context/TimerContext"
 import { useMainTask } from "../context/MainTaskContext"
-import { fmtDuration, projectedEndTimeLocal } from "../utils/timeUtils"
+import {
+  fmtDuration,
+  getHourRingProgress,
+  projectedEndTimeLocal,
+} from "../utils/timeUtils"
 
 export default function TaskCard({
   task,
@@ -37,9 +41,9 @@ export default function TaskCard({
 
   // Mini pie chart for the current task
   const PIE_R = 15
-  const PIE_C = 2 * Math.PI * PIE_R
+  const ringProgress = getHourRingProgress(task.remainingSeconds)
   const totalSec = task.estimatedMinutes * 60
-  const remainingRatio =
+  const taskProgressRatio =
     totalSec > 0 ? Math.max(0, task.remainingSeconds / totalSec) : 0
 
   function handleStepsAction() {
@@ -74,7 +78,7 @@ export default function TaskCard({
               className="task-pie"
               viewBox="0 0 36 36"
               style={{
-                transform: "rotate(-90deg) scaleX(-1)",
+                transform: "rotate(90deg) scaleX(-1)",
                 transformOrigin: "center",
               }}
               aria-hidden="true"
@@ -95,7 +99,8 @@ export default function TaskCard({
                 stroke={task.color}
                 strokeWidth="4"
                 strokeLinecap="round"
-                strokeDasharray={`${remainingRatio * PIE_C} ${PIE_C}`}
+                pathLength={1}
+                strokeDasharray={`${ringProgress} 1`}
               />
             </svg>
             <span className="task-pie__emoji">{task.emoji}</span>
@@ -104,7 +109,15 @@ export default function TaskCard({
           <span className="task-card__emoji">{task.emoji}</span>
         )}
         <div className="task-card__info">
-          <span className="task-card__title">{task.title}</span>
+          {task.sourceMainTaskTitle && (
+            <span className="task-card__main-title">
+              * Fixa sa att jag {task.sourceMainTaskTitle}
+            </span>
+          )}
+          <span className="task-card__title">
+            {task.stepDepth > 0 ? `${"\u21b3 ".repeat(task.stepDepth)}` : ""}
+            {task.title}
+          </span>
           <span className="task-card__times">
             {fmtDuration(task.remainingSeconds)} left &nbsp;·&nbsp;
             {fmtDuration(task.spentSeconds)} spent &nbsp;·&nbsp;→{" "}
@@ -229,7 +242,7 @@ export default function TaskCard({
         <div
           className="task-progress__fill"
           style={{
-            width: `${Math.max(0, Math.min(100, remainingRatio * 100))}%`,
+            width: `${Math.max(0, Math.min(100, taskProgressRatio * 100))}%`,
             background: task.color,
           }}
         />

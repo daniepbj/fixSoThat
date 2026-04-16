@@ -95,14 +95,14 @@ function flattenActionableSteps(steps) {
   // DFS through hierarchy, collecting all steps so parent/sibling visibility
   // remains stable when children are inserted from the queue UI.
   const flattened = []
-  const visit = (parentId) => {
+  const visit = (parentId, depth = 0) => {
     const children = getChildren(steps, parentId)
     for (const step of children) {
-      flattened.push(step)
-      visit(step.id)
+      flattened.push({ step, depth })
+      visit(step.id, depth + 1)
     }
   }
-  visit(null)
+  visit(null, 0)
   return flattened
 }
 
@@ -139,6 +139,8 @@ export default function TimerApp({ sidebarMode = false }) {
     incrementTries,
     incrementStepTries,
     updateMainTask,
+    reorderMainTask,
+    reorderMainTaskStep,
   } = useMainTask()
 
   const mountedRef = useRef(false)
@@ -216,6 +218,7 @@ export default function TimerApp({ sidebarMode = false }) {
   const colorFrameRef = useRef(0)
   const lastConfettiAtRef = useRef(0)
   const lastTryIncrementKeyRef = useRef("")
+  const recentlyCompletedStepIdsRef = useRef(new Set())
 
   // First task is always the "current" active task tied to the timer
   const currentTask = activeTasks[0] ?? null
@@ -270,6 +273,9 @@ export default function TimerApp({ sidebarMode = false }) {
 
     setCurrentView("timer")
     setActiveMainTaskId(task.sourceMainTaskId)
+    if (mainTasks[0]?.id && mainTasks[0].id !== task.sourceMainTaskId) {
+      reorderMainTask(task.sourceMainTaskId, mainTasks[0].id)
+    }
 
     const stepSelector = task.sourceStepId
       ? `[data-main-step-id="${task.sourceStepId}"]`
@@ -297,6 +303,12 @@ export default function TimerApp({ sidebarMode = false }) {
     window.setTimeout(runFocus, 20)
   }
 
+  useEffect(() => {
+    if (!activeMainTaskId || !mainTasks.length) return
+    if (mainTasks[0]?.id === activeMainTaskId) return
+    reorderMainTask(activeMainTaskId, mainTasks[0].id)
+  }, [activeMainTaskId, mainTasks, reorderMainTask])
+
   // When a main task or one of its source steps is deleted, remove all mirrored
   // timer entries so the left queue and report views cannot drift out of sync.
   useEffect(() => {
@@ -313,64 +325,65 @@ export default function TimerApp({ sidebarMode = false }) {
     setDeletedTasks,
   ])
 
-  // Keep timer tasks synced with the currently active main task.
+  // Keep timer tasks synced with all active main tasks in main-list order.
   useEffect(() => {
-    if (!activeMainTask) return
-
     setActiveTasks((prev) => {
       const prevByStepId = new Map(
         prev
-          .filter(
-            (t) => t.sourceMainTaskId === activeMainTask.id && t.sourceStepId,
-          )
-          .map((t) => [t.sourceStepId, t]),
+          .filter((t) => t.sourceMainTaskId && t.sourceStepId)
+          .map((t) => [`${t.sourceMainTaskId}:${t.sourceStepId}`, t]),
       )
 
-      // Keep tasks that don't belong to this main task (manually added or from other sources)
-      const unrelated = prev.filter(
-        (t) => t.sourceMainTaskId !== activeMainTask.id,
-      )
+      const unrelated = prev.filter((t) => !t.sourceMainTaskId)
 
-      const synced = flattenActionableSteps(activeMainTask.steps)
-        .filter((step) => !step.completed)
-        .map((step) => {
-          const parsed = parseStepRaw(step.raw)
-          const safeMinutes = clampMinutes(
-            parsed.minutes,
-            settings.defaultTaskDuration,
-          )
-          const existing = prevByStepId.get(step.id)
+      const synced = (mainTasks || [])
+        .filter((task) => task.status === "active")
+        .flatMap((mainTask) =>
+          flattenActionableSteps(mainTask.steps)
+            .filter(
+              ({ step }) =>
+                !step.completed &&
+                !recentlyCompletedStepIdsRef.current.has(step.id),
+            )
+            .map(({ step, depth }) => {
+              const parsed = parseStepRaw(step.raw)
+              const safeMinutes = clampMinutes(
+                parsed.minutes,
+                settings.defaultTaskDuration,
+              )
+              const key = `${mainTask.id}:${step.id}`
+              const existing = prevByStepId.get(key)
 
-          if (existing) {
-            return {
-              ...existing,
-              title: parsed.text || step.raw || "Step",
-              estimatedMinutes: safeMinutes,
-              color: activeMainTask.color,
-              sourceMainTaskId: activeMainTask.id,
-              sourceStepId: step.id,
-            }
-          }
+              if (existing) {
+                return {
+                  ...existing,
+                  title: parsed.text || step.raw || "Step",
+                  estimatedMinutes: safeMinutes,
+                  color: mainTask.color,
+                  sourceMainTaskId: mainTask.id,
+                  sourceStepId: step.id,
+                  sourceMainTaskTitle: mainTask.title,
+                  stepDepth: depth,
+                }
+              }
 
-          return createTask({
-            title: parsed.text || step.raw || "Step",
-            estimatedMinutes: safeMinutes,
-            sourceMainTaskId: activeMainTask.id,
-            sourceStepId: step.id,
-            emoji: "✅",
-            color: activeMainTask.color,
-          })
-        })
+              return createTask({
+                title: parsed.text || step.raw || "Step",
+                estimatedMinutes: safeMinutes,
+                sourceMainTaskId: mainTask.id,
+                sourceStepId: step.id,
+                emoji: "✅",
+                color: mainTask.color,
+                sourceMainTaskTitle: mainTask.title,
+                stepDepth: depth,
+              })
+            }),
+        )
 
       return [...synced, ...unrelated]
     })
     // Note: do NOT setCurrentView here — user may be on settings or another view
-  }, [
-    activeMainTask,
-    activeMainTaskId,
-    settings.defaultTaskDuration,
-    setActiveTasks,
-  ])
+  }, [mainTasks, settings.defaultTaskDuration, setActiveTasks])
 
   // Autostart hook for builder play: if a newly created main task is marked
   // in localStorage, start the timer as soon as its first synced timer task
@@ -915,7 +928,11 @@ export default function TimerApp({ sidebarMode = false }) {
     if (!task) return
 
     if (task.sourceMainTaskId && task.sourceStepId) {
+      recentlyCompletedStepIdsRef.current.add(task.sourceStepId)
       setStepCompleted(task.sourceMainTaskId, task.sourceStepId, true)
+      window.setTimeout(() => {
+        recentlyCompletedStepIdsRef.current.delete(task.sourceStepId)
+      }, 400)
     }
 
     playCompletionSound(musicVolume)
@@ -1156,6 +1173,8 @@ export default function TimerApp({ sidebarMode = false }) {
 
   function reorderTask(dragId, targetId) {
     if (!dragId || !targetId || dragId === targetId) return
+    const fromTask = activeTasks.find((t) => t.id === dragId)
+    const toTask = activeTasks.find((t) => t.id === targetId)
     setActiveTasks((prev) => {
       const from = prev.findIndex((t) => t.id === dragId)
       const to = prev.findIndex((t) => t.id === targetId)
@@ -1165,9 +1184,32 @@ export default function TimerApp({ sidebarMode = false }) {
       copy.splice(to, 0, item)
       return copy
     })
+
+    if (
+      fromTask?.sourceMainTaskId &&
+      fromTask?.sourceStepId &&
+      toTask?.sourceMainTaskId &&
+      toTask?.sourceStepId
+    ) {
+      const fromIndex = activeTasks.findIndex((t) => t.id === dragId)
+      const toIndex = activeTasks.findIndex((t) => t.id === targetId)
+      const zone = fromIndex < toIndex ? "after" : "before"
+
+      if (toTask.sourceMainTaskId === fromTask.sourceMainTaskId) {
+        reorderMainTaskStep(
+          fromTask.sourceMainTaskId,
+          fromTask.sourceStepId,
+          toTask.sourceStepId,
+          zone,
+        )
+      } else {
+        reorderMainTask(fromTask.sourceMainTaskId, toTask.sourceMainTaskId)
+      }
+    }
   }
 
   function playTask(id) {
+    const task = activeTasks.find((t) => t.id === id)
     setActiveTasks((prev) => {
       const idx = prev.findIndex((t) => t.id === id)
       if (idx < 0) return prev
@@ -1176,8 +1218,17 @@ export default function TimerApp({ sidebarMode = false }) {
       const [item] = copy.splice(idx, 1)
       return [item, ...copy]
     })
+    if (task?.sourceMainTaskId) {
+      setActiveMainTaskId(task.sourceMainTaskId)
+      if (mainTasks[0]?.id && mainTasks[0].id !== task.sourceMainTaskId) {
+        reorderMainTask(task.sourceMainTaskId, mainTasks[0].id)
+      }
+    }
     setCurrentView("timer")
     setTimerRunning(true)
+    if (settingsRef.current.autoScrollOnAlarm !== false && task) {
+      focusAlarmTarget(task)
+    }
   }
 
   function toggleTaskFlag(id, flagKey) {
@@ -1397,6 +1448,8 @@ export default function TimerApp({ sidebarMode = false }) {
         pomoWorkStart={pomoWorkStart}
         pomoWorkDuration={pomoWorkDuration}
         onBreak={onBreak}
+        musicMuted={musicMuted}
+        setMusicMuted={setMusicMuted}
       />
       <TimerProvider value={timerContextValue}>
         <div className="timer-main">

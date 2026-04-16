@@ -128,6 +128,16 @@ export function fmtTimerDisplay(seconds) {
 }
 
 /**
+ * Normalize remaining time against a fixed 60-minute ring scale.
+ * One full circle always represents 60 minutes, regardless of task length.
+ */
+export function getHourRingProgress(remainingSeconds) {
+    const total = 60 * 60
+    const remaining = Number.isFinite(remainingSeconds) ? remainingSeconds : 0
+    return Math.max(0, Math.min(1, remaining / total))
+}
+
+/**
  * Format an ISO string as local "HH:mm".
  */
 export function fmtLocalTime(isoString) {

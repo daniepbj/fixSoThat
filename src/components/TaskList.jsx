@@ -49,7 +49,8 @@ function SortableTaskRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`task-drag-wrap${isDragging ? " task-drag-wrap--dragging" : ""}${isOver ? " task-drag-wrap--target" : ""}`}
+      className={`task-drag-wrap${isDragging ? " task-drag-wrap--dragging" : ""}${isOver ? " task-drag-wrap--target" : ""}${isOver && idx === 0 ? " task-drag-wrap--first-target" : ""}${idx === 0 ? " task-drag-wrap--focused-top" : ""}${task.stepDepth ? " task-drag-wrap--nested task-drag-wrap--subtask" : ""}`}
+      data-step-depth={task.stepDepth || 0}
       {...attributes}
       {...listeners}
     >

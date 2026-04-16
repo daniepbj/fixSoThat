@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef } from "react"
 import { useMainTask } from "../context/MainTaskContext"
 import { useLocalStorage } from "../hooks/useLocalStorage"
 import { genStepId, formatStepRaw } from "../utils/stepUtils"
-import { fmtTimerDisplay } from "../utils/timeUtils"
+import { fmtTimerDisplay, getHourRingProgress } from "../utils/timeUtils"
 
 const STAGES = ["Area", "Target", "Proof", "Brainstorm", "Order", "Save"]
 const MAX_AREAS = 3
@@ -272,13 +272,8 @@ export default function GuidedSmallImprovementBuilder() {
     currentAreaMaxMinutes > 0 && plannedTotal > currentAreaMaxMinutes
   const validProofs = proofs.filter((p) => p.text.trim().length > 0)
   const liveRemaining = liveTimerTask?.remainingSeconds ?? 0
-  const liveTotalSeconds = (liveTimerTask?.estimatedMinutes ?? 25) * 60
-  const liveProgress = Math.max(
-    0,
-    Math.min(1, liveRemaining / liveTotalSeconds),
-  )
+  const liveProgress = getHourRingProgress(liveRemaining)
   const liveRingR = 10
-  const liveRingCirc = 2 * Math.PI * liveRingR
   const liveAlarm = Boolean(liveTimerTask && liveRemaining <= 0)
 
   // Play is always available: if details are missing, queue a starter task
@@ -744,7 +739,7 @@ export default function GuidedSmallImprovementBuilder() {
                   viewBox="0 0 28 28"
                   aria-hidden="true"
                   style={{
-                    transform: "rotate(-90deg)",
+                    transform: "rotate(90deg) scaleX(-1)",
                     transformOrigin: "center",
                   }}
                 >
@@ -759,7 +754,8 @@ export default function GuidedSmallImprovementBuilder() {
                     cx="14"
                     cy="14"
                     r={liveRingR}
-                    strokeDasharray={`${liveProgress * liveRingCirc} ${liveRingCirc}`}
+                    pathLength={1}
+                    strokeDasharray={`${liveProgress} 1`}
                     style={{ stroke: liveTimerTask.color ?? "#6c63ff" }}
                   />
                 </svg>

@@ -88,13 +88,10 @@ function findStepById(flatSteps, stepId) {
 
 function deriveTaskStatus(task) {
   const status = task?.status || "active"
-  // Keep completion explicit: only explicit complete action marks a task completed.
-  // If a completed task later gets an unchecked step, move it back to active.
-  if (status === "completed") {
-    const hasIncomplete = (task.steps || []).some((s) => !s.completed)
-    return hasIncomplete ? "active" : "completed"
-  }
-  return status
+  const steps = Array.isArray(task?.steps) ? task.steps : []
+  if (!steps.length) return status
+  const hasIncomplete = steps.some((s) => !s.completed)
+  return hasIncomplete ? "active" : "completed"
 }
 
 function deriveTaskColor(task) {
@@ -307,6 +304,19 @@ export function MainTaskProvider({ children }) {
           : t,
       ),
     )
+  }
+
+  function reorderMainTask(dragId, targetId) {
+    if (!dragId || !targetId || dragId === targetId) return
+    setMainTasks((prev) => {
+      const from = prev.findIndex((task) => task.id === dragId)
+      const to = prev.findIndex((task) => task.id === targetId)
+      if (from < 0 || to < 0 || from === to) return prev
+      const copy = [...prev]
+      const [item] = copy.splice(from, 1)
+      copy.splice(to, 0, item)
+      return copy
+    })
   }
 
   function incrementTries(id) {
@@ -650,6 +660,10 @@ export function MainTaskProvider({ children }) {
     )
   }
 
+  function reorderMainTaskStep(taskId, sourceId, targetId, zone = "after") {
+    moveStepNextTo(taskId, sourceId, targetId, zone)
+  }
+
   function breakDownStepWithFixa(taskId, stepId, stepsBlock) {
     const parsed = parseStepBlockTree(stepsBlock || "")
     if (!parsed.length) return false
@@ -856,6 +870,8 @@ export function MainTaskProvider({ children }) {
     clearDeletedMainTasks,
     completeMainTask,
     restoreMainTask,
+    reorderMainTask,
+    reorderMainTaskStep,
     incrementTries,
     decrementTries,
     incrementStepTries,

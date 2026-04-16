@@ -433,6 +433,7 @@
     box-shadow 0.2s ease;
   touch-action: none;
   cursor: grab;
+  position: relative;
 }
 
 .task-drag-wrap:active {
@@ -453,6 +454,90 @@
   box-shadow: 0 0 0 2px
     color-mix(in srgb, var(--ta-accent, #6c63ff) 65%, transparent);
 }
+
+.task-drag-wrap--first-target::before {
+  content: "becomes focused task";
+  position: absolute;
+  top: -9px;
+  right: 10px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #ffe6a6;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: rgba(255, 214, 120, 0.18);
+  border: 1px solid rgba(255, 214, 120, 0.4);
+  border-radius: 999px;
+  padding: 2px 8px;
+  z-index: 5;
+}
+
+.task-drag-wrap--first-target .task-card {
+  border-top: 3px solid rgba(255, 214, 120, 0.9);
+}
+
+.task-drag-wrap--focused-top .task-card {
+  border-top: 2px solid rgba(255, 234, 163, 0.65);
+}
+
+.task-drag-wrap--nested {
+  margin-left: calc((var(--depth, 0) + 1) * 10px);
+}
+
+.task-drag-wrap--nested[data-step-depth="1"] {
+  margin-left: 12px;
+}
+
+.task-drag-wrap--nested[data-step-depth="2"] {
+  margin-left: 24px;
+}
+
+.task-drag-wrap--nested[data-step-depth="3"] {
+  margin-left: 36px;
+}
+
+.task-drag-wrap--nested[data-step-depth="4"] {
+  margin-left: 48px;
+}
+
+.task-drag-wrap--nested[data-step-depth="5"] {
+  margin-left: 60px;
+}
+
+.task-drag-wrap--subtask .task-card {
+  padding: 10px 10px 8px;
+  border-radius: 12px;
+  opacity: 0.94;
+}
+
+.task-drag-wrap--subtask::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  bottom: -10px;
+  left: -8px;
+  border-left: 1px dashed rgba(210, 235, 255, 0.35);
+  pointer-events: none;
+}
+
+.task-drag-wrap--subtask .task-card__title {
+  font-size: 0.82rem;
+}
+
+.task-drag-wrap--subtask .task-card__times {
+  font-size: 0.64rem;
+}
+
+.task-drag-wrap--subtask .task-card__main-title {
+  font-size: 0.6rem;
+  opacity: 0.8;
+}
+
+.task-drag-wrap--subtask .task-card__btn {
+  padding: 3px 8px;
+  font-size: 0.68rem;
+}
+
 .task-card:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
@@ -541,6 +626,15 @@
   font-weight: 600;
   font-size: 0.92rem;
   word-break: break-word;
+}
+
+.task-card__main-title {
+  display: block;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ta-text-soft);
+  margin-bottom: 2px;
 }
 
 .task-card__times {

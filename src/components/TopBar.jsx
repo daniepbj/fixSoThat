@@ -19,6 +19,8 @@ export default function TopBar({
   pomoWorkStart,
   pomoWorkDuration,
   onBreak,
+  musicMuted,
+  setMusicMuted,
 }) {
   const [clock, setClock] = useState(currentTimeLocal())
   const [pomoElapsed, setPomoElapsed] = useState(0)
@@ -46,7 +48,7 @@ export default function TopBar({
     pomoWorkDuration > 0 ? Math.min(1, pomoElapsed / pomoWorkDuration) : 0
 
   function toggleSound() {
-    setSettings((s) => ({ ...s, soundEnabled: !s.soundEnabled }))
+    setMusicMuted((prev) => !prev)
   }
 
   return (
@@ -70,13 +72,11 @@ export default function TopBar({
             </span>
           </div>
           <button
-            className={`top-bar__sound ${settings.soundEnabled ? "active" : ""}`}
+            className={`top-bar__sound ${musicMuted ? "" : "active"}`}
             onClick={toggleSound}
-            title={
-              settings.soundEnabled ? "Mute soundscape" : "Play soundscape"
-            }
+            title={musicMuted ? "Unmute music" : "Mute music"}
           >
-            {settings.soundEnabled ? "🔊" : "🔇"}
+            {musicMuted ? "🔇" : "🔊"}
           </button>
           <button
             className="top-bar__sound"

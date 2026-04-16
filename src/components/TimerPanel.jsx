@@ -1,5 +1,5 @@
 import { useTimerContext } from "../context/TimerContext"
-import { fmtTimerDisplay } from "../utils/timeUtils"
+import { fmtTimerDisplay, getHourRingProgress } from "../utils/timeUtils"
 
 export default function TimerPanel() {
   const {
@@ -11,8 +11,7 @@ export default function TimerPanel() {
     stopAlarm,
   } = useTimerContext()
   const remaining = currentTask?.remainingSeconds ?? 0
-  const total = 60 * 60
-  const progress = Math.max(0, Math.min(1, remaining / total))
+  const progress = getHourRingProgress(remaining)
 
   // SVG ring
   const r = 88

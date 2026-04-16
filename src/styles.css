@@ -738,6 +738,37 @@ body {
   gap: 12px;
 }
 
+.mtask-drag-wrap {
+  border-radius: 14px;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  touch-action: none;
+  cursor: grab;
+}
+
+.mtask-drag-wrap:active {
+  cursor: grabbing;
+}
+
+.mtask-drag-wrap--dragging {
+  opacity: 0.55;
+  z-index: 4;
+  position: relative;
+}
+
+.mtask-drag-wrap--dragging .mtask-card {
+  transform: scale(0.988);
+}
+
+.mtask-drag-wrap--target .mtask-card {
+  box-shadow: 0 0 0 2px rgba(255, 218, 145, 0.45);
+}
+
+.mtask-drag-wrap--focused-top .mtask-card {
+  border-top: 2px solid rgba(255, 234, 163, 0.6);
+}
+
 .mtask-deleted-section {
   margin-top: 16px;
 }

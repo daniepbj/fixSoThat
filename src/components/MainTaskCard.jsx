@@ -1,4 +1,17 @@
 import { useState, useEffect } from "react"
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { useMainTask } from "../context/MainTaskContext"
 import { parseStepRaw, buildRenderTree, getDepth } from "../utils/stepUtils"
 import { fmtLocalDate } from "../utils/timeUtils"
@@ -35,6 +48,40 @@ function computeStatus(task) {
   return { hasSteps, hasTime, hasProof, hasPriority }
 }
 
+function flattenRenderOrder(nodes, acc = []) {
+  for (const node of nodes || []) {
+    acc.push(node.id)
+    flattenRenderOrder(node.children || [], acc)
+  }
+  return acc
+}
+
+function SortableStepRow({ nodeId, children }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+    isOver,
+  } = useSortable({ id: nodeId })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return children({
+    setNodeRef,
+    style,
+    attributes,
+    listeners,
+    isDragging,
+    isOver,
+  })
+}
+
 export default function MainTaskCard({ task }) {
   const {
     deleteMainTask,
@@ -46,7 +93,6 @@ export default function MainTaskCard({ task }) {
     decrementStepTries,
     reorderStep,
     addSubstep,
-    reparentStep,
     promoteStep,
     demoteStep,
     moveStepNextTo,
@@ -55,6 +101,8 @@ export default function MainTaskCard({ task }) {
     updateStep,
     addStepToTask,
     removeStepFromTask,
+    mainTasks,
+    reorderMainTask,
     setActiveMainTaskId,
     activeMainTaskId,
   } = useMainTask()
@@ -71,8 +119,6 @@ export default function MainTaskCard({ task }) {
   const [newStepRaw, setNewStepRaw] = useState("")
   const [addingSubstepFor, setAddingSubstepFor] = useState(null) // stepId | null
   const [newSubstepRaw, setNewSubstepRaw] = useState("")
-  const [draggedStepId, setDraggedStepId] = useState(null)
-  const [dropTarget, setDropTarget] = useState(null) // { id, zone: "before"|"after"|"into" }
   const [retryHistoryOpen, setRetryHistoryOpen] = useState(false)
   const status = computeStatus(task)
   const isActive = activeMainTaskId === task.id
@@ -81,6 +127,14 @@ export default function MainTaskCard({ task }) {
   const completedSteps = flatSteps.filter((s) => s.completed).length
   const totalSteps = flatSteps.length
   const renderTree = buildRenderTree(flatSteps)
+  const renderOrder = flattenRenderOrder(renderTree)
+  const stepSensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 6,
+      },
+    }),
+  )
 
   // Keep draft values in sync with task prop updates (e.g. external edits)
   useEffect(() => {
@@ -96,8 +150,19 @@ export default function MainTaskCard({ task }) {
     if (!editingNow) setNowDraft(task.now || "")
   }, [task.now, editingNow])
   useEffect(() => {
-    if (isActive) setExpanded(true)
+    setExpanded(isActive)
   }, [isActive])
+
+  function handleSetActive() {
+    if (isActive) {
+      setActiveMainTaskId("")
+      return
+    }
+    setActiveMainTaskId(task.id)
+    if (mainTasks[0]?.id && mainTasks[0].id !== task.id) {
+      reorderMainTask(task.id, mainTasks[0].id)
+    }
+  }
 
   function handleAddSubstep(parentStepId) {
     if (!newSubstepRaw.trim()) return
@@ -106,50 +171,18 @@ export default function MainTaskCard({ task }) {
     setAddingSubstepFor(null)
   }
 
-  function handleDragStart(stepId, event) {
-    setDraggedStepId(stepId)
-    setDropTarget(null)
-    event.dataTransfer.effectAllowed = "move"
-    event.dataTransfer.setData("text/plain", stepId)
-  }
+  function handleStepDragEnd(event) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
 
-  function handleDragOver(stepId, event) {
-    if (!draggedStepId || draggedStepId === stepId) return
-    event.preventDefault()
-    const rect = event.currentTarget.getBoundingClientRect()
-    const y = event.clientY - rect.top
-    const pct = y / rect.height
-    const zone = pct < 0.25 ? "before" : pct > 0.75 ? "after" : "into"
-    setDropTarget((prev) =>
-      prev?.id === stepId && prev?.zone === zone ? prev : { id: stepId, zone },
-    )
-  }
+    const sourceId = String(active.id)
+    const targetId = String(over.id)
+    const sourceIndex = renderOrder.indexOf(sourceId)
+    const targetIndex = renderOrder.indexOf(targetId)
+    if (sourceIndex < 0 || targetIndex < 0) return
 
-  function handleDragLeave(stepId) {
-    setDropTarget((prev) => (prev?.id === stepId ? null : prev))
-  }
-
-  function handleDrop(targetStepId, event) {
-    event.preventDefault()
-    const sourceId = draggedStepId
-    if (!sourceId || sourceId === targetStepId) {
-      setDraggedStepId(null)
-      setDropTarget(null)
-      return
-    }
-    const zone = dropTarget?.zone ?? "after"
-    if (zone === "into") {
-      reparentStep(task.id, sourceId, targetStepId)
-    } else {
-      moveStepNextTo(task.id, sourceId, targetStepId, zone)
-    }
-    setDraggedStepId(null)
-    setDropTarget(null)
-  }
-
-  function handleDragEnd() {
-    setDraggedStepId(null)
-    setDropTarget(null)
+    const zone = sourceIndex < targetIndex ? "after" : "before"
+    moveStepNextTo(task.id, sourceId, targetId, zone)
   }
 
   function saveTitle() {
@@ -189,140 +222,139 @@ export default function MainTaskCard({ task }) {
 
   function renderStepNode(node, siblingIndex, siblingCount, depth = 0) {
     const parsed = parseStepRaw(node.raw)
-    const isDragged = draggedStepId === node.id
-    const isDropTarget = dropTarget?.id === node.id
-    const dropZone = isDropTarget ? dropTarget.zone : null
     const stepDepth = getDepth(flatSteps, node.id)
     const hasPrevSibling = siblingIndex > 0
 
-    const dropClass =
-      dropZone === "before"
-        ? "mtask-step-row--drop-before"
-        : dropZone === "after"
-          ? "mtask-step-row--drop-after"
-          : dropZone === "into"
-            ? "mtask-step-row--drop-into"
-            : ""
-
     return (
       <div key={node.id} className="mtask-step-tree-node">
-        <div
-          data-main-step-id={node.id}
-          className={`mtask-step-row mtask-step-row--accent ${isDragged ? "mtask-step-row--dragging" : ""} ${dropClass}`}
-          style={{
-            marginLeft: `${depth * 18}px`,
-            "--step-accent": task.color,
-          }}
-          onDragOver={(event) => handleDragOver(node.id, event)}
-          onDragLeave={() => handleDragLeave(node.id)}
-          onDrop={(event) => handleDrop(node.id, event)}
-        >
-          <button
-            type="button"
-            className="mtask-step-drag"
-            draggable
-            onDragStart={(event) => handleDragStart(node.id, event)}
-            onDragEnd={handleDragEnd}
-            title="Drag to reorder or reparent"
-          >
-            ⋮⋮
-          </button>
-          {depth > 0 && <span className="mtask-step-indent">↳</span>}
-          <input
-            type="checkbox"
-            className="mtask-step-check"
-            checked={node.completed}
-            onChange={() => toggleStepComplete(task.id, node.id)}
-          />
-          <input
-            type="text"
-            className={`mtask-step-edit ${node.completed ? "mtask-step-text--done" : ""}`}
-            value={node.raw}
-            onChange={(e) => updateStep(task.id, node.id, e.target.value)}
-            placeholder="Step name 5"
-          />
-          {parsed.minutes > 0 && (
-            <span className="mtask-step-time">{parsed.minutes}m</span>
-          )}
-          <div className="mtask-step-right">
-            <button
-              type="button"
-              className="mtask-step-ctrl"
-              onClick={() => reorderStep(task.id, node.id, "up")}
-              disabled={siblingIndex === 0}
-              title="Move up"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              className="mtask-step-ctrl"
-              onClick={() => reorderStep(task.id, node.id, "down")}
-              disabled={siblingIndex === siblingCount - 1}
-              title="Move down"
-            >
-              ↓
-            </button>
-            {stepDepth > 0 && (
-              <button
-                type="button"
-                className="mtask-step-ctrl"
-                onClick={() => promoteStep(task.id, node.id)}
-                title="Promote (move up one level)"
-              >
-                ←
-              </button>
-            )}
-            {hasPrevSibling && (
-              <button
-                type="button"
-                className="mtask-step-ctrl"
-                onClick={() => demoteStep(task.id, node.id)}
-                title="Demote (nest under previous sibling)"
-              >
-                →
-              </button>
-            )}
-            <span className="mtask-step-tries-count">{node.tries || 0}×</span>
-            <button
-              type="button"
-              className="mtask-step-ctrl"
-              onClick={() => decrementStepTries(task.id, node.id)}
-              title="Decrease step tries"
-            >
-              -
-            </button>
-            <button
-              type="button"
-              className="mtask-step-ctrl"
-              onClick={() => incrementStepTries(task.id, node.id)}
-              title="Increase step tries"
-            >
-              +
-            </button>
-            <button
-              type="button"
-              className="mtask-step-ctrl mtask-step-ctrl--label"
-              onClick={() => {
-                setAddingSubstepFor(
-                  addingSubstepFor === node.id ? null : node.id,
-                )
-                setNewSubstepRaw("")
+        <SortableStepRow nodeId={node.id}>
+          {({
+            setNodeRef,
+            style,
+            attributes,
+            listeners,
+            isDragging,
+            isOver,
+          }) => (
+            <div
+              ref={setNodeRef}
+              data-main-step-id={node.id}
+              className={`mtask-step-row mtask-step-row--accent ${isDragging ? "mtask-step-row--dragging" : ""} ${isOver ? "mtask-step-row--drop-target" : ""}`}
+              style={{
+                ...style,
+                marginLeft: `${depth * 18}px`,
+                "--step-accent": task.color,
               }}
-              title="Add child substep"
             >
-              + Sub
-            </button>
-            <button
-              type="button"
-              className="mtask-step-remove"
-              onClick={() => removeStepFromTask(task.id, node.id)}
-              title="Remove step"
-            >
-              ×
-            </button>
-          </div>
-        </div>
+              <button
+                type="button"
+                className="mtask-step-drag"
+                title="Drag to reorder"
+                {...attributes}
+                {...listeners}
+              >
+                ⋮⋮
+              </button>
+              {depth > 0 && <span className="mtask-step-indent">↳</span>}
+              <input
+                type="checkbox"
+                className="mtask-step-check"
+                checked={node.completed}
+                onChange={() => toggleStepComplete(task.id, node.id)}
+              />
+              <input
+                type="text"
+                className={`mtask-step-edit ${node.completed ? "mtask-step-text--done" : ""}`}
+                value={node.raw}
+                onChange={(e) => updateStep(task.id, node.id, e.target.value)}
+                placeholder="Step name 5"
+              />
+              {parsed.minutes > 0 && (
+                <span className="mtask-step-time">{parsed.minutes}m</span>
+              )}
+              <div className="mtask-step-right">
+                <button
+                  type="button"
+                  className="mtask-step-ctrl"
+                  onClick={() => reorderStep(task.id, node.id, "up")}
+                  disabled={siblingIndex === 0}
+                  title="Move up"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className="mtask-step-ctrl"
+                  onClick={() => reorderStep(task.id, node.id, "down")}
+                  disabled={siblingIndex === siblingCount - 1}
+                  title="Move down"
+                >
+                  ↓
+                </button>
+                {stepDepth > 0 && (
+                  <button
+                    type="button"
+                    className="mtask-step-ctrl"
+                    onClick={() => promoteStep(task.id, node.id)}
+                    title="Promote (move up one level)"
+                  >
+                    ←
+                  </button>
+                )}
+                {hasPrevSibling && (
+                  <button
+                    type="button"
+                    className="mtask-step-ctrl"
+                    onClick={() => demoteStep(task.id, node.id)}
+                    title="Demote (nest under previous sibling)"
+                  >
+                    →
+                  </button>
+                )}
+                <span className="mtask-step-tries-count">
+                  {node.tries || 0}×
+                </span>
+                <button
+                  type="button"
+                  className="mtask-step-ctrl"
+                  onClick={() => decrementStepTries(task.id, node.id)}
+                  title="Decrease step tries"
+                >
+                  -
+                </button>
+                <button
+                  type="button"
+                  className="mtask-step-ctrl"
+                  onClick={() => incrementStepTries(task.id, node.id)}
+                  title="Increase step tries"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  className="mtask-step-ctrl mtask-step-ctrl--label"
+                  onClick={() => {
+                    setAddingSubstepFor(
+                      addingSubstepFor === node.id ? null : node.id,
+                    )
+                    setNewSubstepRaw("")
+                  }}
+                  title="Add child substep"
+                >
+                  + Sub
+                </button>
+                <button
+                  type="button"
+                  className="mtask-step-remove"
+                  onClick={() => removeStepFromTask(task.id, node.id)}
+                  title="Remove step"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
+        </SortableStepRow>
         {addingSubstepFor === node.id && (
           <div
             className="mtask-step-add-child"
@@ -377,10 +409,7 @@ export default function MainTaskCard({ task }) {
       }}
     >
       {/* Header */}
-      <div
-        className="mtask-card__header"
-        onClick={() => setExpanded((v) => !v)}
-      >
+      <div className="mtask-card__header" onClick={handleSetActive}>
         <div className="mtask-card__title-row">
           <span className="mtask-card__expand">{expanded ? "▾" : "▸"}</span>
           <span className="mtask-card__title">
@@ -503,9 +532,20 @@ export default function MainTaskCard({ task }) {
             {renderTree.length === 0 && (
               <p className="mtask-empty">No steps yet.</p>
             )}
-            {renderTree.map((node, idx) =>
-              renderStepNode(node, idx, renderTree.length, 0),
-            )}
+            <DndContext
+              sensors={stepSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleStepDragEnd}
+            >
+              <SortableContext
+                items={renderOrder}
+                strategy={verticalListSortingStrategy}
+              >
+                {renderTree.map((node, idx) =>
+                  renderStepNode(node, idx, renderTree.length, 0),
+                )}
+              </SortableContext>
+            </DndContext>
             <form className="mtask-add-step-form" onSubmit={handleAddStep}>
               <input
                 className="mtask-add-step-input"
@@ -700,7 +740,7 @@ export default function MainTaskCard({ task }) {
               <button
                 type="button"
                 className={`mtask-action-btn ${isActive ? "mtask-action-btn--active-on" : ""}`}
-                onClick={() => setActiveMainTaskId(isActive ? "" : task.id)}
+                onClick={handleSetActive}
               >
                 {isActive ? "▶ In sidebar" : "▶ Set active"}
               </button>
