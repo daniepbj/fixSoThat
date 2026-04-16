@@ -198,9 +198,14 @@ export default function SaveLoadPanel() {
     )
     if (!ok) return
 
+    let musicClearFailed = false
     try {
       if (clearMusic) {
-        await clearAllTracks()
+        try {
+          await clearAllTracks()
+        } catch {
+          musicClearFailed = true
+        }
       }
 
       const keys = Object.keys(window.localStorage).filter((key) =>
@@ -210,8 +215,13 @@ export default function SaveLoadPanel() {
         window.localStorage.removeItem(key)
       }
 
+      // Keep init sentinel so startup does not inject demo tasks after reset.
+      window.localStorage.setItem("fst_v1_init", "1")
+
       flash(
-        `Cleared ${keys.length} data key(s)${clearMusic ? " + music" : ""} — reloading…`,
+        musicClearFailed
+          ? `Cleared ${keys.length} data key(s). Music clear failed — reloading…`
+          : `Cleared ${keys.length} data key(s)${clearMusic ? " + music" : ""} — reloading…`,
       )
       setTimeout(() => window.location.reload(), 350)
     } catch {
