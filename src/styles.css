@@ -151,6 +151,10 @@ body {
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
 }
 
+.task-builder-card--timer-active {
+  animation: gsi-pulse-glow 2.8s ease-in-out infinite;
+}
+
 .task-builder-header {
   display: flex;
   align-items: center;
@@ -1176,6 +1180,25 @@ body {
   color: #fff5d6;
   background: rgba(245, 158, 11, 0.26);
   border-color: rgba(252, 211, 77, 0.55);
+}
+
+.mtask-step-live-progress {
+  margin-top: 4px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.mtask-step-live-progress__fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.28s ease;
+  opacity: 0.72;
+}
+
+.mtask-step-live-progress__fill--head {
+  opacity: 1;
 }
 
 .mtask-step-remove {

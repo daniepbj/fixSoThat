@@ -355,10 +355,25 @@ export default function TimerApp({ sidebarMode = false }) {
               const existing = prevByStepId.get(key)
 
               if (existing) {
+                const previousMinutes = clampMinutes(
+                  existing.estimatedMinutes,
+                  safeMinutes,
+                )
+                const spentSeconds = Math.max(
+                  0,
+                  Number(existing.spentSeconds) || 0,
+                )
+                const minutesChanged = previousMinutes !== safeMinutes
+                const syncedRemainingSeconds = minutesChanged
+                  ? clampSeconds(safeMinutes * 60 - spentSeconds)
+                  : clampSeconds(existing.remainingSeconds)
+
                 return {
                   ...existing,
                   title: parsed.text || step.raw || "Step",
                   estimatedMinutes: safeMinutes,
+                  remainingSeconds: syncedRemainingSeconds,
+                  spentSeconds,
                   color: mainTask.color,
                   sourceMainTaskId: mainTask.id,
                   sourceStepId: step.id,

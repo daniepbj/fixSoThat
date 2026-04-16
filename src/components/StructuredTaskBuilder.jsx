@@ -422,6 +422,7 @@ export default function StructuredTaskBuilder() {
   const queueActive =
     Boolean(liveTimerTask?.sourceMainTaskId) &&
     liveTimerTask.sourceMainTaskId === builderQueueTaskId
+  const liveGlowColor = liveTimerTask?.color ?? "#6c63ff"
   const focusGoal =
     queueActive && liveTimerTask?.sourceStepId === goalQueueStepId
   const focusProof =
@@ -429,7 +430,11 @@ export default function StructuredTaskBuilder() {
   const focusSteps = queueActive && !focusGoal && !focusProof
 
   return (
-    <section className="task-builder-card" aria-label="Fixa så att jag flow">
+    <section
+      className={`task-builder-card${queueActive ? " task-builder-card--timer-active" : ""}`}
+      style={{ "--timer-glow-color": liveGlowColor }}
+      aria-label="Fixa så att jag flow"
+    >
       <div className="task-builder-header">
         <div className="task-builder-header-text">
           <p className="hero-kicker">Structured task writer</p>

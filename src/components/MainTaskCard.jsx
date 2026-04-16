@@ -258,6 +258,16 @@ export default function MainTaskCard({ task }) {
     const hasPrevSibling = siblingIndex > 0
     const liveQueueItem = queueByStepId.get(node.id)
     const isLiveHead = taskHeadQueueItem?.sourceStepId === node.id
+    const liveTotalSeconds = Math.max(
+      60,
+      Number(liveQueueItem?.estimatedMinutes || 1) * 60,
+    )
+    const liveProgressRatio = liveQueueItem
+      ? Math.max(
+          0,
+          Math.min(1, liveQueueItem.remainingSeconds / liveTotalSeconds),
+        )
+      : 0
 
     return (
       <div key={node.id} className="mtask-step-tree-node">
@@ -396,6 +406,21 @@ export default function MainTaskCard({ task }) {
             </div>
           )}
         </SortableStepRow>
+        {liveQueueItem && (
+          <div
+            className="mtask-step-live-progress"
+            style={{ marginLeft: `${depth * 18}px` }}
+            aria-hidden="true"
+          >
+            <div
+              className={`mtask-step-live-progress__fill ${isLiveHead ? "mtask-step-live-progress__fill--head" : ""}`}
+              style={{
+                width: `${Math.max(0, Math.min(100, liveProgressRatio * 100))}%`,
+                background: task.color,
+              }}
+            />
+          </div>
+        )}
         {addingSubstepFor === node.id && (
           <div
             className="mtask-step-add-child"

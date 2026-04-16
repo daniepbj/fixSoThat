@@ -271,10 +271,16 @@ export default function GuidedSmallImprovementBuilder() {
   const overBudget =
     currentAreaMaxMinutes > 0 && plannedTotal > currentAreaMaxMinutes
   const validProofs = proofs.filter((p) => p.text.trim().length > 0)
-  const liveRemaining = liveTimerTask?.remainingSeconds ?? 0
+  const liveQueueOwnedByBuilder =
+    Boolean(liveTimerTask?.sourceMainTaskId) &&
+    Boolean(builderQueueTaskId) &&
+    liveTimerTask.sourceMainTaskId === builderQueueTaskId
+  const scopedLiveTimerTask = liveQueueOwnedByBuilder ? liveTimerTask : null
+  const scopedLiveTimerRunning = liveQueueOwnedByBuilder && liveTimerRunning
+  const liveRemaining = scopedLiveTimerTask?.remainingSeconds ?? 0
   const liveProgress = getHourRingProgress(liveRemaining)
   const liveRingR = 10
-  const liveAlarm = Boolean(liveTimerTask && liveRemaining <= 0)
+  const liveAlarm = Boolean(scopedLiveTimerTask && liveRemaining <= 0)
 
   // Play is always available: if details are missing, queue a starter task
   // that begins by filling in the area.
@@ -293,10 +299,12 @@ export default function GuidedSmallImprovementBuilder() {
     if (!candidates.length) return
     let picked = null
     const liveIsCandidate =
-      liveTimerTask?.sourceMainTaskId === taskId &&
-      ids.includes(liveTimerTask?.sourceStepId)
+      scopedLiveTimerTask?.sourceMainTaskId === taskId &&
+      ids.includes(scopedLiveTimerTask?.sourceStepId)
     if (liveIsCandidate) {
-      picked = candidates.find((step) => step.id === liveTimerTask.sourceStepId)
+      picked = candidates.find(
+        (step) => step.id === scopedLiveTimerTask.sourceStepId,
+      )
     }
     if (!picked) {
       if (!completed && lastStageStepIds[stageIndex]) {
@@ -703,8 +711,8 @@ export default function GuidedSmallImprovementBuilder() {
 
   return (
     <section
-      className={`gsi-card gcb--${builderVisualStyle === "minimal" ? "minimal" : builderVisualStyle === "match" ? "match" : "calm"}${liveTimerRunning ? " gsi-card--timer-active" : ""}`}
-      style={{ "--timer-glow-color": liveTimerTask?.color ?? "#6c63ff" }}
+      className={`gsi-card gcb--${builderVisualStyle === "minimal" ? "minimal" : builderVisualStyle === "match" ? "match" : "calm"}${scopedLiveTimerRunning ? " gsi-card--timer-active" : ""}`}
+      style={{ "--timer-glow-color": scopedLiveTimerTask?.color ?? "#6c63ff" }}
       aria-label="Guided small improvement builder"
     >
       <div className="gsi-header">
@@ -731,9 +739,9 @@ export default function GuidedSmallImprovementBuilder() {
             className={`gsi-progress-dot ${i === stage ? "gsi-progress-dot--active" : ""} ${i < stage ? "gsi-progress-dot--done" : ""}`}
           >
             <span
-              className={`gsi-progress-num ${i === stage && liveTimerTask ? "gsi-progress-num--timer" : ""} ${i === stage && liveAlarm ? "gsi-progress-num--alarm" : ""}`}
+              className={`gsi-progress-num ${i === stage && scopedLiveTimerTask ? "gsi-progress-num--timer" : ""} ${i === stage && liveAlarm ? "gsi-progress-num--alarm" : ""}`}
             >
-              {i === stage && liveTimerTask && (
+              {i === stage && scopedLiveTimerTask && (
                 <svg
                   className="gsi-progress-mini-ring"
                   viewBox="0 0 28 28"
@@ -756,12 +764,12 @@ export default function GuidedSmallImprovementBuilder() {
                     r={liveRingR}
                     pathLength={1}
                     strokeDasharray={`${liveProgress} 1`}
-                    style={{ stroke: liveTimerTask.color ?? "#6c63ff" }}
+                    style={{ stroke: scopedLiveTimerTask.color ?? "#6c63ff" }}
                   />
                 </svg>
               )}
               <span className="gsi-progress-num__value">
-                {i === stage && liveTimerTask
+                {i === stage && scopedLiveTimerTask
                   ? fmtTimerDisplay(liveRemaining)
                   : i + 1}
               </span>

@@ -332,9 +332,9 @@ export function MainTaskProvider({ children }) {
         }
       }),
     )
-    // Trigger reflection modal at every multiple of 3
+    // Trigger reflection modal exactly when this task reaches 3 tries.
     setTimeout(() => {
-      if (newTries > 0 && newTries % 3 === 0) {
+      if (newTries === 3) {
         setRetryReflectionTaskId(id)
       }
     }, 0)
