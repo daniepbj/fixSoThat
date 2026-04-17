@@ -1,5 +1,6 @@
 import { useState, useRef } from "react"
 import { useMainTask } from "../context/MainTaskContext"
+import SectionMoveControls from "./SectionMoveControls"
 import { fmtLocalDateTime } from "../utils/timeUtils"
 import {
   listTracks,
@@ -37,6 +38,7 @@ const FST_KEYS = [
   "fst_pomo_break_start",
   "fst_timezone_override",
   "fst_v1_init",
+  "fst_section_order",
 ]
 
 // Build the export JSON string synchronously from localStorage
@@ -56,7 +58,7 @@ function buildExportJSON() {
   return JSON.stringify(snapshot, null, 2)
 }
 
-export default function SaveLoadPanel() {
+export default function SaveLoadPanel({ sectionControls }) {
   const { saveSlots, saveSlot, loadSlot, clearSlot, mainTasks } = useMainTask()
   const [slotNames, setSlotNames] = useState(["", "", "", "", ""])
   const [message, setMessage] = useState("")
@@ -231,7 +233,10 @@ export default function SaveLoadPanel() {
 
   return (
     <section className="save-load-panel" aria-label="Save and load">
-      <h2 className="save-load-panel__title">Save / Load</h2>
+      <div className="save-load-panel__header">
+        <h2 className="save-load-panel__title">Save / Load</h2>
+        {sectionControls && <SectionMoveControls {...sectionControls} />}
+      </div>
       <p className="save-load-panel__help">
         Save your current tasks to a slot and reload them any time — like save
         states in a game.

@@ -1,3 +1,5 @@
+import SectionMoveControls from "./SectionMoveControls"
+
 const apps = [
   { name: "LLama tasks", url: "https://llamalife.co/tasks" },
   { name: "Ticktick Pomodoro", url: "https://ticktick.com/webapp#focus" },
@@ -8,10 +10,13 @@ const apps = [
   },
 ]
 
-export default function AppLinks() {
+export default function AppLinks({ sectionControls }) {
   return (
     <section className="app-links-card" aria-label="Apps I use">
-      <p className="hero-kicker">Apps I use</p>
+      <div className="app-links-header">
+        <p className="hero-kicker">Apps I use</p>
+        {sectionControls && <SectionMoveControls {...sectionControls} />}
+      </div>
       <ul className="app-links-list">
         {apps.map(({ name, url }) => (
           <li key={name}>

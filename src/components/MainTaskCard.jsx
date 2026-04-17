@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   DndContext,
   PointerSensor,
@@ -122,6 +122,9 @@ export default function MainTaskCard({ task }) {
   const [queueByStepId, setQueueByStepId] = useState(() => new Map())
   const [taskHeadQueueItem, setTaskHeadQueueItem] = useState(null)
   const [retryHistoryOpen, setRetryHistoryOpen] = useState(false)
+  const [focusedTaskFlash, setFocusedTaskFlash] = useState(false)
+  const [focusedStepFlashId, setFocusedStepFlashId] = useState(null)
+  const focusFlashTimeoutRef = useRef(0)
   const status = computeStatus(task)
   const isActive = activeMainTaskId === task.id
   const isCompleted = task.status === "completed"
@@ -154,6 +157,15 @@ export default function MainTaskCard({ task }) {
   useEffect(() => {
     setExpanded(isActive)
   }, [isActive])
+
+  useEffect(
+    () => () => {
+      if (focusFlashTimeoutRef.current) {
+        window.clearTimeout(focusFlashTimeoutRef.current)
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
     function syncQueueSnapshot() {
@@ -194,6 +206,52 @@ export default function MainTaskCard({ task }) {
     if (mainTasks[0]?.id && mainTasks[0].id !== task.id) {
       reorderMainTask(task.id, mainTasks[0].id)
     }
+  }
+
+  function queueFocusRequest(stepId = null) {
+    try {
+      window.localStorage.setItem(
+        "fst_focus_request",
+        JSON.stringify({
+          mainTaskId: task.id,
+          stepId: stepId || null,
+          requestedAt: Date.now(),
+        }),
+      )
+    } catch {
+      // no-op
+    }
+  }
+
+  function triggerFocusFlash(stepId = null) {
+    setFocusedTaskFlash(!stepId)
+    setFocusedStepFlashId(stepId || null)
+    if (focusFlashTimeoutRef.current) {
+      window.clearTimeout(focusFlashTimeoutRef.current)
+    }
+    focusFlashTimeoutRef.current = window.setTimeout(() => {
+      setFocusedTaskFlash(false)
+      setFocusedStepFlashId(null)
+      focusFlashTimeoutRef.current = 0
+    }, 1100)
+  }
+
+  function handleFocusTask() {
+    setActiveMainTaskId(task.id)
+    if (mainTasks[0]?.id && mainTasks[0].id !== task.id) {
+      reorderMainTask(task.id, mainTasks[0].id)
+    }
+    triggerFocusFlash(null)
+    queueFocusRequest(null)
+  }
+
+  function handleFocusStep(stepId) {
+    setActiveMainTaskId(task.id)
+    if (mainTasks[0]?.id && mainTasks[0].id !== task.id) {
+      reorderMainTask(task.id, mainTasks[0].id)
+    }
+    triggerFocusFlash(stepId)
+    queueFocusRequest(stepId)
   }
 
   function handleAddSubstep(parentStepId) {
@@ -283,7 +341,7 @@ export default function MainTaskCard({ task }) {
             <div
               ref={setNodeRef}
               data-main-step-id={node.id}
-              className={`mtask-step-row mtask-step-row--accent ${isDragging ? "mtask-step-row--dragging" : ""} ${isOver ? "mtask-step-row--drop-target" : ""}`}
+              className={`mtask-step-row mtask-step-row--accent ${focusedStepFlashId === node.id ? "mtask-step-row--focus-flash" : ""} ${isDragging ? "mtask-step-row--dragging" : ""} ${isOver ? "mtask-step-row--drop-target" : ""}`}
               style={{
                 ...style,
                 marginLeft: `${depth * 18}px`,
@@ -381,6 +439,16 @@ export default function MainTaskCard({ task }) {
                 >
                   +
                 </button>
+                {!isCompleted && !node.completed && (
+                  <button
+                    type="button"
+                    className={`mtask-step-ctrl mtask-step-ctrl--label mtask-step-ctrl--focus ${focusedStepFlashId === node.id ? "mtask-step-ctrl--focus-on" : ""}`}
+                    onClick={() => handleFocusStep(node.id)}
+                    title="Focus this step in timer"
+                  >
+                    ▶ Focus
+                  </button>
+                )}
                 <button
                   type="button"
                   className="mtask-step-ctrl mtask-step-ctrl--label"
@@ -466,12 +534,13 @@ export default function MainTaskCard({ task }) {
   return (
     <article
       data-main-task-id={task.id}
-      className={`mtask-card ${isCompleted ? "mtask-card--completed" : "mtask-card--active"} ${isActive ? "mtask-card--is-active" : ""}`}
+      className={`mtask-card ${isCompleted ? "mtask-card--completed" : "mtask-card--active"} ${isActive ? "mtask-card--is-active" : ""} ${focusedTaskFlash ? "mtask-card--focus-flash" : ""}`}
       style={{
         borderLeft: `4px solid ${task.color}`,
+        "--task-focus-color": task.color,
         background: isCompleted
           ? undefined
-          : `linear-gradient(135deg, ${task.color}22 0%, rgba(255, 255, 255, 0.06) 58%)`,
+          : `linear-gradient(135deg, ${`color-mix(in srgb, ${task.color} 10%, rgba(255,255,255,0.06))`} 0%, rgba(255, 255, 255, 0.06) 58%)`,
       }}
     >
       {/* Header */}
@@ -810,10 +879,10 @@ export default function MainTaskCard({ task }) {
             {!isCompleted && (
               <button
                 type="button"
-                className={`mtask-action-btn ${isActive ? "mtask-action-btn--active-on" : ""}`}
-                onClick={handleSetActive}
+                className={`mtask-action-btn mtask-action-btn--focus ${focusedTaskFlash ? "mtask-action-btn--focus-on" : ""} ${isActive ? "mtask-action-btn--active-on" : ""}`}
+                onClick={handleFocusTask}
               >
-                {isActive ? "▶ In sidebar" : "▶ Set active"}
+                {focusedTaskFlash ? "▶ Focused" : "▶ Focus"}
               </button>
             )}
             {!isCompleted && (

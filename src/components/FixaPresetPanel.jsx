@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { useMainTask } from "../context/MainTaskContext"
+import SectionMoveControls from "./SectionMoveControls"
 import { parseStepBlock } from "../utils/stepUtils"
 
-export default function FixaPresetPanel() {
+export default function FixaPresetPanel({ sectionControls }) {
   const { fixaPresets, saveFixaPreset, deleteFixaPreset, addMainTask } =
     useMainTask()
 
@@ -52,13 +53,16 @@ export default function FixaPresetPanel() {
     <section className="fixa-preset-panel" aria-label="Fixa presets">
       <div className="fixa-preset-panel__header">
         <h2 className="fixa-preset-panel__title">Presets / templates</h2>
-        <button
-          type="button"
-          className="fixa-preset-toggle-btn"
-          onClick={() => setShowCreate((v) => !v)}
-        >
-          {showCreate ? "Cancel" : "+ New preset"}
-        </button>
+        <div className="fixa-preset-panel__header-actions">
+          <button
+            type="button"
+            className="fixa-preset-toggle-btn"
+            onClick={() => setShowCreate((v) => !v)}
+          >
+            {showCreate ? "Cancel" : "+ New preset"}
+          </button>
+          {sectionControls && <SectionMoveControls {...sectionControls} />}
+        </div>
       </div>
 
       {message && <p className="fixa-preset-msg">{message}</p>}

@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from "react"
 import { useMainTask } from "../context/MainTaskContext"
 import { useLocalStorage } from "../hooks/useLocalStorage"
+import SectionMoveControls from "./SectionMoveControls"
 import { genStepId, formatStepRaw } from "../utils/stepUtils"
 import { fmtTimerDisplay, getHourRingProgress } from "../utils/timeUtils"
 
@@ -185,7 +186,7 @@ function ExampleList({ title, examples }) {
   )
 }
 
-export default function GuidedSmallImprovementBuilder() {
+export default function GuidedSmallImprovementBuilder({ sectionControls }) {
   const {
     addMainTask,
     addMainTaskAndActivate,
@@ -720,16 +721,19 @@ export default function GuidedSmallImprovementBuilder() {
           <p className="gsi-hero-kicker">Experimental Builder</p>
           <h2 className="gsi-title">Build a small improvement</h2>
         </div>
-        <button
-          type="button"
-          className={`gsi-play-btn${canPlay ? " gsi-play-btn--ready" : ""}`}
-          onClick={handleStartInTimer}
-          disabled={!canPlay}
-          title="Start in timer queue"
-          aria-label="Start session in timer"
-        >
-          ▶
-        </button>
+        <div className="gsi-header__actions">
+          {sectionControls && <SectionMoveControls {...sectionControls} />}
+          <button
+            type="button"
+            className={`gsi-play-btn${canPlay ? " gsi-play-btn--ready" : ""}`}
+            onClick={handleStartInTimer}
+            disabled={!canPlay}
+            title="Start in timer queue"
+            aria-label="Start session in timer"
+          >
+            ▶
+          </button>
+        </div>
       </div>
 
       <div className="gsi-progress-bar">

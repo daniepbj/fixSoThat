@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useLocalStorage } from "../hooks/useLocalStorage"
 import {
   getAutoTimezone,
@@ -14,6 +14,11 @@ export default function SettingsView({ settings, setSettings, music }) {
     "fst_builder_visual_style",
     "calm",
   )
+  const uploadInputRef = useRef(null)
+
+  function promptUploadNow() {
+    uploadInputRef.current?.click()
+  }
 
   function update(key, value) {
     setSettings((s) => ({ ...s, [key]: value }))
@@ -296,11 +301,30 @@ export default function SettingsView({ settings, setSettings, music }) {
             track is used globally for active tasks.
           </p>
 
+          {music.uploadedTracks.length === 0 && (
+            <div className="music-empty-prompt" role="status">
+              <p className="music-empty-prompt__title">
+                No music uploaded yet.
+              </p>
+              <p className="settings-help-text">
+                Upload a track so the timer can play background music.
+              </p>
+              <button
+                type="button"
+                className="music-control-btn music-empty-prompt__cta"
+                onClick={promptUploadNow}
+              >
+                Upload a track now
+              </button>
+            </div>
+          )}
+
           <div className="music-upload-row">
             <label className="music-upload-btn" htmlFor="music-upload-input">
               Upload tracks
             </label>
             <input
+              ref={uploadInputRef}
               id="music-upload-input"
               type="file"
               accept="audio/*,.mp3,.wav,.ogg,.m4a"
@@ -324,7 +348,7 @@ export default function SettingsView({ settings, setSettings, music }) {
               min="0"
               max="1"
               step="0.01"
-              value={music.musicVolume ?? 0.55}
+              value={music.musicVolume ?? 1}
               onChange={(e) => music.setMusicVolume(Number(e.target.value))}
               className="music-volume-slider"
             />
@@ -356,9 +380,6 @@ export default function SettingsView({ settings, setSettings, music }) {
           )}
 
           <div className="music-track-list">
-            {music.uploadedTracks.length === 0 && (
-              <p className="settings-help-text">No uploaded tracks yet.</p>
-            )}
             {music.uploadedTracks.map((track) => (
               <article
                 key={track.id}

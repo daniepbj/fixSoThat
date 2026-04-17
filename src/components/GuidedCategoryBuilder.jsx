@@ -1,13 +1,20 @@
 import { useState, useRef, useContext } from "react"
 import { useMainTask } from "../context/MainTaskContext"
 import { useLocalStorage } from "../hooks/useLocalStorage"
+import SectionMoveControls from "./SectionMoveControls"
 import { genStepId, parseStepRaw } from "../utils/stepUtils"
 import { TimerContext } from "../context/TimerContext"
 
 const MAX_CATEGORIES = 5
 const STAGES = ["Areas", "Goals", "Proof", "Steps", "Review"]
 const TIME_CHIPS = [3, 5, 10]
-const PLACEHOLDERS = ["cleaning", "school project", "website", "kitchen", "essay"]
+const PLACEHOLDERS = [
+  "cleaning",
+  "school project",
+  "website",
+  "kitchen",
+  "essay",
+]
 
 function makeCat() {
   return {
@@ -35,7 +42,7 @@ function ContextBar({ categories, stage }) {
   )
 }
 
-export default function GuidedCategoryBuilder() {
+export default function GuidedCategoryBuilder({ sectionControls }) {
   const { addMainTask } = useMainTask()
   const timerCtx = useContext(TimerContext)
   const timerRunning = timerCtx?.timerRunning ?? false
@@ -168,8 +175,7 @@ export default function GuidedCategoryBuilder() {
       for (const c of categories) {
         if (!c.name.trim()) return "Every area needs a name."
         const mins = parseInt(c.minutes, 10)
-        if (!mins || mins <= 0)
-          return `"${c.name}" needs a positive time cap.`
+        if (!mins || mins <= 0) return `"${c.name}" needs a positive time cap.`
       }
     }
     if (stage === 1) {
@@ -299,9 +305,7 @@ export default function GuidedCategoryBuilder() {
                   type="number"
                   min="1"
                   value={c.minutes}
-                  onChange={(e) =>
-                    updateCat(c.id, { minutes: e.target.value })
-                  }
+                  onChange={(e) => updateCat(c.id, { minutes: e.target.value })}
                   placeholder="min"
                   aria-label="Custom minutes"
                 />
@@ -380,8 +384,7 @@ export default function GuidedCategoryBuilder() {
           What tiny steps come first?
           <span className="gcb-stage-hint">
             {" "}
-            · end a step with a number for minutes, e.g.{" "}
-            <code>dishes 5</code>
+            · end a step with a number for minutes, e.g. <code>dishes 5</code>
           </span>
         </p>
         {categories.map((c) => (
@@ -498,14 +501,17 @@ export default function GuidedCategoryBuilder() {
   if (!open) {
     return (
       <section className="task-builder-card gcb-collapsed">
-        <button
-          type="button"
-          className="gcb-toggle-btn"
-          onClick={() => setOpen(true)}
-        >
-          Guided Category Builder
-          <span className="gcb-toggle-arrow">▸</span>
-        </button>
+        <div className="gcb-collapsed-header">
+          <button
+            type="button"
+            className="gcb-toggle-btn"
+            onClick={() => setOpen(true)}
+          >
+            Guided Category Builder
+            <span className="gcb-toggle-arrow">▸</span>
+          </button>
+          {sectionControls && <SectionMoveControls {...sectionControls} />}
+        </div>
       </section>
     )
   }
@@ -525,34 +531,41 @@ export default function GuidedCategoryBuilder() {
           Guided Category Builder
           <span className="gcb-toggle-arrow">▾</span>
         </button>
-        <div className="gcb-style-toggle" role="group" aria-label="Card style">
-          <button
-            type="button"
-            className={`gcb-style-btn${builderVisualStyle === "calm" ? " gcb-style-btn--active" : ""}`}
-            aria-pressed={builderVisualStyle === "calm"}
-            title="Calm motion"
-            onClick={() => setBuilderVisualStyle("calm")}
+        <div className="gcb-header-row__actions">
+          <div
+            className="gcb-style-toggle"
+            role="group"
+            aria-label="Card style"
           >
-            🌊
-          </button>
-          <button
-            type="button"
-            className={`gcb-style-btn${builderVisualStyle === "minimal" ? " gcb-style-btn--active" : ""}`}
-            aria-pressed={builderVisualStyle === "minimal"}
-            title="Minimal"
-            onClick={() => setBuilderVisualStyle("minimal")}
-          >
-            ○
-          </button>
-          <button
-            type="button"
-            className={`gcb-style-btn${builderVisualStyle === "match" ? " gcb-style-btn--active" : ""}`}
-            aria-pressed={builderVisualStyle === "match"}
-            title="Match main style"
-            onClick={() => setBuilderVisualStyle("match")}
-          >
-            ✦
-          </button>
+            <button
+              type="button"
+              className={`gcb-style-btn${builderVisualStyle === "calm" ? " gcb-style-btn--active" : ""}`}
+              aria-pressed={builderVisualStyle === "calm"}
+              title="Calm motion"
+              onClick={() => setBuilderVisualStyle("calm")}
+            >
+              🌊
+            </button>
+            <button
+              type="button"
+              className={`gcb-style-btn${builderVisualStyle === "minimal" ? " gcb-style-btn--active" : ""}`}
+              aria-pressed={builderVisualStyle === "minimal"}
+              title="Minimal"
+              onClick={() => setBuilderVisualStyle("minimal")}
+            >
+              ○
+            </button>
+            <button
+              type="button"
+              className={`gcb-style-btn${builderVisualStyle === "match" ? " gcb-style-btn--active" : ""}`}
+              aria-pressed={builderVisualStyle === "match"}
+              title="Match main style"
+              onClick={() => setBuilderVisualStyle("match")}
+            >
+              ✦
+            </button>
+          </div>
+            {sectionControls && <SectionMoveControls {...sectionControls} />}
         </div>
       </div>
 
@@ -577,9 +590,7 @@ export default function GuidedCategoryBuilder() {
               .filter(Boolean)
               .join(" ")}
           >
-            <span className="gcb-stage-dot-num">
-              {i < stage ? "✓" : i + 1}
-            </span>
+            <span className="gcb-stage-dot-num">{i < stage ? "✓" : i + 1}</span>
             <span className="gcb-stage-dot-label">{label}</span>
           </div>
         ))}

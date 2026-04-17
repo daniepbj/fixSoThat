@@ -477,7 +477,18 @@
 }
 
 .task-drag-wrap--focused-top .task-card {
-  border-top: 2px solid rgba(255, 234, 163, 0.65);
+  border-top: 2px solid
+    color-mix(
+      in srgb,
+      var(--task-focus-color, rgba(255, 234, 163, 0.65)) 70%,
+      transparent
+    );
+  box-shadow: 0 -4px 14px
+    color-mix(
+      in srgb,
+      var(--task-focus-color, rgba(255, 234, 163, 0.65)) 25%,
+      transparent
+    );
 }
 
 .task-drag-wrap--nested {
@@ -545,6 +556,7 @@
 .task-card--current {
   border-left-width: 5px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22);
+  animation: task-focus-pulse 1.35s ease-in-out infinite;
 }
 
 .task-card__header {
@@ -1288,6 +1300,45 @@
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
+}
+
+.music-empty-prompt {
+  margin: 10px 0;
+  padding: 14px 16px;
+  border: 1px dashed var(--ta-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: center;
+}
+
+.music-empty-prompt__title {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ta-text);
+}
+
+.music-empty-prompt p {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  color: var(--ta-text-soft, rgba(255, 255, 255, 0.55));
+}
+
+.music-empty-prompt__cta {
+  border: 1px solid var(--ta-border);
+  border-radius: 8px;
+  background: var(--ta-btn);
+  color: var(--ta-text);
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.music-empty-prompt__cta:hover {
+  background: var(--ta-btn-hover, rgba(255, 255, 255, 0.18));
 }
 
 .music-upload-btn,

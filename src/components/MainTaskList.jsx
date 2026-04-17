@@ -13,6 +13,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useMainTask } from "../context/MainTaskContext"
+import SectionMoveControls from "./SectionMoveControls"
 import { fmtLocalDateTime } from "../utils/timeUtils"
 import MainTaskCard from "./MainTaskCard"
 
@@ -45,7 +46,7 @@ function SortableMainTaskRow({ task, isFocusedTop }) {
   )
 }
 
-export default function MainTaskList() {
+export default function MainTaskList({ sectionControls }) {
   const {
     deletedMainTasks,
     mainTasks,
@@ -96,29 +97,34 @@ export default function MainTaskList() {
   return (
     <section className="mtask-list-section" aria-label="Internal task list">
       <div className="mtask-list-header">
-        <h2 className="mtask-list-title">Task list</h2>
-        <div className="mtask-filter-row">
-          <button
-            type="button"
-            className={`mtask-filter-btn ${filter === "active" ? "mtask-filter-btn--on" : ""}`}
-            onClick={() => setFilter("active")}
-          >
-            Active ({activeCount})
-          </button>
-          <button
-            type="button"
-            className={`mtask-filter-btn ${filter === "completed" ? "mtask-filter-btn--on" : ""}`}
-            onClick={() => setFilter("completed")}
-          >
-            Done ({completedCount})
-          </button>
-          <button
-            type="button"
-            className={`mtask-filter-btn ${filter === "all" ? "mtask-filter-btn--on" : ""}`}
-            onClick={() => setFilter("all")}
-          >
-            All ({mainTasks.length})
-          </button>
+        <div className="mtask-list-heading">
+          <h2 className="mtask-list-title">Task list</h2>
+        </div>
+        <div className="mtask-list-header-actions">
+          <div className="mtask-filter-row">
+            <button
+              type="button"
+              className={`mtask-filter-btn ${filter === "active" ? "mtask-filter-btn--on" : ""}`}
+              onClick={() => setFilter("active")}
+            >
+              Active ({activeCount})
+            </button>
+            <button
+              type="button"
+              className={`mtask-filter-btn ${filter === "completed" ? "mtask-filter-btn--on" : ""}`}
+              onClick={() => setFilter("completed")}
+            >
+              Done ({completedCount})
+            </button>
+            <button
+              type="button"
+              className={`mtask-filter-btn ${filter === "all" ? "mtask-filter-btn--on" : ""}`}
+              onClick={() => setFilter("all")}
+            >
+              All ({mainTasks.length})
+            </button>
+          </div>
+          {sectionControls && <SectionMoveControls {...sectionControls} />}
         </div>
       </div>
 
