@@ -96,17 +96,17 @@ export function initStorageIfNew() {
     if (localStorage.getItem('fst_active') === null) localStorage.setItem('fst_active', JSON.stringify([]));
     if (localStorage.getItem('fst_completed') === null) localStorage.setItem('fst_completed', JSON.stringify([]));
     if (localStorage.getItem('fst_deferred') === null) localStorage.setItem('fst_deferred', JSON.stringify([]));
-    if (localStorage.getItem('fst_presets') === null) localStorage.setItem('fst_presets', JSON.stringify(SEED_PRESETS));
+    if (localStorage.getItem('fst_presets') === null) localStorage.setItem('fst_presets', JSON.stringify([]));
     if (localStorage.getItem('fst_settings') === null) localStorage.setItem('fst_settings', JSON.stringify(SEED_SETTINGS));
     localStorage.setItem('fst_v1_init', '1');
     return;
   }
 
-  // Brand-new users get seeded demo data once.
-  localStorage.setItem('fst_active', JSON.stringify(SEED_TASKS));
+  // Brand-new users start with empty task data to avoid legacy/demo reappearing.
+  localStorage.setItem('fst_active', JSON.stringify([]));
   localStorage.setItem('fst_completed', JSON.stringify([]));
   localStorage.setItem('fst_deferred', JSON.stringify([]));
   localStorage.setItem('fst_settings', JSON.stringify(SEED_SETTINGS));
-  localStorage.setItem('fst_presets', JSON.stringify(SEED_PRESETS));
+  localStorage.setItem('fst_presets', JSON.stringify([]));
   localStorage.setItem('fst_v1_init', '1');
 }

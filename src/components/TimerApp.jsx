@@ -743,37 +743,92 @@ export default function TimerApp({ sidebarMode = false }) {
     alarmIntervalRef.current = null
   }, [timerRunning])
 
-    // ── Waiting task expiry check ─────────────────────────────────────────────
-    useEffect(() => {
-      if (!waitingTask) {
-        waitExpiryTriggeredRef.current = false
-        return
+  // ── Waiting task expiry check ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!waitingTask) {
+      waitExpiryTriggeredRef.current = false
+      return
+    }
+    const waitUntilMs = new Date(waitingTask.waitUntil).getTime()
+    if (!Number.isFinite(waitUntilMs)) return
+    const id = setInterval(() => {
+      if (waitExpiryTriggeredRef.current) return
+      if (Date.now() >= waitUntilMs) {
+        waitExpiryTriggeredRef.current = true
+        setWaitExpiring(true)
+        waitExpiryTimerRef.current = setTimeout(() => {
+          const {
+            waitUntil,
+            waitDurationSeconds,
+            waitStartedAt,
+            waitSourceIndex,
+            autoFollowUpTaskId,
+            followUpTaskId,
+            ...finishedTask
+          } = waitingTask
+
+          // Waiting means this step finished waiting; mark it completed.
+          if (finishedTask.sourceMainTaskId && finishedTask.sourceStepId) {
+            recentlyCompletedStepIdsRef.current.add(finishedTask.sourceStepId)
+            setStepCompleted(
+              finishedTask.sourceMainTaskId,
+              finishedTask.sourceStepId,
+              true,
+            )
+            window.setTimeout(() => {
+              recentlyCompletedStepIdsRef.current.delete(finishedTask.sourceStepId)
+            }, 400)
+          }
+
+          setCompletedTasks((ct) => [
+            ...ct,
+            {
+              ...finishedTask,
+              completedAt: new Date().toISOString(),
+              completedByWait: true,
+            },
+          ])
+
+          // Queue the selected follow-up task as next (index 1) without stealing focus.
+          const preferredFollowUpId = followUpTaskId || autoFollowUpTaskId || ""
+          setActiveTasks((prev) => {
+            if (!prev.length) return prev
+
+            let candidateId = preferredFollowUpId
+
+            if (
+              !candidateId &&
+              finishedTask.sourceMainTaskId &&
+              prev.some((t) => t.sourceMainTaskId === finishedTask.sourceMainTaskId)
+            ) {
+              candidateId =
+                prev.find(
+                  (t) =>
+                    t.sourceMainTaskId === finishedTask.sourceMainTaskId &&
+                    t.id !== prev[0]?.id,
+                )?.id || ""
+            }
+
+            const from = prev.findIndex((t) => t.id === candidateId)
+            if (from < 0) return prev
+
+            const copy = [...prev]
+            const [picked] = copy.splice(from, 1)
+            if (!copy.length) return [picked]
+            return [copy[0], picked, ...copy.slice(1)]
+          })
+
+          setWaitingTask(null)
+          setWaitExpiring(false)
+          playPowerUpSound(musicVolume)
+        }, 1500)
       }
-      const waitUntilMs = new Date(waitingTask.waitUntil).getTime()
-      if (!Number.isFinite(waitUntilMs)) return
-      const id = setInterval(() => {
-        if (waitExpiryTriggeredRef.current) return
-        if (Date.now() >= waitUntilMs) {
-          waitExpiryTriggeredRef.current = true
-          setWaitExpiring(true)
-          waitExpiryTimerRef.current = setTimeout(() => {
-            const { waitUntil, waitDurationSeconds, waitStartedAt, ...cleanTask } = waitingTask
-            setActiveTasks((prev) => {
-              if (prev.length === 0) return [cleanTask]
-              const [head, ...rest] = prev
-              return [head, cleanTask, ...rest]
-            })
-            setWaitingTask(null)
-            setWaitExpiring(false)
-            playPowerUpSound(musicVolume)
-          }, 1500)
-        }
-      }, 500)
-      return () => {
-        clearInterval(id)
-        clearTimeout(waitExpiryTimerRef.current)
-      }
-    }, [waitingTask, musicVolume])
+    }, 500)
+    return () => {
+      clearInterval(id)
+      clearTimeout(waitExpiryTimerRef.current)
+    }
+  }, [waitingTask, musicVolume, setStepCompleted, setCompletedTasks, setActiveTasks])
 
   // ── Music persistence and playback ───────────────────────────────────────
   useEffect(() => {
@@ -1205,40 +1260,74 @@ export default function TimerApp({ sidebarMode = false }) {
     setActiveTasks((prev) => prev.filter((t) => t.id !== id))
   }
 
-    function waitTask(id, minutes) {
-      if (waitingTask) return // Only one waiting task at a time
-      const task = activeTasks.find((t) => t.id === id)
-      if (!task) return
-      const parsed = Number(minutes)
-      const safeMinutes = Number.isFinite(parsed)
-        ? Math.max(1, Math.min(240, Math.round(parsed)))
-        : settings.defaultTaskDuration
-      const durationSecs = safeMinutes * 60
-      const now = new Date()
-      const until = new Date(now.getTime() + durationSecs * 1000).toISOString()
-      setWaitingTask({
-        ...task,
-        waitUntil: until,
-        waitDurationSeconds: durationSecs,
-        waitStartedAt: now.toISOString(),
-      })
-      setActiveTasks((prev) => prev.filter((t) => t.id !== id))
-    }
+  function waitTask(id, minutes, followUpTaskId = "") {
+    if (waitingTask) return // Only one waiting task at a time
+    const sourceIndex = activeTasks.findIndex((t) => t.id === id)
+    const task = sourceIndex >= 0 ? activeTasks[sourceIndex] : null
+    if (!task) return
 
-    function cancelWait() {
-      if (!waitingTask) return
-      const { waitUntil, waitDurationSeconds, waitStartedAt, ...cleanTask } = waitingTask
-      waitExpiryTriggeredRef.current = false
-      setActiveTasks((prev) => [cleanTask, ...prev])
-      setWaitingTask(null)
-      setWaitExpiring(false)
-    }
+    const parsed = Number(minutes)
+    const safeMinutes = Number.isFinite(parsed)
+      ? Math.max(1, Math.min(240, Math.round(parsed)))
+      : settings.defaultTaskDuration
+    const durationSecs = safeMinutes * 60
+    const now = new Date()
+    const until = new Date(now.getTime() + durationSecs * 1000).toISOString()
+    const autoFollowUpTaskId = activeTasks[sourceIndex + 1]?.id || ""
 
-    function waitTaskBySourceStepId(stepId, minutes) {
-      const task = activeTasks.find((t) => t.sourceStepId === stepId)
-      if (!task) return
-      waitTask(task.id, minutes)
-    }
+    setWaitingTask({
+      ...task,
+      waitUntil: until,
+      waitDurationSeconds: durationSecs,
+      waitStartedAt: now.toISOString(),
+      waitSourceIndex: sourceIndex,
+      autoFollowUpTaskId,
+      followUpTaskId: followUpTaskId || "",
+    })
+    setActiveTasks((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  function setWaitFollowUpTask(nextTaskId) {
+    setWaitingTask((prev) =>
+      prev
+        ? {
+            ...prev,
+            followUpTaskId: nextTaskId || "",
+          }
+        : prev,
+    )
+  }
+
+  function cancelWait() {
+    if (!waitingTask) return
+    const {
+      waitUntil,
+      waitDurationSeconds,
+      waitStartedAt,
+      waitSourceIndex,
+      autoFollowUpTaskId,
+      followUpTaskId,
+      ...cleanTask
+    } = waitingTask
+    waitExpiryTriggeredRef.current = false
+    setActiveTasks((prev) => {
+      if (!prev.length) return [cleanTask]
+      const insertAt = Number.isFinite(waitSourceIndex)
+        ? Math.max(0, Math.min(prev.length, waitSourceIndex))
+        : 0
+      const copy = [...prev]
+      copy.splice(insertAt, 0, cleanTask)
+      return copy
+    })
+    setWaitingTask(null)
+    setWaitExpiring(false)
+  }
+
+  function waitTaskBySourceStepId(stepId, minutes) {
+    const task = activeTasks.find((t) => t.sourceStepId === stepId)
+    if (!task) return
+    waitTask(task.id, minutes)
+  }
 
   function addTask(taskData) {
     const toAdd = Array.isArray(taskData) ? taskData : [taskData]
@@ -1615,6 +1704,7 @@ export default function TimerApp({ sidebarMode = false }) {
     waitingTask,
     waitExpiring,
     waitTask,
+    setWaitFollowUpTask,
     cancelWait,
     waitTaskBySourceStepId,
     defaultTaskDuration: settings.defaultTaskDuration,

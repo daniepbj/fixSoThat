@@ -2,7 +2,13 @@ import { useEffect, useState } from "react"
 import { useTimerContext } from "../context/TimerContext"
 
 export default function WaitingTaskPanel() {
-  const { waitingTask, cancelWait, waitExpiring } = useTimerContext()
+  const {
+    waitingTask,
+    cancelWait,
+    waitExpiring,
+    activeTasks,
+    setWaitFollowUpTask,
+  } = useTimerContext()
   const [countdown, setCountdown] = useState(0)
   const [progress, setProgress] = useState(1)
 
@@ -53,6 +59,24 @@ export default function WaitingTaskPanel() {
           <span className="waiting-task-panel__title">{waitingTask.title}</span>
         </div>
         <div className="waiting-task-panel__countdown">{display}</div>
+      </div>
+      <div className="waiting-task-panel__followup">
+        <label htmlFor="wait-follow-up-select" className="waiting-task-panel__followup-label">
+          After wait, queue next:
+        </label>
+        <select
+          id="wait-follow-up-select"
+          className="waiting-task-panel__followup-select"
+          value={waitingTask.followUpTaskId || ""}
+          onChange={(e) => setWaitFollowUpTask(e.target.value)}
+        >
+          <option value="">Automatic continuation</option>
+          {activeTasks.map((task) => (
+            <option key={task.id} value={task.id}>
+              {task.emoji} {task.title}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="waiting-task-panel__bar-track">
         <div
