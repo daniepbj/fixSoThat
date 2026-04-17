@@ -449,6 +449,77 @@ export default function TimerApp({ sidebarMode = false }) {
     }
   }, [activeMainTaskId, activeTasks, timerRunning, onBreak, setTimerRunning])
 
+  // ── Consume fst_focus_request from MainTaskList/MainTaskCard ───────────
+  // MainTaskCard lives outside TimerProvider and cannot call playTask directly.
+  // It writes a focus request to localStorage and this effect mirrors queue focus.
+  useEffect(() => {
+    let cancelled = false
+
+    const id = setInterval(() => {
+      if (cancelled) return
+
+      try {
+        const raw = window.localStorage.getItem("fst_focus_request")
+        if (!raw) return
+
+        const payload = JSON.parse(raw)
+        const mainTaskId = payload?.mainTaskId
+        const stepId = payload?.stepId || null
+
+        if (!mainTaskId) {
+          window.localStorage.removeItem("fst_focus_request")
+          return
+        }
+
+        if (activeMainTaskId !== mainTaskId) {
+          setActiveMainTaskId(mainTaskId)
+        }
+        if (mainTasks[0]?.id && mainTasks[0].id !== mainTaskId) {
+          reorderMainTask(mainTaskId, mainTasks[0].id)
+        }
+
+        const exactStepTask = stepId
+          ? activeTasks.find(
+              (task) =>
+                task.sourceMainTaskId === mainTaskId &&
+                task.sourceStepId === stepId,
+            )
+          : null
+
+        const fallbackMainTask = activeTasks.find(
+          (task) => task.sourceMainTaskId === mainTaskId,
+        )
+
+        const targetTask = exactStepTask || fallbackMainTask
+
+        if (targetTask) {
+          playTask(targetTask.id)
+          window.localStorage.removeItem("fst_focus_request")
+          return
+        }
+
+        // Queue not synced yet — arm autostart and wait for next tick.
+        window.localStorage.setItem("fst_autostart_main_task", mainTaskId)
+        setCurrentView("timer")
+      } catch {
+        window.localStorage.removeItem("fst_focus_request")
+      }
+    }, 150)
+
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [
+    activeMainTaskId,
+    activeTasks,
+    mainTasks,
+    playTask,
+    reorderMainTask,
+    setActiveMainTaskId,
+    setCurrentView,
+  ])
+
   // ── Consume fst_stop_alarm signal from the builder ───────────────────────
   // The builder lives outside TimerProvider so it can't call stopAlarm() directly.
   // It writes "fst_stop_alarm" to localStorage; we poll and consume it here.

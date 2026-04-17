@@ -1144,6 +1144,12 @@ body {
   background: rgba(137, 246, 187, 0.08);
 }
 
+.mtask-step-row--focus-flash {
+  border-color: rgba(252, 211, 77, 0.75);
+  box-shadow: 0 0 0 2px rgba(252, 211, 77, 0.28);
+  background: rgba(252, 211, 77, 0.08);
+}
+
 .mtask-step-drag {
   width: 26px;
   height: 26px;
@@ -1227,6 +1233,16 @@ body {
   width: auto;
   min-width: 48px;
   padding: 0 6px;
+}
+
+.mtask-step-ctrl--focus {
+  min-width: 64px;
+}
+
+.mtask-step-ctrl--focus-on {
+  border-color: rgba(252, 211, 77, 0.7);
+  background: rgba(252, 211, 77, 0.2);
+  color: #fff3cd;
 }
 
 .mtask-step-tries-count {
@@ -1385,6 +1401,17 @@ body {
   background: rgba(255, 210, 123, 0.2);
 }
 
+.mtask-action-btn--focus {
+  border-color: rgba(161, 173, 255, 0.62);
+  background: rgba(88, 101, 242, 0.2);
+}
+
+.mtask-action-btn--focus-on {
+  border-color: rgba(252, 211, 77, 0.72);
+  background: rgba(245, 158, 11, 0.26);
+  color: #fff5d6;
+}
+
 .mtask-action-btn--complete {
   border-color: rgba(137, 246, 187, 0.7);
   background: rgba(21, 128, 61, 0.34);
@@ -1399,6 +1426,12 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.mtask-card--focus-flash {
+  box-shadow:
+    0 0 0 2px rgba(252, 211, 77, 0.42),
+    0 0 20px rgba(245, 158, 11, 0.18);
 }
 
 .mtask-tries-count {
