@@ -40,6 +40,7 @@ const FST_KEYS = [
   "fst_v1_init",
   "fst_section_order",
   "fst_section_collapsed",
+  "fst_waiting",
 ]
 
 // Build the export JSON string synchronously from localStorage

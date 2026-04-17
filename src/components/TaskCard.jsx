@@ -23,7 +23,14 @@ export default function TaskCard({
   playTask,
   toggleTaskFlag,
 }) {
-  const { currentTask, timerRunning } = useTimerContext()
+  const {
+    currentTask,
+    timerRunning,
+    waitingTask,
+    waitTask,
+    defaultTaskDuration,
+  } = useTimerContext()
+  const [waitMinutes, setWaitMinutes] = useState("")
   const { addSubstep } = useMainTask()
   const [showSubstepInput, setShowSubstepInput] = useState(false)
   const [substepRaw, setSubstepRaw] = useState("")
@@ -236,6 +243,37 @@ export default function TaskCard({
           onClick={() => deferTask(task.id)}
         >
           ⏭ Not now
+        </button>
+        <input
+          type="number"
+          className="wait-minutes-input"
+          min="1"
+          max="120"
+          value={waitMinutes}
+          onChange={(e) => setWaitMinutes(e.target.value)}
+          placeholder={defaultTaskDuration ?? 2}
+          title="Wait duration in minutes"
+          aria-label="Wait minutes"
+          disabled={Boolean(waitingTask)}
+        />
+        <button
+          className="task-card__btn task-card__btn--wait"
+          onClick={() =>
+            waitTask(
+              task.id,
+              waitMinutes !== ""
+                ? Number(waitMinutes)
+                : (defaultTaskDuration ?? 2),
+            )
+          }
+          disabled={Boolean(waitingTask)}
+          title={
+            waitingTask
+              ? "Another task is already waiting"
+              : "Move task aside and set a wait timer"
+          }
+        >
+          ⏸ Wait
         </button>
       </div>
 

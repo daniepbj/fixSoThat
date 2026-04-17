@@ -350,6 +350,122 @@
   max-width: 320px;
 }
 
+.waiting-task-panel {
+  width: min(420px, 100%);
+  margin: 0 auto 14px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--wtp-accent, #f59e0b) 42%, transparent);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--wtp-accent, #f59e0b) 20%, transparent) 0%,
+      color-mix(in srgb, var(--wtp-accent, #f59e0b) 6%, var(--ta-card) 94%) 100%
+    );
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--wtp-accent, #f59e0b) 20%, transparent);
+}
+
+.waiting-task-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.waiting-task-panel__label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ta-text) 75%, var(--wtp-accent, #f59e0b) 25%);
+}
+
+.waiting-task-panel__cancel {
+  border: none;
+  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--ta-text);
+  background: color-mix(in srgb, var(--wtp-accent, #f59e0b) 24%, transparent);
+}
+
+.waiting-task-panel__body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.waiting-task-panel__task {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.waiting-task-panel__emoji {
+  font-size: 1rem;
+}
+
+.waiting-task-panel__title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.waiting-task-panel__countdown {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--ta-text) 78%, var(--wtp-accent, #f59e0b) 22%);
+}
+
+.waiting-task-panel__bar-track {
+  margin-top: 8px;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--wtp-accent, #f59e0b) 18%, transparent);
+}
+
+.waiting-task-panel__bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--wtp-accent, #f59e0b) 70%, #ffffff 30%) 0%,
+      var(--wtp-accent, #f59e0b) 100%
+    );
+  transition: width 0.4s linear;
+}
+
+@keyframes wait-exit-flash {
+  0% {
+    transform: scale(1);
+    filter: saturate(1);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--wtp-accent, #f59e0b) 20%, transparent);
+  }
+  35% {
+    transform: scale(1.03);
+    filter: saturate(1.35);
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--wtp-accent, #f59e0b) 18%, transparent);
+  }
+  100% {
+    transform: translateY(-6px) scale(0.98);
+    opacity: 0;
+  }
+}
+
+.waiting-task-panel--exiting {
+  animation: wait-exit-flash 1.5s ease forwards;
+}
+
 .timer-btn {
   border: none;
   cursor: pointer;

@@ -1,5 +1,6 @@
 import { useTimerContext } from "../context/TimerContext"
 import { fmtTimerDisplay, getHourRingProgress } from "../utils/timeUtils"
+import WaitingTaskPanel from "./WaitingTaskPanel"
 
 export default function TimerPanel() {
   const {
@@ -11,6 +12,7 @@ export default function TimerPanel() {
     stopAlarm,
     hasSelectedTrack,
     hasUploadedTracks,
+    waitingTask,
   } = useTimerContext()
   const remaining = currentTask?.remainingSeconds ?? 0
   const progress = getHourRingProgress(remaining)
@@ -36,7 +38,8 @@ export default function TimerPanel() {
       className={`timer-panel${timerRunning ? " timer-panel--running" : ""}${alarmActive ? " timer-panel--alarm" : ""}`}
       style={{ "--timer-glow-color": currentTask?.color ?? "#6c63ff" }}
     >
-      <div className="timer-ring-wrapper">
+        {waitingTask && <WaitingTaskPanel />}
+        <div className="timer-ring-wrapper">
         <svg
           className="timer-ring"
           viewBox="0 0 200 200"

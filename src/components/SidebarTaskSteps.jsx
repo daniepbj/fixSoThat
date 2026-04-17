@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useMainTask } from "../context/MainTaskContext"
+import { useTimerContext } from "../context/TimerContext"
 import { parseStepRaw, buildRenderTree, getDepth } from "../utils/stepUtils"
 
 export default function SidebarTaskSteps() {
@@ -18,9 +19,12 @@ export default function SidebarTaskSteps() {
     promoteStep,
     demoteStep,
   } = useMainTask()
+  const { activeTasks, waitingTask, waitTaskBySourceStepId, defaultTaskDuration } =
+    useTimerContext()
 
   const [addingSubstepFor, setAddingSubstepFor] = useState(null)
   const [newSubstepRaw, setNewSubstepRaw] = useState("")
+  const [stepWaitMinutes, setStepWaitMinutes] = useState({})
 
   const task = mainTasks.find((t) => t.id === activeMainTaskId)
 
@@ -31,6 +35,11 @@ export default function SidebarTaskSteps() {
   const completedCount = flatSteps.filter((s) => s.completed).length
   const allDone = totalCount > 0 && completedCount === totalCount
   const renderTree = buildRenderTree(flatSteps)
+  const activeTaskStepIds = new Set(
+    activeTasks
+      .map((activeTask) => activeTask.sourceStepId)
+      .filter(Boolean),
+  )
 
   function handleAddSubstep(parentStepId) {
     if (!newSubstepRaw.trim()) return
@@ -43,6 +52,9 @@ export default function SidebarTaskSteps() {
     const parsed = parseStepRaw(node.raw)
     const stepDepth = getDepth(flatSteps, node.id)
     const hasPrevSibling = siblingIndex > 0
+    const hasLinkedTimerTask = activeTaskStepIds.has(node.id)
+    const waitValue = stepWaitMinutes[node.id] ?? ""
+    const waitDisabled = Boolean(waitingTask) || !hasLinkedTimerTask || node.completed
 
     return (
       <div key={node.id}>
@@ -137,6 +149,44 @@ export default function SidebarTaskSteps() {
               title="Add child substep"
             >
               + Sub
+            </button>
+            <input
+              type="number"
+              min="1"
+              max="240"
+              className="step-wait-minutes-input"
+              value={waitValue}
+              onChange={(e) =>
+                setStepWaitMinutes((prev) => ({
+                  ...prev,
+                  [node.id]: e.target.value,
+                }))
+              }
+              placeholder={defaultTaskDuration ?? 2}
+              title="Wait duration in minutes"
+              aria-label={`Wait minutes for ${parsed.text || node.raw}`}
+              disabled={waitDisabled}
+            />
+            <button
+              type="button"
+              className="sidebar-step__tries-btn step-wait-btn"
+              onClick={() => {
+                const parsedMinutes = Number(waitValue)
+                const minutes = Number.isFinite(parsedMinutes)
+                  ? parsedMinutes
+                  : (defaultTaskDuration ?? 2)
+                waitTaskBySourceStepId(node.id, minutes)
+              }}
+              title={
+                waitingTask
+                  ? "Another task is already in waiting mode"
+                  : !hasLinkedTimerTask
+                    ? "This step is not currently in the timer queue"
+                    : "Move this step into waiting mode"
+              }
+              disabled={waitDisabled}
+            >
+              ⏸
             </button>
           </span>
         </div>

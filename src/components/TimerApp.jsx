@@ -30,7 +30,7 @@ import {
   getTrack,
   listTracks,
 } from "../utils/musicStore"
-import { playClickSound, playCompletionSound } from "../utils/soundEffects"
+import { playClickSound, playCompletionSound, playPowerUpSound } from "../utils/soundEffects"
 
 // Seed localStorage exactly once – never re-seeds after user clears tasks
 initStorageIfNew()
@@ -203,6 +203,9 @@ export default function TimerApp({ sidebarMode = false }) {
   const [musicUiMessage, setMusicUiMessage] = useState("")
   const [audioBlockedMessage, setAudioBlockedMessage] = useState("")
   const [previewTrackId, setPreviewTrackId] = useState("")
+  const [waitingTask, setWaitingTask] = useLocalStorage("fst_waiting", null)
+  const [waitExpiring, setWaitExpiring] = useState(false)
+  const waitExpiryTriggeredRef = useRef(false)
 
   // ── Pomodoro state ───────────────────────────────────────────────────────
   // Timestamps stored as ISO instants via Temporal — survives refresh, no drift.
@@ -228,6 +231,7 @@ export default function TimerApp({ sidebarMode = false }) {
   const previewUrlRef = useRef("")
   const confettiTimerRef = useRef(null)
   const colorFrameRef = useRef(0)
+  const waitExpiryTimerRef = useRef(null)
   const lastConfettiAtRef = useRef(0)
   const lastTryIncrementKeyRef = useRef("")
   const recentlyCompletedStepIdsRef = useRef(new Set())
@@ -739,6 +743,38 @@ export default function TimerApp({ sidebarMode = false }) {
     alarmIntervalRef.current = null
   }, [timerRunning])
 
+    // ── Waiting task expiry check ─────────────────────────────────────────────
+    useEffect(() => {
+      if (!waitingTask) {
+        waitExpiryTriggeredRef.current = false
+        return
+      }
+      const waitUntilMs = new Date(waitingTask.waitUntil).getTime()
+      if (!Number.isFinite(waitUntilMs)) return
+      const id = setInterval(() => {
+        if (waitExpiryTriggeredRef.current) return
+        if (Date.now() >= waitUntilMs) {
+          waitExpiryTriggeredRef.current = true
+          setWaitExpiring(true)
+          waitExpiryTimerRef.current = setTimeout(() => {
+            const { waitUntil, waitDurationSeconds, waitStartedAt, ...cleanTask } = waitingTask
+            setActiveTasks((prev) => {
+              if (prev.length === 0) return [cleanTask]
+              const [head, ...rest] = prev
+              return [head, cleanTask, ...rest]
+            })
+            setWaitingTask(null)
+            setWaitExpiring(false)
+            playPowerUpSound(musicVolume)
+          }, 1500)
+        }
+      }, 500)
+      return () => {
+        clearInterval(id)
+        clearTimeout(waitExpiryTimerRef.current)
+      }
+    }, [waitingTask, musicVolume])
+
   // ── Music persistence and playback ───────────────────────────────────────
   useEffect(() => {
     let alive = true
@@ -1169,6 +1205,41 @@ export default function TimerApp({ sidebarMode = false }) {
     setActiveTasks((prev) => prev.filter((t) => t.id !== id))
   }
 
+    function waitTask(id, minutes) {
+      if (waitingTask) return // Only one waiting task at a time
+      const task = activeTasks.find((t) => t.id === id)
+      if (!task) return
+      const parsed = Number(minutes)
+      const safeMinutes = Number.isFinite(parsed)
+        ? Math.max(1, Math.min(240, Math.round(parsed)))
+        : settings.defaultTaskDuration
+      const durationSecs = safeMinutes * 60
+      const now = new Date()
+      const until = new Date(now.getTime() + durationSecs * 1000).toISOString()
+      setWaitingTask({
+        ...task,
+        waitUntil: until,
+        waitDurationSeconds: durationSecs,
+        waitStartedAt: now.toISOString(),
+      })
+      setActiveTasks((prev) => prev.filter((t) => t.id !== id))
+    }
+
+    function cancelWait() {
+      if (!waitingTask) return
+      const { waitUntil, waitDurationSeconds, waitStartedAt, ...cleanTask } = waitingTask
+      waitExpiryTriggeredRef.current = false
+      setActiveTasks((prev) => [cleanTask, ...prev])
+      setWaitingTask(null)
+      setWaitExpiring(false)
+    }
+
+    function waitTaskBySourceStepId(stepId, minutes) {
+      const task = activeTasks.find((t) => t.sourceStepId === stepId)
+      if (!task) return
+      waitTask(task.id, minutes)
+    }
+
   function addTask(taskData) {
     const toAdd = Array.isArray(taskData) ? taskData : [taskData]
     if (toAdd.some((d) => !d.sourceMainTaskId)) {
@@ -1526,6 +1597,7 @@ export default function TimerApp({ sidebarMode = false }) {
   )
 
   const timerContextValue = {
+    activeTasks,
     currentTask,
     timerRunning,
     setTimerRunning,
@@ -1540,6 +1612,12 @@ export default function TimerApp({ sidebarMode = false }) {
     pomoWorkDuration,
     hasSelectedTrack: Boolean(selectedTrackId),
     hasUploadedTracks: uploadedTracks.length > 0,
+    waitingTask,
+    waitExpiring,
+    waitTask,
+    cancelWait,
+    waitTaskBySourceStepId,
+    defaultTaskDuration: settings.defaultTaskDuration,
   }
 
   function skipBreak() {
