@@ -2,7 +2,9 @@ function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-function clampMinutes(value, fallback = 25) {
+const DEFAULT_TASK_DURATION = 2
+
+function clampMinutes(value, fallback = DEFAULT_TASK_DURATION) {
   const num = Number(value);
   if (!Number.isFinite(num)) return fallback;
   return Math.max(1, Math.min(60, Math.round(num)));
@@ -10,7 +12,7 @@ function clampMinutes(value, fallback = 25) {
 
 /** Build a task object, merging any overrides. */
 export function createTask(overrides = {}) {
-  const estimatedMinutes = clampMinutes(overrides.estimatedMinutes, 25);
+  const estimatedMinutes = clampMinutes(overrides.estimatedMinutes, DEFAULT_TASK_DURATION);
   const {
     id: _discard,
     adhdFlags: overrideFlags,
@@ -52,9 +54,15 @@ export const SEED_TASKS = [
 export const SEED_SETTINGS = {
   soundEnabled: false,
   autoStartNextTask: true,
-  defaultTaskDuration: 25,
+  autoScrollOnAlarm: true,
+  defaultTaskDuration: DEFAULT_TASK_DURATION,
   showCompletedByDefault: false,
-  matchMainPageStyle: false,
+  matchMainPageStyle: true,
+  alarmMode: 'nag',
+  idlePromptSeconds: 30,
+  pomodoroEnabled: true,
+  pomodoroWorkMinutes: 20,
+  pomodoroBreakMinutes: 5,
 };
 
 export const SEED_PRESETS = [
@@ -69,8 +77,8 @@ export const SEED_PRESETS = [
   },
 ];
 
-export const EMOJIS = ['🎯','🚀','💡','⚡','🔥','🌟','🎨','🧩','🏆','🦾','📝','🐛','📧','🗓️','✏️','👀','✍️','🧑‍💻'];
-export const COLORS = ['#6c63ff','#f59e0b','#10b981','#ef4444','#3b82f6','#ec4899','#8b5cf6','#14b8a6'];
+export const EMOJIS = ['🎯', '🚀', '💡', '⚡', '🔥', '🌟', '🎨', '🧩', '🏆', '🦾', '📝', '🐛', '📧', '🗓️', '✏️', '👀', '✍️', '🧑‍💻'];
+export const COLORS = ['#6c63ff', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#ec4899', '#8b5cf6', '#14b8a6'];
 
 /**
  * Seeds localStorage on the very first load.

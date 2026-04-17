@@ -68,7 +68,8 @@ export default function TaskCard({
       className={`task-card ${isFirst ? "task-card--current" : ""}`}
       style={{
         borderLeftColor: task.color,
-        background: `linear-gradient(135deg, ${task.color}30 0%, var(--ta-card) 55%)`,
+        "--task-focus-color": task.color,
+        background: `linear-gradient(135deg, ${`color-mix(in srgb, ${task.color} 12%, var(--ta-card))`} 0%, var(--ta-card) 55%)`,
       }}
     >
       <div className="task-card__header">

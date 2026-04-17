@@ -36,8 +36,23 @@ import { playClickSound, playCompletionSound } from "../utils/soundEffects"
 initStorageIfNew()
 
 const MAX_TASK_SECONDS = 60 * 60
+const DEFAULT_TASK_DURATION = 2
+const DEFAULT_MUSIC_VOLUME = 1
+const DEFAULT_SETTINGS = {
+  soundEnabled: false,
+  autoStartNextTask: true,
+  autoScrollOnAlarm: true,
+  defaultTaskDuration: DEFAULT_TASK_DURATION,
+  showCompletedByDefault: false,
+  matchMainPageStyle: true,
+  alarmMode: "nag",
+  idlePromptSeconds: 30,
+  pomodoroEnabled: true,
+  pomodoroWorkMinutes: 20,
+  pomodoroBreakMinutes: 5,
+}
 
-function clampMinutes(value, fallback = 25) {
+function clampMinutes(value, fallback = DEFAULT_TASK_DURATION) {
   const num = Number(value)
   if (!Number.isFinite(num) || num <= 0) return fallback
   return Math.max(1, Math.min(60, Math.round(num)))
@@ -60,7 +75,10 @@ function normalizeAdhdFlags(flags) {
 }
 
 function normalizeTask(task) {
-  const estimatedMinutes = clampMinutes(task.estimatedMinutes, 25)
+  const estimatedMinutes = clampMinutes(
+    task.estimatedMinutes,
+    DEFAULT_TASK_DURATION,
+  )
   const fallbackRemaining = estimatedMinutes * 60
   return {
     ...task,
@@ -157,23 +175,17 @@ export default function TimerApp({ sidebarMode = false }) {
   )
   const [deferredTasks, setDeferredTasks] = useLocalStorage("fst_deferred", [])
   const [presets, setPresets] = useLocalStorage("fst_presets", [])
-  const [settings, setSettings] = useLocalStorage("fst_settings", {
-    soundEnabled: false,
-    autoStartNextTask: true,
-    autoScrollOnAlarm: true,
-    defaultTaskDuration: 25,
-    showCompletedByDefault: false,
-    matchMainPageStyle: false,
-    alarmMode: "nag",
-    idlePromptSeconds: 30,
-  })
+  const [settings, setSettings] = useLocalStorage(
+    "fst_settings",
+    DEFAULT_SETTINGS,
+  )
   const [timerRunning, setTimerRunning] = useLocalStorage("fst_running", false)
   const [sessionSeconds, setSessionSeconds] = useLocalStorage("fst_session", 0)
   const [currentView, setCurrentView] = useLocalStorage("fst_view", "timer")
   const [theme, setTheme] = useLocalStorage("fst_theme", "dark")
   const [musicVolume, setMusicVolume] = useLocalStorage(
     "fst_music_volume",
-    0.55,
+    DEFAULT_MUSIC_VOLUME,
   )
   const [musicLoop, setMusicLoop] = useLocalStorage("fst_music_loop", true)
   const [musicMuted, setMusicMuted] = useLocalStorage("fst_music_muted", false)
@@ -243,16 +255,35 @@ export default function TimerApp({ sidebarMode = false }) {
     setDeletedTasks((prev) => prev.map(normalizeTask))
     setDeferredTasks((prev) => prev.map(normalizeTask))
     setSettings((prev) => ({
+      ...DEFAULT_SETTINGS,
       ...prev,
-      defaultTaskDuration: clampMinutes(prev.defaultTaskDuration, 25),
-      matchMainPageStyle: Boolean(prev.matchMainPageStyle),
+      defaultTaskDuration: clampMinutes(
+        prev.defaultTaskDuration,
+        DEFAULT_TASK_DURATION,
+      ),
+      matchMainPageStyle: prev.matchMainPageStyle ?? true,
       autoScrollOnAlarm: prev.autoScrollOnAlarm ?? true,
-      alarmMode: prev.alarmMode ?? (prev.soundEnabled ? "nag" : "silent"),
+      alarmMode: prev.alarmMode ?? "nag",
+      pomodoroEnabled: prev.pomodoroEnabled ?? true,
+      pomodoroWorkMinutes: Math.max(
+        1,
+        Math.min(120, Number(prev.pomodoroWorkMinutes) || 20),
+      ),
+      pomodoroBreakMinutes: Math.max(
+        1,
+        Math.min(30, Number(prev.pomodoroBreakMinutes) || 5),
+      ),
     }))
+    setMusicVolume((prev) => {
+      const n = Number(prev)
+      if (!Number.isFinite(n)) return DEFAULT_MUSIC_VOLUME
+      return Math.max(0, Math.min(1, n))
+    })
   }, [
     setActiveTasks,
     setDeletedTasks,
     setDeferredTasks,
+    setMusicVolume,
     setSettings,
     setTimerRunning,
   ])
@@ -1032,14 +1063,17 @@ export default function TimerApp({ sidebarMode = false }) {
     }
 
     const newRemaining = clampSeconds(
-      clampMinutes(task?.estimatedMinutes, 25) * 60,
+      clampMinutes(task?.estimatedMinutes, DEFAULT_TASK_DURATION) * 60,
     )
     setActiveTasks((prev) =>
       prev.map((t) =>
         t.id === id
           ? {
               ...t,
-              estimatedMinutes: clampMinutes(t.estimatedMinutes, 25),
+              estimatedMinutes: clampMinutes(
+                t.estimatedMinutes,
+                DEFAULT_TASK_DURATION,
+              ),
               remainingSeconds: newRemaining,
               spentSeconds: 0,
             }
@@ -1382,9 +1416,12 @@ export default function TimerApp({ sidebarMode = false }) {
       preset.tasks.map((t) => ({
         ...t,
         id: Math.random().toString(36).slice(2, 10),
-        estimatedMinutes: clampMinutes(t.estimatedMinutes, 25),
+        estimatedMinutes: clampMinutes(
+          t.estimatedMinutes,
+          DEFAULT_TASK_DURATION,
+        ),
         remainingSeconds: clampSeconds(
-          clampMinutes(t.estimatedMinutes, 25) * 60,
+          clampMinutes(t.estimatedMinutes, DEFAULT_TASK_DURATION) * 60,
         ),
         spentSeconds: 0,
       })),

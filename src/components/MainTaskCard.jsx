@@ -469,9 +469,10 @@ export default function MainTaskCard({ task }) {
       className={`mtask-card ${isCompleted ? "mtask-card--completed" : "mtask-card--active"} ${isActive ? "mtask-card--is-active" : ""}`}
       style={{
         borderLeft: `4px solid ${task.color}`,
+        "--task-focus-color": task.color,
         background: isCompleted
           ? undefined
-          : `linear-gradient(135deg, ${task.color}22 0%, rgba(255, 255, 255, 0.06) 58%)`,
+          : `linear-gradient(135deg, ${`color-mix(in srgb, ${task.color} 10%, rgba(255,255,255,0.06))`} 0%, rgba(255, 255, 255, 0.06) 58%)`,
       }}
     >
       {/* Header */}

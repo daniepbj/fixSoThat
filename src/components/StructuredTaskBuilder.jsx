@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { useMainTask } from "../context/MainTaskContext"
+import SectionMoveControls from "./SectionMoveControls"
 import { parseStepRaw, genStepId, formatStepRaw } from "../utils/stepUtils"
 
 const MAX_CHUNK_SIZE = 250
@@ -119,7 +120,7 @@ function buildToDoChunks({ goal, steps, proof }, maxSize = MAX_CHUNK_SIZE) {
   })
 }
 
-export default function StructuredTaskBuilder() {
+export default function StructuredTaskBuilder({ sectionControls }) {
   const { addMainTask, addMainTaskAndActivate } = useMainTask()
 
   const [goal, setGoal] = useState("")
@@ -440,15 +441,18 @@ export default function StructuredTaskBuilder() {
           <p className="hero-kicker">Structured task writer</p>
           <h2 className="task-builder-title">Fixa så att jag</h2>
         </div>
-        <button
-          type="button"
-          className="task-builder-play-btn"
-          onClick={handleStartInTimer}
-          title="Start in timer queue"
-          aria-label="Start in timer"
-        >
-          ▶
-        </button>
+        <div className="task-builder-header-actions">
+          {sectionControls && <SectionMoveControls {...sectionControls} />}
+          <button
+            type="button"
+            className="task-builder-play-btn"
+            onClick={handleStartInTimer}
+            title="Start in timer queue"
+            aria-label="Start in timer"
+          >
+            ▶
+          </button>
+        </div>
       </div>
       <p className="task-builder-help">
         Type your goal and steps. Use <code>step name 5</code> format for

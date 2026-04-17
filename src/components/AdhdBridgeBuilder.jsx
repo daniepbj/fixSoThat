@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { useMainTask } from "../context/MainTaskContext"
 import { useLocalStorage } from "../hooks/useLocalStorage"
+import SectionMoveControls from "./SectionMoveControls"
 import { genStepId, parseStepRaw, formatStepRaw } from "../utils/stepUtils"
 
 const STAGES = ["Area", "Current", "Better", "Proof", "Steps"]
@@ -15,7 +16,7 @@ function parsePositiveInt(value, fallback = 0) {
   return num
 }
 
-export default function AdhdBridgeBuilder() {
+export default function AdhdBridgeBuilder({ sectionControls }) {
   const { addMainTask } = useMainTask()
   const [builderVisualStyle] = useLocalStorage(
     "fst_builder_visual_style",
@@ -155,10 +156,15 @@ export default function AdhdBridgeBuilder() {
       className={`adhd-bridge-card gcb--${builderVisualStyle === "minimal" ? "minimal" : builderVisualStyle === "match" ? "match" : "calm"}`}
       aria-label="ADHD bridge builder"
     >
-      <p className="hero-kicker">New ADHD Guided Card</p>
-      <h2 className="adhd-bridge-title">
-        Current to Better to Proof to Tiny Steps
-      </h2>
+      <div className="adhd-bridge-head">
+        <div>
+          <p className="hero-kicker">New ADHD Guided Card</p>
+          <h2 className="adhd-bridge-title">
+            Current to Better to Proof to Tiny Steps
+          </h2>
+        </div>
+        {sectionControls && <SectionMoveControls {...sectionControls} />}
+      </div>
       <p className="adhd-bridge-help">
         Concrete, low-pressure, and action-first. Build a small bridge from how
         it is now to what would be a little better.

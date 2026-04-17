@@ -35,14 +35,96 @@ body {
 }
 
 .hero-card {
-  width: min(680px, 100%);
+  width: min(900px, 100%);
   border: 1px solid var(--card-border);
   border-radius: 24px;
-  padding: clamp(24px, 5vw, 48px);
+  padding: clamp(20px, 4vw, 28px);
   background: var(--card-bg);
   backdrop-filter: blur(10px);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
   animation: drift 5.5s ease-in-out infinite;
+}
+
+/* === Section move controls === */
+.app-links-header,
+.save-load-panel__header,
+.adhd-bridge-head,
+.mtask-list-heading,
+.hero-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.section-move-controls {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+  min-width: 122px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+}
+
+.section-move-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: color-mix(in srgb, var(--text-soft) 80%, transparent);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.section-move-btn--jump {
+  font-size: 0.74rem;
+  opacity: 0.82;
+}
+
+.section-move-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.section-move-btn:focus-visible:not(:disabled) {
+  outline: none;
+  color: var(--text-main);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text-main) 20%, transparent);
+}
+
+.section-move-btn:disabled {
+  opacity: 0.22;
+  cursor: not-allowed;
+}
+
+/* === Task focus pulse animation === */
+@keyframes task-focus-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px
+      color-mix(in srgb, var(--task-focus-color, #ffd079) 55%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px
+        color-mix(in srgb, var(--task-focus-color, #ffd079) 40%, transparent),
+      0 0 18px 4px
+        color-mix(in srgb, var(--task-focus-color, #ffd079) 22%, transparent);
+  }
 }
 
 .hero-kicker {
@@ -99,10 +181,10 @@ body {
 
 /* ── App Links ── */
 .app-links-card {
-  width: min(680px, 100%);
+  width: min(900px, 100%);
   border: 1px solid var(--card-border);
   border-radius: 24px;
-  padding: clamp(24px, 5vw, 48px);
+  padding: clamp(20px, 4vw, 28px);
   background: var(--card-bg);
   backdrop-filter: blur(10px);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
@@ -142,10 +224,10 @@ body {
 
 /* Structured Task Builder */
 .task-builder-card {
-  width: min(680px, 100%);
+  width: min(900px, 100%);
   border: 1px solid var(--card-border);
   border-radius: 24px;
-  padding: clamp(20px, 4vw, 32px);
+  padding: clamp(20px, 4vw, 28px);
   background: var(--card-bg);
   backdrop-filter: blur(10px);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
@@ -157,13 +239,22 @@ body {
 
 .task-builder-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
 .task-builder-header-text {
   text-align: left;
+}
+
+.task-builder-header-actions,
+.gsi-header__actions {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 8px;
+  flex: 0 0 74px;
 }
 
 .task-builder-play-btn {
@@ -685,6 +776,18 @@ body {
   padding: 6px 6px 28px;
 }
 
+.hero-card,
+.app-links-card,
+.task-builder-card,
+.gsi-card,
+.adhd-bridge-card,
+.mtask-list-section,
+.fixa-preset-panel,
+.save-load-panel {
+  width: min(900px, 100%);
+  padding: clamp(20px, 4vw, 28px);
+}
+
 /* ── Main task list ───────────────────────────────────────────────────── */
 
 .mtask-list-section {
@@ -700,9 +803,26 @@ body {
 .mtask-list-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.mtask-list-heading {
+  margin-bottom: 0;
+}
+
+.mtask-list-header-actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px 10px;
+}
+
+.mtask-filter-row {
+  justify-content: flex-end;
 }
 
 .mtask-list-title {
@@ -770,7 +890,18 @@ body {
 }
 
 .mtask-drag-wrap--focused-top .mtask-card {
-  border-top: 2px solid rgba(255, 234, 163, 0.6);
+  border-top: 2px solid
+    color-mix(
+      in srgb,
+      var(--task-focus-color, rgba(255, 234, 163, 0.6)) 70%,
+      transparent
+    );
+  box-shadow: 0 -4px 14px
+    color-mix(
+      in srgb,
+      var(--task-focus-color, rgba(255, 234, 163, 0.6)) 25%,
+      transparent
+    );
 }
 
 .mtask-deleted-section {
@@ -826,7 +957,7 @@ body {
 }
 
 .mtask-card--is-active {
-  box-shadow: 0 0 0 2px rgba(255, 208, 121, 0.6);
+  animation: task-focus-pulse 1.35s ease-in-out infinite;
 }
 
 .mtask-card__header {
@@ -2306,9 +2437,28 @@ body {
 /* Header row */
 .gcb-header-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 16px;
+}
+
+.gcb-collapsed-header,
+.gcb-header-row__actions,
+.fixa-preset-panel__header-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.gcb-collapsed-header {
+  width: 100%;
+}
+
+.gcb-header-row__actions,
+.fixa-preset-panel__header-actions {
+  margin-left: auto;
 }
 
 /* Style toggle */
@@ -2996,10 +3146,10 @@ body {
 
 /* ── GSI card ───────────────────────────────────────────────────────────── */
 .gsi-card {
-  width: min(680px, 100%);
+  width: min(900px, 100%);
   border: 1px solid var(--card-border);
   border-radius: 24px;
-  padding: clamp(20px, 4vw, 32px);
+  padding: clamp(20px, 4vw, 28px);
   background: var(--card-bg);
   backdrop-filter: blur(10px);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
@@ -3014,7 +3164,7 @@ body {
 
 .gsi-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 2px;
