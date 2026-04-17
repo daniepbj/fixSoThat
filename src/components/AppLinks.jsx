@@ -10,27 +10,42 @@ const apps = [
   },
 ]
 
-export default function AppLinks({ sectionControls }) {
+export default function AppLinks({
+  sectionControls,
+  sectionCollapsed,
+  onToggleSectionCollapsed,
+}) {
   return (
     <section className="app-links-card" aria-label="Apps I use">
       <div className="app-links-header">
-        <p className="hero-kicker">Apps I use</p>
+        <button
+          type="button"
+          className="section-collapse-toggle"
+          onClick={onToggleSectionCollapsed}
+        >
+          Apps I use
+          <span className="section-collapse-arrow">
+            {sectionCollapsed ? "▸" : "▾"}
+          </span>
+        </button>
         {sectionControls && <SectionMoveControls {...sectionControls} />}
       </div>
-      <ul className="app-links-list">
-        {apps.map(({ name, url }) => (
-          <li key={name}>
-            <a
-              href={url}
-              className="app-link"
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              {name}
-            </a>
-          </li>
-        ))}
-      </ul>
+      {!sectionCollapsed && (
+        <ul className="app-links-list">
+          {apps.map(({ name, url }) => (
+            <li key={name}>
+              <a
+                href={url}
+                className="app-link"
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                {name}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }

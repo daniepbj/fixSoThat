@@ -186,7 +186,7 @@ function ExampleList({ title, examples }) {
   )
 }
 
-export default function GuidedSmallImprovementBuilder({ sectionControls }) {
+export default function GuidedSmallImprovementBuilder({ sectionControls, sectionCollapsed, onToggleSectionCollapsed }) {
   const {
     addMainTask,
     addMainTaskAndActivate,
@@ -717,24 +717,33 @@ export default function GuidedSmallImprovementBuilder({ sectionControls }) {
       aria-label="Guided small improvement builder"
     >
       <div className="gsi-header">
-        <div className="gsi-header__text">
-          <p className="gsi-hero-kicker">Experimental Builder</p>
-          <h2 className="gsi-title">Build a small improvement</h2>
-        </div>
+        <button
+          type="button"
+          className="section-collapse-toggle"
+          onClick={onToggleSectionCollapsed}
+        >
+          Build a small improvement
+          <span className="section-collapse-arrow">{sectionCollapsed ? "▸" : "▾"}</span>
+        </button>
         <div className="gsi-header__actions">
+          {!sectionCollapsed && (
+            <button
+              type="button"
+              className={`gsi-play-btn${canPlay ? " gsi-play-btn--ready" : ""}`}
+              onClick={handleStartInTimer}
+              disabled={!canPlay}
+              title="Start in timer queue"
+              aria-label="Start session in timer"
+            >
+              ▶
+            </button>
+          )}
           {sectionControls && <SectionMoveControls {...sectionControls} />}
-          <button
-            type="button"
-            className={`gsi-play-btn${canPlay ? " gsi-play-btn--ready" : ""}`}
-            onClick={handleStartInTimer}
-            disabled={!canPlay}
-            title="Start in timer queue"
-            aria-label="Start session in timer"
-          >
-            ▶
-          </button>
         </div>
       </div>
+
+      {!sectionCollapsed && (
+        <>
 
       <div className="gsi-progress-bar">
         {STAGES.map((name, i) => (
@@ -1293,7 +1302,10 @@ export default function GuidedSmallImprovementBuilder({ sectionControls }) {
             Save to list
           </button>
         )}
-      </div>
+        </div>
+
+        </>
+      )}
     </section>
   )
 }

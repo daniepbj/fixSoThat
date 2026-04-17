@@ -17,10 +17,10 @@ import { getTimezoneOverride, setTimezoneOverride } from "./utils/timeUtils"
 
 const DEFAULT_SECTION_ORDER = [
   "structured-task-builder",
+  "main-task-list",
   "guided-small-improvement-builder",
   "guided-category-builder",
   "adhd-bridge-builder",
-  "main-task-list",
   "fixa-preset-panel",
   "save-load-panel",
   "app-links",
@@ -39,6 +39,18 @@ const SECTION_LABELS = {
   "feature-hello": "Feature component",
 }
 
+const DEFAULT_SECTION_COLLAPSED = {
+  "structured-task-builder": false,
+  "guided-small-improvement-builder": true,
+  "guided-category-builder": true,
+  "adhd-bridge-builder": true,
+  "main-task-list": false,
+  "fixa-preset-panel": false,
+  "save-load-panel": true,
+  "app-links": true,
+  "feature-hello": true,
+}
+
 // Keep only valid known ids (no dupes), then append any missing ones
 function normalizeSectionOrder(order) {
   const source = Array.isArray(order) ? order : []
@@ -52,6 +64,18 @@ function normalizeSectionOrder(order) {
     if (!result.includes(id)) result.push(id)
   }
   return result
+}
+
+// Normalize collapse state: fill missing known sections, discard orphaned ones, default unknown sections to collapsed
+function normalizeSectionCollapsed(collapsed) {
+  if (!collapsed || typeof collapsed !== "object") {
+    return DEFAULT_SECTION_COLLAPSED
+  }
+  const normalized = {}
+  for (const id of DEFAULT_SECTION_ORDER) {
+    normalized[id] = collapsed[id] ?? DEFAULT_SECTION_COLLAPSED[id]
+  }
+  return normalized
 }
 
 export default function App() {
@@ -80,6 +104,13 @@ function AppContent() {
   )
   const sectionOrder = normalizeSectionOrder(rawOrder)
 
+  const [rawCollapsed, setRawCollapsed] = useLocalStorage(
+    "fst_section_collapsed",
+    DEFAULT_SECTION_COLLAPSED,
+    normalizeSectionCollapsed,
+  )
+  const sectionCollapsed = normalizeSectionCollapsed(rawCollapsed)
+
   function moveSection(id, direction) {
     setRawOrder((prev) => {
       const order = normalizeSectionOrder(prev)
@@ -100,6 +131,13 @@ function AppContent() {
     })
   }
 
+  function toggleSectionCollapsed(id) {
+    setRawCollapsed((prev) => {
+      const current = normalizeSectionCollapsed(prev)
+      return { ...current, [id]: !current[id] }
+    })
+  }
+
   function getSectionControls(id, index) {
     return {
       label: SECTION_LABELS[id] || id,
@@ -114,28 +152,56 @@ function AppContent() {
     }
   }
 
+  function getSectionProps(id) {
+    return {
+      sectionCollapsed: sectionCollapsed[id] ?? false,
+      onToggleSectionCollapsed: () => toggleSectionCollapsed(id),
+    }
+  }
+
   function renderSection(id, controls) {
+    const props = getSectionProps(id)
     switch (id) {
       case "structured-task-builder":
-        return <StructuredTaskBuilder key={id} sectionControls={controls} />
+        return (
+          <StructuredTaskBuilder
+            key={id}
+            sectionControls={controls}
+            {...props}
+          />
+        )
       case "guided-small-improvement-builder":
         return (
-          <GuidedSmallImprovementBuilder key={id} sectionControls={controls} />
+          <GuidedSmallImprovementBuilder
+            key={id}
+            sectionControls={controls}
+            {...props}
+          />
         )
       case "guided-category-builder":
-        return <GuidedCategoryBuilder key={id} sectionControls={controls} />
+        return (
+          <GuidedCategoryBuilder
+            key={id}
+            sectionControls={controls}
+            {...props}
+          />
+        )
       case "adhd-bridge-builder":
-        return <AdhdBridgeBuilder key={id} sectionControls={controls} />
+        return (
+          <AdhdBridgeBuilder key={id} sectionControls={controls} {...props} />
+        )
       case "main-task-list":
-        return <MainTaskList key={id} sectionControls={controls} />
+        return <MainTaskList key={id} sectionControls={controls} {...props} />
       case "fixa-preset-panel":
-        return <FixaPresetPanel key={id} sectionControls={controls} />
+        return (
+          <FixaPresetPanel key={id} sectionControls={controls} {...props} />
+        )
       case "save-load-panel":
-        return <SaveLoadPanel key={id} sectionControls={controls} />
+        return <SaveLoadPanel key={id} sectionControls={controls} {...props} />
       case "app-links":
-        return <AppLinks key={id} sectionControls={controls} />
+        return <AppLinks key={id} sectionControls={controls} {...props} />
       case "feature-hello":
-        return <FeatureHello key={id} sectionControls={controls} />
+        return <FeatureHello key={id} sectionControls={controls} {...props} />
       default:
         return null
     }

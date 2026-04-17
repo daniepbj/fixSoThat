@@ -39,6 +39,7 @@ const FST_KEYS = [
   "fst_timezone_override",
   "fst_v1_init",
   "fst_section_order",
+  "fst_section_collapsed",
 ]
 
 // Build the export JSON string synchronously from localStorage
@@ -58,7 +59,7 @@ function buildExportJSON() {
   return JSON.stringify(snapshot, null, 2)
 }
 
-export default function SaveLoadPanel({ sectionControls }) {
+export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onToggleSectionCollapsed }) {
   const { saveSlots, saveSlot, loadSlot, clearSlot, mainTasks } = useMainTask()
   const [slotNames, setSlotNames] = useState(["", "", "", "", ""])
   const [message, setMessage] = useState("")
@@ -234,17 +235,26 @@ export default function SaveLoadPanel({ sectionControls }) {
   return (
     <section className="save-load-panel" aria-label="Save and load">
       <div className="save-load-panel__header">
-        <h2 className="save-load-panel__title">Save / Load</h2>
+        <button
+          type="button"
+          className="section-collapse-toggle"
+          onClick={onToggleSectionCollapsed}
+        >
+          Save / Load
+          <span className="section-collapse-arrow">{sectionCollapsed ? "▸" : "▾"}</span>
+        </button>
         {sectionControls && <SectionMoveControls {...sectionControls} />}
       </div>
-      <p className="save-load-panel__help">
-        Save your current tasks to a slot and reload them any time — like save
-        states in a game.
-      </p>
+      {!sectionCollapsed && (
+        <>
+          <p className="save-load-panel__help">
+            Save your current tasks to a slot and reload them any time — like save
+            states in a game.
+          </p>
 
-      {message && <p className="save-load-msg">{message}</p>}
+          {message && <p className="save-load-msg">{message}</p>}
 
-      <div className="save-load-slots">
+          <div className="save-load-slots">
         {saveSlots.map((slot, index) => (
           <div
             key={index}
@@ -305,7 +315,7 @@ export default function SaveLoadPanel({ sectionControls }) {
             </div>
           </div>
         ))}
-      </div>
+        </div>
 
       <div className="export-import-section">
         <h3 className="export-import-title">Export / Import</h3>
@@ -387,6 +397,8 @@ export default function SaveLoadPanel({ sectionControls }) {
           </button>
         </div>
       </div>
+        </>
+      )}
     </section>
   )
 }

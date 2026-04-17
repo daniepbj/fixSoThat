@@ -120,7 +120,7 @@ function buildToDoChunks({ goal, steps, proof }, maxSize = MAX_CHUNK_SIZE) {
   })
 }
 
-export default function StructuredTaskBuilder({ sectionControls }) {
+export default function StructuredTaskBuilder({ sectionControls, sectionCollapsed, onToggleSectionCollapsed }) {
   const { addMainTask, addMainTaskAndActivate } = useMainTask()
 
   const [goal, setGoal] = useState("")
@@ -438,8 +438,14 @@ export default function StructuredTaskBuilder({ sectionControls }) {
     >
       <div className="task-builder-header">
         <div className="task-builder-header-text">
-          <p className="hero-kicker">Structured task writer</p>
-          <h2 className="task-builder-title">Fixa så att jag</h2>
+          <button
+            type="button"
+            className="section-collapse-toggle"
+            onClick={onToggleSectionCollapsed}
+          >
+            Fixa så att jag
+            <span className="section-collapse-arrow">{sectionCollapsed ? "▸" : "▾"}</span>
+          </button>
         </div>
         <div className="task-builder-header-actions">
           {sectionControls && <SectionMoveControls {...sectionControls} />}
@@ -454,11 +460,13 @@ export default function StructuredTaskBuilder({ sectionControls }) {
           </button>
         </div>
       </div>
-      <p className="task-builder-help">
-        Type your goal and steps. Use <code>step name 5</code> format for
-        integer minutes. Press <kbd>Enter</kbd> to add a step; paste multiple
-        lines at once.
-      </p>
+      {!sectionCollapsed && (
+        <>
+          <p className="task-builder-help">
+            Type your goal and steps. Use <code>step name 5</code> format for
+            integer minutes. Press <kbd>Enter</kbd> to add a step; paste multiple
+            lines at once.
+          </p>
 
       <form className="task-builder-form" onSubmit={handleGenerate}>
         <label className="task-builder-label" htmlFor="goal-input">
@@ -688,6 +696,8 @@ export default function StructuredTaskBuilder({ sectionControls }) {
               Pasted into Llama
             </label>
           </section>
+        </>
+      )}
         </>
       )}
     </section>

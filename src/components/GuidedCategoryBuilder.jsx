@@ -42,12 +42,11 @@ function ContextBar({ categories, stage }) {
   )
 }
 
-export default function GuidedCategoryBuilder({ sectionControls }) {
+export default function GuidedCategoryBuilder({ sectionControls, sectionCollapsed, onToggleSectionCollapsed }) {
   const { addMainTask } = useMainTask()
   const timerCtx = useContext(TimerContext)
   const timerRunning = timerCtx?.timerRunning ?? false
 
-  const [open, setOpen] = useState(false)
   const [stage, setStage] = useState(0)
   const [categories, setCategories] = useState([makeCat()])
   const [error, setError] = useState("")
@@ -498,14 +497,14 @@ export default function GuidedCategoryBuilder({ sectionControls }) {
         ? "gcb--match"
         : "gcb--calm"
 
-  if (!open) {
+  if (sectionCollapsed) {
     return (
       <section className="task-builder-card gcb-collapsed">
         <div className="gcb-collapsed-header">
           <button
             type="button"
             className="gcb-toggle-btn"
-            onClick={() => setOpen(true)}
+            onClick={onToggleSectionCollapsed}
           >
             Guided Category Builder
             <span className="gcb-toggle-arrow">▸</span>
@@ -526,7 +525,7 @@ export default function GuidedCategoryBuilder({ sectionControls }) {
         <button
           type="button"
           className="gcb-toggle-btn gcb-toggle-btn--open"
-          onClick={() => setOpen(false)}
+          onClick={onToggleSectionCollapsed}
         >
           Guided Category Builder
           <span className="gcb-toggle-arrow">▾</span>

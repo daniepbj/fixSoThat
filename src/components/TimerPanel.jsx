@@ -9,6 +9,8 @@ export default function TimerPanel() {
     adjustTime,
     alarmActive,
     stopAlarm,
+    hasSelectedTrack,
+    hasUploadedTracks,
   } = useTimerContext()
   const remaining = currentTask?.remainingSeconds ?? 0
   const progress = getHourRingProgress(remaining)
@@ -23,6 +25,11 @@ export default function TimerPanel() {
     if (!currentTask) return
     toggleTimerWithClick()
   }
+
+  const showNoMusicHint = Boolean(currentTask) && !hasSelectedTrack
+  const noMusicHintText = hasUploadedTracks
+    ? "No track selected. Open Settings to choose one."
+    : "No music uploaded yet. Open Settings to add a track."
 
   return (
     <section
@@ -95,6 +102,12 @@ export default function TimerPanel() {
           +5m
         </button>
       </div>
+
+      {showNoMusicHint && (
+        <p className="timer-music-hint" role="status">
+          {noMusicHintText}
+        </p>
+      )}
 
       {alarmActive && (
         <button className="timer-btn timer-btn--dismiss" onClick={stopAlarm}>

@@ -1538,6 +1538,8 @@ export default function TimerApp({ sidebarMode = false }) {
     pomoEnabled,
     pomoWorkStart,
     pomoWorkDuration,
+    hasSelectedTrack: Boolean(selectedTrackId),
+    hasUploadedTracks: uploadedTracks.length > 0,
   }
 
   function skipBreak() {

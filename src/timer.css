@@ -337,6 +337,19 @@
   margin-top: 14px;
 }
 
+.timer-music-hint {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #ffb86b 45%, transparent);
+  background: color-mix(in srgb, #ffb86b 14%, transparent);
+  color: color-mix(in srgb, var(--ta-text) 90%, #ffdfb3 10%);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  max-width: 320px;
+}
+
 .timer-btn {
   border: none;
   cursor: pointer;

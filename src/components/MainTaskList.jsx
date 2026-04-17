@@ -46,7 +46,11 @@ function SortableMainTaskRow({ task, isFocusedTop }) {
   )
 }
 
-export default function MainTaskList({ sectionControls }) {
+export default function MainTaskList({
+  sectionControls,
+  sectionCollapsed,
+  onToggleSectionCollapsed,
+}) {
   const {
     deletedMainTasks,
     mainTasks,
@@ -98,107 +102,124 @@ export default function MainTaskList({ sectionControls }) {
     <section className="mtask-list-section" aria-label="Internal task list">
       <div className="mtask-list-header">
         <div className="mtask-list-heading">
-          <h2 className="mtask-list-title">Task list</h2>
+          <button
+            type="button"
+            className="section-collapse-toggle"
+            onClick={onToggleSectionCollapsed}
+          >
+            Task list
+            <span className="section-collapse-arrow">
+              {sectionCollapsed ? "▸" : "▾"}
+            </span>
+          </button>
         </div>
         <div className="mtask-list-header-actions">
-          <div className="mtask-filter-row">
-            <button
-              type="button"
-              className={`mtask-filter-btn ${filter === "active" ? "mtask-filter-btn--on" : ""}`}
-              onClick={() => setFilter("active")}
-            >
-              Active ({activeCount})
-            </button>
-            <button
-              type="button"
-              className={`mtask-filter-btn ${filter === "completed" ? "mtask-filter-btn--on" : ""}`}
-              onClick={() => setFilter("completed")}
-            >
-              Done ({completedCount})
-            </button>
-            <button
-              type="button"
-              className={`mtask-filter-btn ${filter === "all" ? "mtask-filter-btn--on" : ""}`}
-              onClick={() => setFilter("all")}
-            >
-              All ({mainTasks.length})
-            </button>
-          </div>
+          {!sectionCollapsed && (
+            <div className="mtask-filter-row">
+              <button
+                type="button"
+                className={`mtask-filter-btn ${filter === "active" ? "mtask-filter-btn--on" : ""}`}
+                onClick={() => setFilter("active")}
+              >
+                Active ({activeCount})
+              </button>
+              <button
+                type="button"
+                className={`mtask-filter-btn ${filter === "completed" ? "mtask-filter-btn--on" : ""}`}
+                onClick={() => setFilter("completed")}
+              >
+                Done ({completedCount})
+              </button>
+              <button
+                type="button"
+                className={`mtask-filter-btn ${filter === "all" ? "mtask-filter-btn--on" : ""}`}
+                onClick={() => setFilter("all")}
+              >
+                All ({mainTasks.length})
+              </button>
+            </div>
+          )}
           {sectionControls && <SectionMoveControls {...sectionControls} />}
         </div>
       </div>
 
-      {filtered.length === 0 && (
-        <p className="mtask-empty-state">
-          {filter === "active"
-            ? "No active tasks. Load a Fixa output above to add one."
-            : "Nothing here yet."}
-        </p>
-      )}
-
-      <div className="mtask-list-cards">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={orderedFiltered.map((task) => task.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            {orderedFiltered.map((task, idx) => (
-              <SortableMainTaskRow
-                key={task.id}
-                task={task}
-                isFocusedTop={idx === 0 && task.id === activeMainTaskId}
-              />
-            ))}
-          </SortableContext>
-        </DndContext>
-      </div>
-
-      <div className="mtask-deleted-section">
-        <div className="mtask-deleted-section__header">
-          <button
-            type="button"
-            className="mtask-filter-btn"
-            onClick={() => setShowDeleted((open) => !open)}
-          >
-            {showDeleted ? "▲" : "▼"} Deleted ({deletedMainTasks.length})
-          </button>
-          {deletedMainTasks.length > 0 && (
-            <button
-              type="button"
-              className="mtask-action-btn mtask-action-btn--danger"
-              onClick={clearDeletedMainTasks}
-            >
-              Clear all
-            </button>
+      {!sectionCollapsed && (
+        <>
+          {filtered.length === 0 && (
+            <p className="mtask-empty-state">
+              {filter === "active"
+                ? "No active tasks. Load a Fixa output above to add one."
+                : "Nothing here yet."}
+            </p>
           )}
-        </div>
-        {showDeleted && (
-          <div className="mtask-deleted-list">
-            {deletedMainTasks.length === 0 && (
-              <p className="mtask-empty-state">No deleted main tasks.</p>
-            )}
-            {[...deletedMainTasks].reverse().map((task) => (
-              <div key={task.id} className="mtask-deleted-item">
-                <span className="mtask-deleted-item__title">{task.title}</span>
-                <span className="mtask-deleted-item__meta">
-                  {fmtLocalDateTime(task.deletedAt)}
-                </span>
+
+          <div className="mtask-list-cards">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={orderedFiltered.map((task) => task.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {orderedFiltered.map((task, idx) => (
+                  <SortableMainTaskRow
+                    key={task.id}
+                    task={task}
+                    isFocusedTop={idx === 0 && task.id === activeMainTaskId}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          </div>
+
+          <div className="mtask-deleted-section">
+            <div className="mtask-deleted-section__header">
+              <button
+                type="button"
+                className="mtask-filter-btn"
+                onClick={() => setShowDeleted((open) => !open)}
+              >
+                {showDeleted ? "▲" : "▼"} Deleted ({deletedMainTasks.length})
+              </button>
+              {deletedMainTasks.length > 0 && (
                 <button
                   type="button"
-                  className="mtask-action-btn"
-                  onClick={() => undoDeleteMainTask(task.id)}
+                  className="mtask-action-btn mtask-action-btn--danger"
+                  onClick={clearDeletedMainTasks}
                 >
-                  Undo
+                  Clear all
                 </button>
+              )}
+            </div>
+            {showDeleted && (
+              <div className="mtask-deleted-list">
+                {deletedMainTasks.length === 0 && (
+                  <p className="mtask-empty-state">No deleted main tasks.</p>
+                )}
+                {[...deletedMainTasks].reverse().map((task) => (
+                  <div key={task.id} className="mtask-deleted-item">
+                    <span className="mtask-deleted-item__title">
+                      {task.title}
+                    </span>
+                    <span className="mtask-deleted-item__meta">
+                      {fmtLocalDateTime(task.deletedAt)}
+                    </span>
+                    <button
+                      type="button"
+                      className="mtask-action-btn"
+                      onClick={() => undoDeleteMainTask(task.id)}
+                    >
+                      Undo
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
     </section>
   )
 }

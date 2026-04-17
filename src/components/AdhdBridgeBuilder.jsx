@@ -16,7 +16,7 @@ function parsePositiveInt(value, fallback = 0) {
   return num
 }
 
-export default function AdhdBridgeBuilder({ sectionControls }) {
+export default function AdhdBridgeBuilder({ sectionControls, sectionCollapsed, onToggleSectionCollapsed }) {
   const { addMainTask } = useMainTask()
   const [builderVisualStyle] = useLocalStorage(
     "fst_builder_visual_style",
@@ -157,20 +157,24 @@ export default function AdhdBridgeBuilder({ sectionControls }) {
       aria-label="ADHD bridge builder"
     >
       <div className="adhd-bridge-head">
-        <div>
-          <p className="hero-kicker">New ADHD Guided Card</p>
-          <h2 className="adhd-bridge-title">
-            Current to Better to Proof to Tiny Steps
-          </h2>
-        </div>
+        <button
+          type="button"
+          className="section-collapse-toggle"
+          onClick={onToggleSectionCollapsed}
+        >
+          ADHD bridge builder
+          <span className="section-collapse-arrow">{sectionCollapsed ? "▸" : "▾"}</span>
+        </button>
         {sectionControls && <SectionMoveControls {...sectionControls} />}
       </div>
-      <p className="adhd-bridge-help">
-        Concrete, low-pressure, and action-first. Build a small bridge from how
-        it is now to what would be a little better.
-      </p>
+      {!sectionCollapsed && (
+        <>
+          <p className="adhd-bridge-help">
+            Concrete, low-pressure, and action-first. Build a small bridge from how
+            it is now to what would be a little better.
+          </p>
 
-      <div className="adhd-bridge-stages" aria-hidden="true">
+          <div className="adhd-bridge-stages" aria-hidden="true">
         {STAGES.map((name, i) => (
           <div
             key={name}
@@ -427,7 +431,9 @@ export default function AdhdBridgeBuilder({ sectionControls }) {
             Load into list
           </button>
         )}
-      </div>
+        </div>
+        </>
+      )}
     </section>
   )
 }
