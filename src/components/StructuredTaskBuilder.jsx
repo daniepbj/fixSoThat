@@ -121,7 +121,7 @@ function buildToDoChunks({ goal, steps, proof }, maxSize = MAX_CHUNK_SIZE) {
 }
 
 export default function StructuredTaskBuilder({ sectionControls, sectionCollapsed, onToggleSectionCollapsed }) {
-  const { addMainTask, addMainTaskAndActivate } = useMainTask()
+  const { addMainTask, addMainTaskAndActivate, completeMainTask } = useMainTask()
 
   const [goal, setGoal] = useState("")
   const [steps, setSteps] = useState([{ id: genStepId(), raw: "" }])
@@ -135,6 +135,7 @@ export default function StructuredTaskBuilder({ sectionControls, sectionCollapse
   const [copyMessage, setCopyMessage] = useState("")
   const [loadMessage, setLoadMessage] = useState("")
   const [clearAfterLoad, setClearAfterLoad] = useState(true)
+  const [loadIntoQueue, setLoadIntoQueue] = useState(true)
   const [draggedStepId, setDraggedStepId] = useState("")
   const [builderQueueTaskId, setBuilderQueueTaskId] = useState("")
   const [goalQueueStepId, setGoalQueueStepId] = useState("")
@@ -189,6 +190,18 @@ export default function StructuredTaskBuilder({ sectionControls, sectionCollapse
 
   function addStep() {
     const newStep = { id: genStepId(), raw: "" }
+    setSteps((prev) => [...prev, newStep])
+    window.setTimeout(() => {
+      const ref = stepInputRefs.current[newStep.id]
+      if (ref) ref.focus()
+    }, 0)
+  }
+
+  function addWaitingStep() {
+    const newStep = {
+      id: genStepId(),
+      raw: formatStepRaw("Wait for response", 2),
+    }
     setSteps((prev) => [...prev, newStep])
     window.setTimeout(() => {
       const ref = stepInputRefs.current[newStep.id]
@@ -341,13 +354,29 @@ export default function StructuredTaskBuilder({ sectionControls, sectionCollapse
         .map((s) => ({ raw: String(s?.raw || "").trim() }))
         .filter((s) => s.raw.length > 0)
 
-      addMainTask({
+      const createdTask = addMainTask({
         title: String(goal || "").trim(),
         steps: validSteps,
         proof: String(proof || "").trim(),
         priority: String(priority || "").trim(),
       })
-      setLoadMessage("Loaded into task list ↓")
+
+      if (loadIntoQueue && createdTask?.id) {
+        window.localStorage.setItem("fst_focus_request", JSON.stringify({
+          mainTaskId: createdTask.id,
+          stepId: null,
+          ts: Date.now(),
+        }))
+        window.localStorage.setItem("fst_autostart_main_task", createdTask.id)
+      }
+
+      if (queueActive && focusProof && builderQueueTaskId) {
+        completeMainTask(builderQueueTaskId)
+      }
+
+      setLoadMessage(
+        loadIntoQueue ? "Loaded into task list + queue ↓" : "Loaded into task list ↓",
+      )
       if (clearAfterLoad) {
         resetStructuredWriterForm()
       }
@@ -564,13 +593,23 @@ export default function StructuredTaskBuilder({ sectionControls, sectionCollapse
             })}
           </div>
 
-          <button
-            type="button"
-            className="task-builder-add-step-btn"
-            onClick={addStep}
-          >
-            + Add step
-          </button>
+          <div className="task-builder-step-actions">
+            <button
+              type="button"
+              className="task-builder-add-step-btn"
+              onClick={addStep}
+            >
+              + Add step
+            </button>
+            <button
+              type="button"
+              className="task-builder-add-step-btn task-builder-add-step-btn--wait"
+              onClick={addWaitingStep}
+              title="Insert a waiting step quickly"
+            >
+              ⏳ Add waiting step
+            </button>
+          </div>
         </fieldset>
 
         <label className="task-builder-label" htmlFor="proof-input">
@@ -616,6 +655,14 @@ export default function StructuredTaskBuilder({ sectionControls, sectionCollapse
               onChange={(e) => setClearAfterLoad(e.target.checked)}
             />
             Clear form after loading
+          </label>
+          <label className="task-check-label task-builder-clear-after-load">
+            <input
+              type="checkbox"
+              checked={loadIntoQueue}
+              onChange={(e) => setLoadIntoQueue(e.target.checked)}
+            />
+            Load into queue
           </label>
         </div>
       </form>

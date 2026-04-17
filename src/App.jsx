@@ -51,6 +51,12 @@ const DEFAULT_SECTION_COLLAPSED = {
   "feature-hello": true,
 }
 
+const DEFAULT_UI_LAYOUT = "split"
+
+function normalizeUiLayout(layout) {
+  return layout === "unlocked" ? "unlocked" : DEFAULT_UI_LAYOUT
+}
+
 // Keep only valid known ids (no dupes), then append any missing ones
 function normalizeSectionOrder(order) {
   const source = Array.isArray(order) ? order : []
@@ -82,11 +88,54 @@ export default function App() {
   useEffect(() => {
     // Default timezone to Oslo if the user has never set an override
     if (!getTimezoneOverride()) setTimezoneOverride("Europe/Oslo")
+
+    try {
+      const storedUiTheme = JSON.parse(
+        window.localStorage.getItem("fst_ui_theme") || '"original"',
+      )
+      const safeTheme =
+        storedUiTheme === "copper-dusk" ||
+        storedUiTheme === "neon" ||
+        storedUiTheme === "sunburst" ||
+        storedUiTheme === "mint-pop" ||
+        storedUiTheme === "high-contrast" ||
+        storedUiTheme === "pastel-play"
+          ? storedUiTheme
+          : "original"
+      document.documentElement.setAttribute("data-ui-theme", safeTheme)
+    } catch {
+      document.documentElement.setAttribute("data-ui-theme", "original")
+    }
+
     function handleClick(e) {
       if (e.target.closest("button")) playClickSound()
     }
+
+    function handleThemeStorage(event) {
+      if (event.key !== "fst_ui_theme") return
+      try {
+        const next = JSON.parse(event.newValue || '"original"')
+        const safeTheme =
+          next === "copper-dusk" ||
+          next === "neon" ||
+          next === "sunburst" ||
+          next === "mint-pop" ||
+          next === "high-contrast" ||
+          next === "pastel-play"
+            ? next
+            : "original"
+        document.documentElement.setAttribute("data-ui-theme", safeTheme)
+      } catch {
+        document.documentElement.setAttribute("data-ui-theme", "original")
+      }
+    }
+
     document.addEventListener("click", handleClick)
-    return () => document.removeEventListener("click", handleClick)
+    window.addEventListener("storage", handleThemeStorage)
+    return () => {
+      document.removeEventListener("click", handleClick)
+      window.removeEventListener("storage", handleThemeStorage)
+    }
   }, [])
 
   return (
@@ -110,6 +159,19 @@ function AppContent() {
     normalizeSectionCollapsed,
   )
   const sectionCollapsed = normalizeSectionCollapsed(rawCollapsed)
+  const [uiLayout, setUiLayout] = useLocalStorage(
+    "fst_ui_layout",
+    DEFAULT_UI_LAYOUT,
+    normalizeUiLayout,
+  )
+
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    document.documentElement.setAttribute(
+      "data-ui-layout",
+      normalizeUiLayout(uiLayout),
+    )
+  }, [uiLayout])
 
   function moveSection(id, direction) {
     setRawOrder((prev) => {
@@ -205,6 +267,24 @@ function AppContent() {
       default:
         return null
     }
+  }
+
+  if (normalizeUiLayout(uiLayout) === "unlocked") {
+    return (
+      <>
+        <div className="app-layout app-layout--unlocked">
+          <main className="app-main app-main--unlocked">
+            <section className="app-main-timer-unlocked">
+              <TimerApp />
+            </section>
+            {sectionOrder.map((id, index) =>
+              renderSection(id, getSectionControls(id, index)),
+            )}
+          </main>
+        </div>
+        {retryReflectionTaskId && <RetryReflectionModal />}
+      </>
+    )
   }
 
   return (

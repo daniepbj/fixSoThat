@@ -79,115 +79,117 @@ export default function SidebarTaskSteps() {
           {parsed.minutes > 0 && (
             <span className="sidebar-step__time">{parsed.minutes}m</span>
           )}
-          <span className="sidebar-step__step-tries">
-            {node.tries || 0}×
-            <button
-              type="button"
-              className="sidebar-step__tries-btn"
-              onClick={() => decrementStepTries(task.id, node.id)}
-              title="Decrease step tries"
-            >
-              -
-            </button>
-            <button
-              type="button"
-              className="sidebar-step__tries-btn"
-              onClick={() => incrementStepTries(task.id, node.id)}
-              title="Increase step tries"
-            >
-              +
-            </button>
-          </span>
-          <span className="sidebar-step__hierarchy-btns">
-            <button
-              type="button"
-              className="sidebar-step__tries-btn"
-              onClick={() => reorderStep(task.id, node.id, "up")}
-              disabled={siblingIndex === 0}
-              title="Move up"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              className="sidebar-step__tries-btn"
-              onClick={() => reorderStep(task.id, node.id, "down")}
-              disabled={siblingIndex === siblingCount - 1}
-              title="Move down"
-            >
-              ↓
-            </button>
-            {stepDepth > 0 && (
+          <span className="sidebar-step__controls">
+            <span className="sidebar-step__step-tries">
+              {node.tries || 0}×
               <button
                 type="button"
                 className="sidebar-step__tries-btn"
-                onClick={() => promoteStep(task.id, node.id)}
-                title="Promote"
+                onClick={() => decrementStepTries(task.id, node.id)}
+                title="Decrease step tries"
               >
-                ←
+                -
               </button>
-            )}
-            {hasPrevSibling && (
               <button
                 type="button"
                 className="sidebar-step__tries-btn"
-                onClick={() => demoteStep(task.id, node.id)}
-                title="Demote"
+                onClick={() => incrementStepTries(task.id, node.id)}
+                title="Increase step tries"
               >
-                →
+                +
               </button>
-            )}
-            <button
-              type="button"
-              className="sidebar-step__tries-btn sidebar-step__breakdown-btn"
-              onClick={() => {
-                setAddingSubstepFor(
-                  addingSubstepFor === node.id ? null : node.id,
-                )
-                setNewSubstepRaw("")
-              }}
-              title="Add child substep"
-            >
-              + Sub
-            </button>
-            <input
-              type="number"
-              min="1"
-              max="240"
-              className="step-wait-minutes-input"
-              value={waitValue}
-              onChange={(e) =>
-                setStepWaitMinutes((prev) => ({
-                  ...prev,
-                  [node.id]: e.target.value,
-                }))
-              }
-              placeholder={defaultTaskDuration ?? 2}
-              title="Wait duration in minutes"
-              aria-label={`Wait minutes for ${parsed.text || node.raw}`}
-              disabled={waitDisabled}
-            />
-            <button
-              type="button"
-              className="sidebar-step__tries-btn step-wait-btn"
-              onClick={() => {
-                const parsedMinutes = Number(waitValue)
-                const minutes = Number.isFinite(parsedMinutes)
-                  ? parsedMinutes
-                  : (defaultTaskDuration ?? 2)
-                waitTaskBySourceStepId(node.id, minutes)
-              }}
-              title={
-                waitingTask
-                  ? "Another task is already in waiting mode"
-                  : !hasLinkedTimerTask
-                    ? "This step is not currently in the timer queue"
-                    : "Move this step into waiting mode"
-              }
-              disabled={waitDisabled}
-            >
-              ⏸
-            </button>
+            </span>
+            <span className="sidebar-step__hierarchy-btns">
+              <button
+                type="button"
+                className="sidebar-step__tries-btn"
+                onClick={() => reorderStep(task.id, node.id, "up")}
+                disabled={siblingIndex === 0}
+                title="Move up"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                className="sidebar-step__tries-btn"
+                onClick={() => reorderStep(task.id, node.id, "down")}
+                disabled={siblingIndex === siblingCount - 1}
+                title="Move down"
+              >
+                ↓
+              </button>
+              {stepDepth > 0 && (
+                <button
+                  type="button"
+                  className="sidebar-step__tries-btn"
+                  onClick={() => promoteStep(task.id, node.id)}
+                  title="Promote"
+                >
+                  ←
+                </button>
+              )}
+              {hasPrevSibling && (
+                <button
+                  type="button"
+                  className="sidebar-step__tries-btn"
+                  onClick={() => demoteStep(task.id, node.id)}
+                  title="Demote"
+                >
+                  →
+                </button>
+              )}
+              <button
+                type="button"
+                className="sidebar-step__tries-btn sidebar-step__breakdown-btn"
+                onClick={() => {
+                  setAddingSubstepFor(
+                    addingSubstepFor === node.id ? null : node.id,
+                  )
+                  setNewSubstepRaw("")
+                }}
+                title="Add child substep"
+              >
+                + Sub
+              </button>
+              <input
+                type="number"
+                min="1"
+                max="240"
+                className="step-wait-minutes-input"
+                value={waitValue}
+                onChange={(e) =>
+                  setStepWaitMinutes((prev) => ({
+                    ...prev,
+                    [node.id]: e.target.value,
+                  }))
+                }
+                placeholder={defaultTaskDuration ?? 2}
+                title="Wait duration in minutes"
+                aria-label={`Wait minutes for ${parsed.text || node.raw}`}
+                disabled={waitDisabled}
+              />
+              <button
+                type="button"
+                className="sidebar-step__tries-btn step-wait-btn"
+                onClick={() => {
+                  const parsedMinutes = Number(waitValue)
+                  const minutes = Number.isFinite(parsedMinutes)
+                    ? parsedMinutes
+                    : (defaultTaskDuration ?? 2)
+                  waitTaskBySourceStepId(node.id, minutes)
+                }}
+                title={
+                  waitingTask
+                    ? "Another task is already in waiting mode"
+                    : !hasLinkedTimerTask
+                      ? "This step is not currently in the timer queue"
+                      : "Move this step into waiting mode"
+                }
+                disabled={waitDisabled}
+              >
+                ⏸
+              </button>
+            </span>
           </span>
         </div>
         {addingSubstepFor === node.id && (
@@ -267,7 +269,7 @@ export default function SidebarTaskSteps() {
           onClick={() => decrementTries(task.id)}
           title={`Tries: ${task.tries || 0}`}
         >
-          Tries: {task.tries || 0} -
+          - Try ({task.tries || 0})
         </button>
         <button
           type="button"
@@ -275,7 +277,7 @@ export default function SidebarTaskSteps() {
           onClick={() => incrementTries(task.id)}
           title={`Tries: ${task.tries || 0}`}
         >
-          Tries: {task.tries || 0} +
+          + Try ({task.tries || 0})
         </button>
         {allDone && (
           <button

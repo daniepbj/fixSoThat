@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { useTimerContext } from "../context/TimerContext"
+import { useLocalStorage } from "../hooks/useLocalStorage"
 import { fmtTimerDisplay, getHourRingProgress } from "../utils/timeUtils"
 import WaitingTaskPanel from "./WaitingTaskPanel"
 
@@ -6,16 +9,24 @@ export default function TimerPanel() {
   const {
     currentTask,
     timerRunning,
+    setCurrentView,
+    musicPromptRequestId,
     toggleTimerWithClick,
     adjustTime,
     alarmActive,
     stopAlarm,
+    queueBlockedByWait,
     hasSelectedTrack,
     hasUploadedTracks,
+    uploadMusicFromModal,
     waitingTask,
   } = useTimerContext()
   const remaining = currentTask?.remainingSeconds ?? 0
   const progress = getHourRingProgress(remaining)
+  const [showNoMusicModal, setShowNoMusicModal] = useState(false)
+  const [uploadingFromModal, setUploadingFromModal] = useState(false)
+  const [skipNoUploadPromptForever, setSkipNoUploadPromptForever] =
+    useLocalStorage("fst_skip_no_music_upload_prompt_forever", false)
 
   // SVG ring
   const r = 88
@@ -25,21 +36,113 @@ export default function TimerPanel() {
 
   function toggle() {
     if (!currentTask) return
+    const shouldPromptMissingUpload =
+      !hasUploadedTracks && !skipNoUploadPromptForever
+    const shouldPromptMissingSelection = hasUploadedTracks && !hasSelectedTrack
+
+    if (shouldPromptMissingUpload || shouldPromptMissingSelection) {
+      setShowNoMusicModal(true)
+      return
+    }
     toggleTimerWithClick()
   }
 
-  const showNoMusicHint = Boolean(currentTask) && !hasSelectedTrack
   const noMusicHintText = hasUploadedTracks
     ? "No track selected. Open Settings to choose one."
-    : "No music uploaded yet. Open Settings to add a track."
+    : "No music uploaded yet. Upload one now or skip."
+
+  useEffect(() => {
+    if (!musicPromptRequestId) return
+    const shouldPromptMissingUpload =
+      !hasUploadedTracks && !skipNoUploadPromptForever
+    const shouldPromptMissingSelection = hasUploadedTracks && !hasSelectedTrack
+    if (shouldPromptMissingUpload || shouldPromptMissingSelection) {
+      setShowNoMusicModal(true)
+    }
+  }, [
+    musicPromptRequestId,
+    hasUploadedTracks,
+    hasSelectedTrack,
+    skipNoUploadPromptForever,
+  ])
+
+  async function handleUploadNow() {
+    if (uploadingFromModal) return
+    setUploadingFromModal(true)
+    const uploaded = await uploadMusicFromModal()
+    setUploadingFromModal(false)
+    if (uploaded) {
+      setShowNoMusicModal(false)
+      toggleTimerWithClick()
+    }
+  }
+
+  function handleSkipMusicModal() {
+    setShowNoMusicModal(false)
+    setCurrentView("timer")
+  }
+
+  function handleSkipForever() {
+    setSkipNoUploadPromptForever(true)
+    setShowNoMusicModal(false)
+    setCurrentView("timer")
+    toggleTimerWithClick()
+  }
+
+  const noMusicModal =
+    showNoMusicModal && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className="timer-music-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Music upload required"
+          >
+            <div className="timer-music-modal__backdrop" />
+            <div className="timer-music-modal__card">
+              <strong>No music configured</strong>
+              <span>{noMusicHintText}</span>
+              <div className="timer-music-modal__actions">
+                <button
+                  type="button"
+                  className="timer-music-modal__btn timer-music-modal__btn--primary"
+                  onClick={handleUploadNow}
+                  disabled={uploadingFromModal}
+                >
+                  {uploadingFromModal ? "Opening..." : "Upload now"}
+                </button>
+                <button
+                  type="button"
+                  className="timer-music-modal__btn"
+                  onClick={handleSkipMusicModal}
+                  disabled={uploadingFromModal}
+                >
+                  Skip
+                </button>
+                {!hasUploadedTracks && (
+                  <button
+                    type="button"
+                    className="timer-music-modal__btn timer-music-modal__btn--danger"
+                    onClick={handleSkipForever}
+                    disabled={uploadingFromModal}
+                  >
+                    Skip forever
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null
 
   return (
     <section
       className={`timer-panel${timerRunning ? " timer-panel--running" : ""}${alarmActive ? " timer-panel--alarm" : ""}`}
       style={{ "--timer-glow-color": currentTask?.color ?? "#6c63ff" }}
     >
-        {waitingTask && <WaitingTaskPanel />}
-        <div className="timer-ring-wrapper">
+      {waitingTask && <WaitingTaskPanel />}
+      <div className="timer-ring-wrapper">
         <svg
           className="timer-ring"
           viewBox="0 0 200 200"
@@ -73,7 +176,7 @@ export default function TimerPanel() {
           )}
           {!currentTask && (
             <div className="timer-task-label" style={{ opacity: 0.4 }}>
-              No active task
+              {queueBlockedByWait ? "Queue paused by wait" : "No active task"}
             </div>
           )}
         </div>
@@ -106,11 +209,7 @@ export default function TimerPanel() {
         </button>
       </div>
 
-      {showNoMusicHint && (
-        <p className="timer-music-hint" role="status">
-          {noMusicHintText}
-        </p>
-      )}
+      {noMusicModal}
 
       {alarmActive && (
         <button className="timer-btn timer-btn--dismiss" onClick={stopAlarm}>

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useLocalStorage } from "../hooks/useLocalStorage"
 import {
   getAutoTimezone,
@@ -14,7 +14,45 @@ export default function SettingsView({ settings, setSettings, music }) {
     "fst_builder_visual_style",
     "calm",
   )
+  const [uiTheme, setUiTheme] = useLocalStorage("fst_ui_theme", "original")
+  const [uiLayout, setUiLayout] = useLocalStorage("fst_ui_layout", "split")
   const uploadInputRef = useRef(null)
+  const UI_THEMES = [
+    { v: "original", icon: "◈", label: "Original" },
+    { v: "copper-dusk", icon: "◌", label: "Copper Dusk" },
+    { v: "neon", icon: "✹", label: "Neon Glow" },
+    { v: "sunburst", icon: "☀", label: "Sunburst" },
+    { v: "mint-pop", icon: "◍", label: "Mint Pop" },
+    { v: "high-contrast", icon: "▣", label: "High Contrast" },
+    { v: "pastel-play", icon: "◐", label: "Pastel Play" },
+  ]
+
+  function applyUiTheme(themeName) {
+    const safeTheme =
+      themeName === "copper-dusk" ||
+      themeName === "neon" ||
+      themeName === "sunburst" ||
+      themeName === "mint-pop" ||
+      themeName === "high-contrast" ||
+      themeName === "pastel-play"
+        ? themeName
+        : "original"
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-ui-theme", safeTheme)
+    }
+  }
+
+  function randomizeTheme() {
+    const options = UI_THEMES.map((t) => t.v)
+    if (!options.length) return
+    const random = options[Math.floor(Math.random() * options.length)]
+    setUiTheme(random)
+    applyUiTheme(random)
+  }
+
+  useEffect(() => {
+    applyUiTheme(uiTheme)
+  }, [uiTheme])
 
   function promptUploadNow() {
     uploadInputRef.current?.click()
@@ -177,6 +215,59 @@ export default function SettingsView({ settings, setSettings, music }) {
             onChange={(e) => update("matchMainPageStyle", e.target.checked)}
           />
         </label>
+
+        <div className="settings-row settings-row--block">
+          <span className="settings-row__label">UI color scheme</span>
+          <p className="settings-help-text">
+            Switch the full app palette. Original keeps the current look.
+          </p>
+          <div className="gcb-style-toggle settings-style-toggle">
+            {UI_THEMES.map(({ v, icon, label }) => (
+              <button
+                key={v}
+                type="button"
+                className={`gcb-style-btn settings-style-btn${uiTheme === v ? " gcb-style-btn--active" : ""}`}
+                aria-pressed={uiTheme === v}
+                onClick={() => {
+                  setUiTheme(v)
+                  applyUiTheme(v)
+                }}
+              >
+                {icon} {label}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="gcb-style-btn settings-style-btn"
+              onClick={randomizeTheme}
+            >
+              ✦ Random
+            </button>
+          </div>
+        </div>
+
+        <div className="settings-row settings-row--block">
+          <span className="settings-row__label">UI layout mode</span>
+          <p className="settings-help-text">
+            Split keeps the locked sidebar. Unlocked gives a free-flow canvas layout.
+          </p>
+          <div className="gcb-style-toggle settings-style-toggle">
+            {[
+              { v: "split", icon: "▥", label: "Split (Original)" },
+              { v: "unlocked", icon: "◫", label: "Unlocked Canvas" },
+            ].map(({ v, icon, label }) => (
+              <button
+                key={v}
+                type="button"
+                className={`gcb-style-btn settings-style-btn${uiLayout === v ? " gcb-style-btn--active" : ""}`}
+                aria-pressed={uiLayout === v}
+                onClick={() => setUiLayout(v)}
+              >
+                {icon} {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="settings-row settings-row--block">
           <span className="settings-row__label">Builder card style</span>

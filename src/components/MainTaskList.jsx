@@ -52,14 +52,20 @@ export default function MainTaskList({
   onToggleSectionCollapsed,
 }) {
   const {
+    deferredMainTasks,
     deletedMainTasks,
     mainTasks,
     activeMainTaskId,
+    bulkSetMainTaskWaitCompatible,
     reorderMainTask,
+    restoreDeferredMainTask,
+    clearDeferredMainTasks,
     undoDeleteMainTask,
     clearDeletedMainTasks,
   } = useMainTask()
   const [filter, setFilter] = useState("active")
+  const [showOnlyWaitCompatible, setShowOnlyWaitCompatible] = useState(false)
+  const [showDeferred, setShowDeferred] = useState(false)
   const [showDeleted, setShowDeleted] = useState(false)
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -79,7 +85,7 @@ export default function MainTaskList({
     if (filter === "active") return t.status === "active"
     if (filter === "completed") return t.status === "completed"
     return true
-  })
+  }).filter((t) => (showOnlyWaitCompatible ? Boolean(t.waitCompatible) : true))
 
   const orderedFiltered = [...filtered].sort((a, b) => {
     if (a.id === activeMainTaskId) return -1
@@ -91,6 +97,12 @@ export default function MainTaskList({
   const completedCount = mainTasks.filter(
     (t) => t.status === "completed",
   ).length
+  const waitCompatibleCount = mainTasks.filter(
+    (t) => t.status === "active" && Boolean(t.waitCompatible),
+  ).length
+  const visibleActiveTaskIds = filtered
+    .filter((task) => task.status === "active")
+    .map((task) => task.id)
 
   function handleDragEnd(event) {
     const { active, over } = event
@@ -137,6 +149,38 @@ export default function MainTaskList({
               >
                 All ({mainTasks.length})
               </button>
+              <button
+                type="button"
+                className={`mtask-filter-btn ${showOnlyWaitCompatible ? "mtask-filter-btn--on" : ""}`}
+                onClick={() => setShowOnlyWaitCompatible((prev) => !prev)}
+                title="Show only tasks marked as compatible while waiting"
+              >
+                Compatible ({waitCompatibleCount})
+              </button>
+              {visibleActiveTaskIds.length > 0 && (
+                <button
+                  type="button"
+                  className="mtask-filter-btn"
+                  onClick={() =>
+                    bulkSetMainTaskWaitCompatible(visibleActiveTaskIds, true)
+                  }
+                  title="Mark shown active tasks as compatible while waiting"
+                >
+                  Mark shown
+                </button>
+              )}
+              {visibleActiveTaskIds.length > 0 && (
+                <button
+                  type="button"
+                  className="mtask-filter-btn"
+                  onClick={() =>
+                    bulkSetMainTaskWaitCompatible(visibleActiveTaskIds, false)
+                  }
+                  title="Unmark shown active tasks from compatible while waiting"
+                >
+                  Clear shown
+                </button>
+              )}
             </div>
           )}
           {sectionControls && <SectionMoveControls {...sectionControls} />}
@@ -172,6 +216,49 @@ export default function MainTaskList({
                 ))}
               </SortableContext>
             </DndContext>
+          </div>
+
+          <div className="mtask-deleted-section">
+            <div className="mtask-deleted-section__header">
+              <button
+                type="button"
+                className="mtask-filter-btn"
+                onClick={() => setShowDeferred((open) => !open)}
+              >
+                {showDeferred ? "▲" : "▼"} Not now ({deferredMainTasks.length})
+              </button>
+              {deferredMainTasks.length > 0 && (
+                <button
+                  type="button"
+                  className="mtask-action-btn mtask-action-btn--danger"
+                  onClick={clearDeferredMainTasks}
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+            {showDeferred && (
+              <div className="mtask-deleted-list">
+                {deferredMainTasks.length === 0 && (
+                  <p className="mtask-empty-state">No tasks in Not now.</p>
+                )}
+                {[...deferredMainTasks].reverse().map((task) => (
+                  <div key={task.id} className="mtask-deleted-item">
+                    <span className="mtask-not-now-item__title">{task.title}</span>
+                    <span className="mtask-deleted-item__meta">
+                      {fmtLocalDateTime(task.deferredAt)}
+                    </span>
+                    <button
+                      type="button"
+                      className="mtask-action-btn"
+                      onClick={() => restoreDeferredMainTask(task.id)}
+                    >
+                      Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mtask-deleted-section">

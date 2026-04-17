@@ -14,6 +14,7 @@ import SettingsView from "./SettingsView"
 import BottomNav from "./BottomNav"
 import SidebarTaskSteps from "./SidebarTaskSteps"
 import BreakOverlay from "./BreakOverlay"
+import IdleTriagePanel from "./IdleTriagePanel"
 import { TimerProvider } from "../context/TimerContext"
 import { useMainTask } from "../context/MainTaskContext"
 import "../timer.css"
@@ -152,6 +153,8 @@ export default function TimerApp({ sidebarMode = false }) {
     activeMainTaskId,
     setActiveMainTaskId,
     addMainTaskAndActivate,
+    setMainTaskWaitCompatible,
+    bulkSetMainTaskWaitCompatible,
     removeStepFromTask,
     setStepCompleted,
     incrementTries,
@@ -199,10 +202,17 @@ export default function TimerApp({ sidebarMode = false }) {
   const [idleInputText, setIdleInputText] = useState("")
   // null = timer running (idle inactive); number = countdown value (≥ 0)
   const [idleCountdown, setIdleCountdown] = useState(null)
+  const [afterWaitMainTaskIds, setAfterWaitMainTaskIds] = useLocalStorage(
+    "fst_after_wait_main_ids",
+    [],
+    (raw) =>
+      (Array.isArray(raw) ? raw : []).filter((id) => typeof id === "string"),
+  )
   const [uploadedTracks, setUploadedTracks] = useState([])
   const [musicUiMessage, setMusicUiMessage] = useState("")
   const [audioBlockedMessage, setAudioBlockedMessage] = useState("")
   const [previewTrackId, setPreviewTrackId] = useState("")
+  const [musicPromptRequestId, setMusicPromptRequestId] = useState(0)
   const [waitingTask, setWaitingTask] = useLocalStorage("fst_waiting", null)
   const [waitExpiring, setWaitExpiring] = useState(false)
   const waitExpiryTriggeredRef = useRef(false)
@@ -238,6 +248,8 @@ export default function TimerApp({ sidebarMode = false }) {
 
   // First task is always the "current" active task tied to the timer
   const currentTask = activeTasks[0] ?? null
+  const queueBlockedByWait = Boolean(waitingTask?.waitBlocksQueue)
+  const currentTaskForUi = queueBlockedByWait ? null : currentTask
   const activeMainTask =
     mainTasks.find((t) => t.id === activeMainTaskId) || null
   const settingsRef = useRef(settings)
@@ -344,6 +356,15 @@ export default function TimerApp({ sidebarMode = false }) {
     reorderMainTask(activeMainTaskId, mainTasks[0].id)
   }, [activeMainTaskId, mainTasks, reorderMainTask])
 
+  useEffect(() => {
+    const activeIds = new Set(
+      mainTasks
+        .filter((task) => task.status === "active")
+        .map((task) => task.id),
+    )
+    setAfterWaitMainTaskIds((prev) => prev.filter((id) => activeIds.has(id)))
+  }, [mainTasks, setAfterWaitMainTaskIds])
+
   // When a main task or one of its source steps is deleted, remove all mirrored
   // timer entries so the left queue and report views cannot drift out of sync.
   useEffect(() => {
@@ -378,6 +399,7 @@ export default function TimerApp({ sidebarMode = false }) {
             .filter(
               ({ step }) =>
                 !step.completed &&
+                step.id !== waitingTask?.sourceStepId &&
                 !recentlyCompletedStepIdsRef.current.has(step.id),
             )
             .map(({ step, depth }) => {
@@ -433,7 +455,7 @@ export default function TimerApp({ sidebarMode = false }) {
       return [...synced, ...unrelated]
     })
     // Note: do NOT setCurrentView here — user may be on settings or another view
-  }, [mainTasks, settings.defaultTaskDuration, setActiveTasks])
+  }, [mainTasks, settings.defaultTaskDuration, setActiveTasks, waitingTask])
 
   // Autostart hook for builder play: if a newly created main task is marked
   // in localStorage, start the timer as soon as its first synced timer task
@@ -446,12 +468,19 @@ export default function TimerApp({ sidebarMode = false }) {
       const head = activeTasks[0]
       if (!head || head.sourceMainTaskId !== activeMainTaskId) return
       if (head.remainingSeconds <= 0) return
-      if (!timerRunning) setTimerRunning(true)
+      if (!timerRunning) startTimerWithMusicGuard()
       window.localStorage.removeItem("fst_autostart_main_task")
     } catch {
       // no-op
     }
-  }, [activeMainTaskId, activeTasks, timerRunning, onBreak, setTimerRunning])
+  }, [
+    activeMainTaskId,
+    activeTasks,
+    timerRunning,
+    onBreak,
+    setTimerRunning,
+    uploadedTracks.length,
+  ])
 
   // ── Consume fst_focus_request from MainTaskList/MainTaskCard ───────────
   // MainTaskCard lives outside TimerProvider and cannot call playTask directly.
@@ -743,92 +772,131 @@ export default function TimerApp({ sidebarMode = false }) {
     alarmIntervalRef.current = null
   }, [timerRunning])
 
+  // Queue-blocking wait mode pauses the active timer until wait is resolved.
+  useEffect(() => {
+    if (!queueBlockedByWait) return
+    if (!timerRunning) return
+    setTimerRunning(false)
+  }, [queueBlockedByWait, timerRunning, setTimerRunning])
+
   // ── Waiting task expiry check ─────────────────────────────────────────────
   useEffect(() => {
     if (!waitingTask) {
       waitExpiryTriggeredRef.current = false
       return
     }
+
+    const finishWaitingTask = () => {
+      if (waitExpiryTriggeredRef.current) return
+      waitExpiryTriggeredRef.current = true
+      setWaitExpiring(true)
+      waitExpiryTimerRef.current = setTimeout(() => {
+        const {
+          waitUntil,
+          waitDurationSeconds,
+          waitStartedAt,
+          waitMode,
+          waitDependencyTaskId,
+          waitBlocksQueue,
+          waitSourceIndex,
+          autoFollowUpTaskId,
+          followUpTaskId,
+          ...finishedTask
+        } = waitingTask
+
+        // Waiting means this step finished waiting; mark it completed.
+        if (finishedTask.sourceMainTaskId && finishedTask.sourceStepId) {
+          recentlyCompletedStepIdsRef.current.add(finishedTask.sourceStepId)
+          setStepCompleted(
+            finishedTask.sourceMainTaskId,
+            finishedTask.sourceStepId,
+            true,
+          )
+          window.setTimeout(() => {
+            recentlyCompletedStepIdsRef.current.delete(finishedTask.sourceStepId)
+          }, 400)
+        }
+
+        setCompletedTasks((ct) => [
+          ...ct,
+          {
+            ...finishedTask,
+            completedAt: new Date().toISOString(),
+            completedByWait: true,
+          },
+        ])
+
+        // Queue the selected follow-up task as next (index 1) without stealing focus.
+        const preferredFollowUpId = followUpTaskId || autoFollowUpTaskId || ""
+        setActiveTasks((prev) => {
+          if (!prev.length) return prev
+
+          let candidateId = preferredFollowUpId
+
+          if (
+            !candidateId &&
+            finishedTask.sourceMainTaskId &&
+            prev.some((t) => t.sourceMainTaskId === finishedTask.sourceMainTaskId)
+          ) {
+            candidateId =
+              prev.find(
+                (t) =>
+                  t.sourceMainTaskId === finishedTask.sourceMainTaskId &&
+                  t.id !== prev[0]?.id,
+              )?.id || ""
+          }
+
+          const from = prev.findIndex((t) => t.id === candidateId)
+          if (from < 0) return prev
+
+          const copy = [...prev]
+          const [picked] = copy.splice(from, 1)
+          if (!copy.length) return [picked]
+          return [copy[0], picked, ...copy.slice(1)]
+        })
+
+        setWaitingTask(null)
+        setWaitExpiring(false)
+        playPowerUpSound(musicVolume)
+      }, 1500)
+    }
+
+    const waitMode = waitingTask.waitMode || "time"
+    const waitDependencyTaskId = waitingTask.waitDependencyTaskId || ""
+
+    if (waitMode === "task") {
+      if (!waitDependencyTaskId) return
+      const dependencyDone = completedTasks.some(
+        (task) => task.id === waitDependencyTaskId,
+      )
+      if (dependencyDone) {
+        finishWaitingTask()
+      }
+      return () => {
+        clearTimeout(waitExpiryTimerRef.current)
+      }
+    }
+
     const waitUntilMs = new Date(waitingTask.waitUntil).getTime()
     if (!Number.isFinite(waitUntilMs)) return
     const id = setInterval(() => {
       if (waitExpiryTriggeredRef.current) return
       if (Date.now() >= waitUntilMs) {
-        waitExpiryTriggeredRef.current = true
-        setWaitExpiring(true)
-        waitExpiryTimerRef.current = setTimeout(() => {
-          const {
-            waitUntil,
-            waitDurationSeconds,
-            waitStartedAt,
-            waitSourceIndex,
-            autoFollowUpTaskId,
-            followUpTaskId,
-            ...finishedTask
-          } = waitingTask
-
-          // Waiting means this step finished waiting; mark it completed.
-          if (finishedTask.sourceMainTaskId && finishedTask.sourceStepId) {
-            recentlyCompletedStepIdsRef.current.add(finishedTask.sourceStepId)
-            setStepCompleted(
-              finishedTask.sourceMainTaskId,
-              finishedTask.sourceStepId,
-              true,
-            )
-            window.setTimeout(() => {
-              recentlyCompletedStepIdsRef.current.delete(finishedTask.sourceStepId)
-            }, 400)
-          }
-
-          setCompletedTasks((ct) => [
-            ...ct,
-            {
-              ...finishedTask,
-              completedAt: new Date().toISOString(),
-              completedByWait: true,
-            },
-          ])
-
-          // Queue the selected follow-up task as next (index 1) without stealing focus.
-          const preferredFollowUpId = followUpTaskId || autoFollowUpTaskId || ""
-          setActiveTasks((prev) => {
-            if (!prev.length) return prev
-
-            let candidateId = preferredFollowUpId
-
-            if (
-              !candidateId &&
-              finishedTask.sourceMainTaskId &&
-              prev.some((t) => t.sourceMainTaskId === finishedTask.sourceMainTaskId)
-            ) {
-              candidateId =
-                prev.find(
-                  (t) =>
-                    t.sourceMainTaskId === finishedTask.sourceMainTaskId &&
-                    t.id !== prev[0]?.id,
-                )?.id || ""
-            }
-
-            const from = prev.findIndex((t) => t.id === candidateId)
-            if (from < 0) return prev
-
-            const copy = [...prev]
-            const [picked] = copy.splice(from, 1)
-            if (!copy.length) return [picked]
-            return [copy[0], picked, ...copy.slice(1)]
-          })
-
-          setWaitingTask(null)
-          setWaitExpiring(false)
-          playPowerUpSound(musicVolume)
-        }, 1500)
+        finishWaitingTask()
       }
     }, 500)
     return () => {
       clearInterval(id)
       clearTimeout(waitExpiryTimerRef.current)
     }
-  }, [waitingTask, musicVolume, setStepCompleted, setCompletedTasks, setActiveTasks])
+  }, [
+    waitingTask,
+    completedTasks,
+    musicVolume,
+    setStepCompleted,
+    setCompletedTasks,
+    setActiveTasks,
+  ])
 
   // ── Music persistence and playback ───────────────────────────────────────
   useEffect(() => {
@@ -1042,6 +1110,65 @@ export default function TimerApp({ sidebarMode = false }) {
     setMusicUiMessage("Track removed.")
   }
 
+  function uploadMusicFromModal() {
+    return new Promise((resolve) => {
+      if (typeof document === "undefined") {
+        resolve(false)
+        return
+      }
+
+      const picker = document.createElement("input")
+      picker.type = "file"
+      picker.accept = "audio/*,.mp3,.wav,.ogg,.m4a"
+      picker.multiple = true
+
+      picker.onchange = async () => {
+        const files = picker.files
+        if (!files || files.length === 0) {
+          resolve(false)
+          return
+        }
+
+        try {
+          await handleMusicUpload(files)
+          resolve(true)
+        } catch {
+          resolve(false)
+        }
+      }
+
+      picker.click()
+    })
+  }
+
+  function shouldPromptForMissingMusicUpload() {
+    if (uploadedTracks.length > 0) return false
+    try {
+      const raw = window.localStorage.getItem(
+        "fst_skip_no_music_upload_prompt_forever",
+      )
+      if (raw == null) return true
+      return !Boolean(JSON.parse(raw))
+    } catch {
+      return true
+    }
+  }
+
+  function requestMusicPrompt() {
+    setCurrentView("timer")
+    setMusicPromptRequestId((prev) => prev + 1)
+  }
+
+  function startTimerWithMusicGuard() {
+    if (queueBlockedByWait) return false
+    if (shouldPromptForMissingMusicUpload()) {
+      requestMusicPrompt()
+      return false
+    }
+    setTimerRunning(true)
+    return true
+  }
+
   function toggleMusicPlaybackFromUI() {
     const audio = taskMusicRef.current
     if (!audio) return
@@ -1051,7 +1178,7 @@ export default function TimerApp({ sidebarMode = false }) {
         .play()
         .then(() => {
           setAudioBlockedMessage("")
-          if (!timerRunning && currentTask) setTimerRunning(true)
+          if (!timerRunning && currentTask) startTimerWithMusicGuard()
         })
         .catch(() => {
           setAudioBlockedMessage(
@@ -1114,6 +1241,15 @@ export default function TimerApp({ sidebarMode = false }) {
   function toggleTimerWithClick() {
     if (!currentTask) return
 
+    if (queueBlockedByWait) return
+
+    if (timerRunning) {
+      setTimerRunning(false)
+      return
+    }
+
+    if (!startTimerWithMusicGuard()) return
+
     // If user resumes from the alarm state, count it as a retry attempt.
     if (alarmActive && currentTask.sourceMainTaskId) {
       incrementTries(currentTask.sourceMainTaskId)
@@ -1124,8 +1260,6 @@ export default function TimerApp({ sidebarMode = false }) {
         )
       }
     }
-
-    setTimerRunning((running) => !running)
   }
 
   // ── Task actions ─────────────────────────────────────────────────────────
@@ -1152,7 +1286,7 @@ export default function TimerApp({ sidebarMode = false }) {
     setActiveTasks((prev) => {
       const remaining = prev.filter((t) => t.id !== id)
       if (settingsRef.current.autoStartNextTask && remaining.length > 0)
-        setTimerRunning(true)
+        startTimerWithMusicGuard()
       return remaining
     })
   }
@@ -1280,11 +1414,49 @@ export default function TimerApp({ sidebarMode = false }) {
       waitUntil: until,
       waitDurationSeconds: durationSecs,
       waitStartedAt: now.toISOString(),
+      waitMode: "time",
+      waitDependencyTaskId: "",
+      waitBlocksQueue: true,
       waitSourceIndex: sourceIndex,
       autoFollowUpTaskId,
       followUpTaskId: followUpTaskId || "",
     })
+    setTimerRunning(false)
     setActiveTasks((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  function setWaitMode(mode) {
+    const nextMode = mode === "task" ? "task" : "time"
+    setWaitingTask((prev) =>
+      prev
+        ? {
+            ...prev,
+            waitMode: nextMode,
+          }
+        : prev,
+    )
+  }
+
+  function setWaitDependencyTask(taskId) {
+    setWaitingTask((prev) =>
+      prev
+        ? {
+            ...prev,
+            waitDependencyTaskId: taskId || "",
+          }
+        : prev,
+    )
+  }
+
+  function setWaitBlocksQueue(blocked) {
+    setWaitingTask((prev) =>
+      prev
+        ? {
+            ...prev,
+            waitBlocksQueue: Boolean(blocked),
+          }
+        : prev,
+    )
   }
 
   function setWaitFollowUpTask(nextTaskId) {
@@ -1304,6 +1476,9 @@ export default function TimerApp({ sidebarMode = false }) {
       waitUntil,
       waitDurationSeconds,
       waitStartedAt,
+      waitMode,
+      waitDependencyTaskId,
+      waitBlocksQueue,
       waitSourceIndex,
       autoFollowUpTaskId,
       followUpTaskId,
@@ -1327,6 +1502,94 @@ export default function TimerApp({ sidebarMode = false }) {
     const task = activeTasks.find((t) => t.sourceStepId === stepId)
     if (!task) return
     waitTask(task.id, minutes)
+  }
+
+  function getMainTaskById(taskId) {
+    return mainTasks.find((task) => task.id === taskId) || null
+  }
+
+  function estimateTaskMinutes(mainTask) {
+    const steps = Array.isArray(mainTask?.steps) ? mainTask.steps : []
+    const incomplete = steps.filter((step) => !step.completed)
+    if (!incomplete.length) return settings.defaultTaskDuration
+    const mins = incomplete
+      .map((step) => clampMinutes(parseStepRaw(step.raw).minutes, 0))
+      .filter((value) => value > 0)
+    if (!mins.length) return settings.defaultTaskDuration
+    return Math.min(...mins)
+  }
+
+  function queueCompatibleMainTask(mainTaskId) {
+    const mainTask = getMainTaskById(mainTaskId)
+    if (!mainTask || mainTask.status !== "active") return false
+
+    setMainTaskWaitCompatible(mainTaskId, true)
+
+    const existingLinked = activeTasks.find(
+      (task) => task.sourceMainTaskId === mainTaskId,
+    )
+
+    if (existingLinked) {
+      setWaitFollowUpTask(existingLinked.id)
+      setActiveTasks((prev) => {
+        const from = prev.findIndex((task) => task.id === existingLinked.id)
+        if (from < 0) return prev
+        const to = prev.length > 1 ? 1 : 0
+        if (from === to) return prev
+        const copy = [...prev]
+        const [picked] = copy.splice(from, 1)
+        copy.splice(to, 0, picked)
+        return copy
+      })
+      return true
+    }
+
+    const actionable = flattenActionableSteps(mainTask.steps).find(
+      ({ step }) =>
+        !step.completed &&
+        step.id !== waitingTask?.sourceStepId &&
+        !activeTasks.some(
+          (task) =>
+            task.sourceMainTaskId === mainTask.id && task.sourceStepId === step.id,
+        ),
+    )
+
+    if (!actionable) return false
+
+    const parsed = parseStepRaw(actionable.step.raw)
+    const safeMinutes = clampMinutes(
+      parsed.minutes,
+      settings.defaultTaskDuration,
+    )
+
+    const queuedTask = createTask({
+      title: parsed.text || actionable.step.raw || "Step",
+      estimatedMinutes: safeMinutes,
+      sourceMainTaskId: mainTask.id,
+      sourceStepId: actionable.step.id,
+      sourceMainTaskTitle: mainTask.title,
+      color: mainTask.color,
+      emoji: "✅",
+      stepDepth: actionable.depth,
+    })
+
+    setWaitFollowUpTask(queuedTask.id)
+    setActiveTasks((prev) => {
+      if (
+        prev.some(
+          (task) =>
+            task.sourceMainTaskId === mainTask.id &&
+            task.sourceStepId === actionable.step.id,
+        )
+      ) {
+        return prev
+      }
+      const copy = [...prev]
+      const insertAt = copy.length > 0 ? 1 : 0
+      copy.splice(insertAt, 0, queuedTask)
+      return copy
+    })
+    return true
   }
 
   function addTask(taskData) {
@@ -1383,6 +1646,54 @@ export default function TimerApp({ sidebarMode = false }) {
       window.localStorage.setItem("fst_autostart_main_task", created.id)
     }
     setIdleInputText("")
+  }
+
+  function addTaskToAfterWaitLane(taskId) {
+    const source = mainTasks.find((task) => task.id === taskId)
+    if (!source || source.status !== "active") return
+    setMainTaskWaitCompatible(taskId, true)
+    setAfterWaitMainTaskIds((prev) =>
+      prev.includes(taskId) ? prev : [...prev, taskId],
+    )
+  }
+
+  function removeTaskFromAfterWaitLane(taskId) {
+    setAfterWaitMainTaskIds((prev) => prev.filter((id) => id !== taskId))
+  }
+
+  function reorderAfterWaitLane(dragId, targetId) {
+    if (!dragId || !targetId || dragId === targetId) return
+    setAfterWaitMainTaskIds((prev) => {
+      const from = prev.findIndex((id) => id === dragId)
+      const to = prev.findIndex((id) => id === targetId)
+      if (from < 0 || to < 0 || from === to) return prev
+      const copy = [...prev]
+      const [item] = copy.splice(from, 1)
+      copy.splice(to, 0, item)
+      return copy
+    })
+  }
+
+  const idleActiveMainTasks = mainTasks.filter((task) => task.status === "active")
+  const afterWaitMainTaskIdSet = new Set(afterWaitMainTaskIds)
+  const afterWaitMainTasks = afterWaitMainTaskIds
+    .map((id) => mainTasks.find((task) => task.id === id && task.status === "active"))
+    .filter(Boolean)
+
+  function toggleIdleMainTaskCompatibility(taskId) {
+    const task = mainTasks.find((entry) => entry.id === taskId)
+    if (!task) return
+    setMainTaskWaitCompatible(taskId, !Boolean(task.waitCompatible))
+  }
+
+  function markAllIdleMainTasksCompatible() {
+    const ids = idleActiveMainTasks.map((task) => task.id)
+    bulkSetMainTaskWaitCompatible(ids, true)
+  }
+
+  function clearAllIdleMainTaskCompatible() {
+    const ids = idleActiveMainTasks.map((task) => task.id)
+    bulkSetMainTaskWaitCompatible(ids, false)
   }
 
   function adjustTime(seconds) {
@@ -1530,6 +1841,7 @@ export default function TimerApp({ sidebarMode = false }) {
   }
 
   function playTask(id) {
+    if (queueBlockedByWait) return
     const task = activeTasks.find((t) => t.id === id)
     setActiveTasks((prev) => {
       const idx = prev.findIndex((t) => t.id === id)
@@ -1546,7 +1858,7 @@ export default function TimerApp({ sidebarMode = false }) {
       }
     }
     setCurrentView("timer")
-    setTimerRunning(true)
+    startTimerWithMusicGuard()
     if (settingsRef.current.autoScrollOnAlarm !== false && task) {
       focusAlarmTarget(task)
     }
@@ -1685,9 +1997,74 @@ export default function TimerApp({ sidebarMode = false }) {
     0,
   )
 
+  const waitingSourceMainTaskId = waitingTask?.sourceMainTaskId || ""
+  const waitCompatibleQueuedTasks = activeTasks
+    .filter((task) => task.id !== waitingTask?.id)
+    .filter((task) => task.sourceMainTaskId)
+    .filter((task) => task.sourceMainTaskId !== waitingSourceMainTaskId)
+    .filter((task) => {
+      const source = getMainTaskById(task.sourceMainTaskId)
+      if (!source || source.status !== "active") return false
+      if (afterWaitMainTaskIdSet.has(source.id)) return true
+      if (source.waitCompatible) return true
+      return clampMinutes(task.estimatedMinutes, settings.defaultTaskDuration) <= 10
+    })
+    .sort((a, b) => {
+      const aSource = getMainTaskById(a.sourceMainTaskId)
+      const bSource = getMainTaskById(b.sourceMainTaskId)
+      const aPriority = afterWaitMainTaskIds.indexOf(aSource?.id || "")
+      const bPriority = afterWaitMainTaskIds.indexOf(bSource?.id || "")
+      const aRank = aPriority < 0 ? Number.MAX_SAFE_INTEGER : aPriority
+      const bRank = bPriority < 0 ? Number.MAX_SAFE_INTEGER : bPriority
+      if (aRank !== bRank) return aRank - bRank
+      const aManual = aSource?.waitCompatible ? 1 : 0
+      const bManual = bSource?.waitCompatible ? 1 : 0
+      if (aManual !== bManual) return bManual - aManual
+      return a.remainingSeconds - b.remainingSeconds
+    })
+
+  const manualCompatibleSuggestions = mainTasks
+    .filter((task) => task.status === "active")
+    .filter((task) => task.id !== waitingSourceMainTaskId)
+    .filter((task) => task.waitCompatible || afterWaitMainTaskIdSet.has(task.id))
+    .filter((task) => (task.steps || []).some((step) => !step.completed))
+
+  const manualIds = new Set(manualCompatibleSuggestions.map((task) => task.id))
+
+  const heuristicCompatibleSuggestions = mainTasks
+    .filter((task) => task.status === "active")
+    .filter((task) => task.id !== waitingSourceMainTaskId)
+    .filter((task) => !manualIds.has(task.id))
+    .filter((task) => (task.steps || []).some((step) => !step.completed))
+    .sort((a, b) => estimateTaskMinutes(a) - estimateTaskMinutes(b))
+    .slice(0, 5)
+
+  const waitCompatibleSuggestions = [
+    ...manualCompatibleSuggestions.map((task) => ({
+      ...task,
+      suggestionReason: "Marked compatible",
+    })),
+    ...heuristicCompatibleSuggestions.map((task) => ({
+      ...task,
+      suggestionReason: "Quick win suggestion",
+    })),
+  ]
+    .sort((a, b) => {
+      const aPriority = afterWaitMainTaskIds.indexOf(a.id)
+      const bPriority = afterWaitMainTaskIds.indexOf(b.id)
+      const aRank = aPriority < 0 ? Number.MAX_SAFE_INTEGER : aPriority
+      const bRank = bPriority < 0 ? Number.MAX_SAFE_INTEGER : bPriority
+      if (aRank !== bRank) return aRank - bRank
+      return 0
+    })
+    .slice(0, 6)
+
   const timerContextValue = {
     activeTasks,
-    currentTask,
+    currentTask: currentTaskForUi,
+    queueBlockedByWait,
+    setCurrentView,
+    musicPromptRequestId,
     timerRunning,
     setTimerRunning,
     toggleTimerWithClick,
@@ -1701,12 +2078,20 @@ export default function TimerApp({ sidebarMode = false }) {
     pomoWorkDuration,
     hasSelectedTrack: Boolean(selectedTrackId),
     hasUploadedTracks: uploadedTracks.length > 0,
+    uploadMusicFromModal,
     waitingTask,
     waitExpiring,
     waitTask,
+    setWaitMode,
+    setWaitDependencyTask,
+    setWaitBlocksQueue,
     setWaitFollowUpTask,
     cancelWait,
     waitTaskBySourceStepId,
+    waitCompatibleQueuedTasks,
+    waitCompatibleSuggestions,
+    queueCompatibleMainTask,
+    setMainTaskWaitCompatible,
     defaultTaskDuration: settings.defaultTaskDuration,
   }
 
@@ -1824,6 +2209,21 @@ export default function TimerApp({ sidebarMode = false }) {
                     </button>
                   </div>
                 </div>
+              )}
+              {!timerRunning && !onBreak && idleCountdown === 0 && (
+                <IdleTriagePanel
+                  queueTasks={activeTasks}
+                  mainTasks={idleActiveMainTasks}
+                  afterWaitTasks={afterWaitMainTasks}
+                  onReorderQueue={reorderTask}
+                  onReorderMain={reorderMainTask}
+                  onReorderAfterWait={reorderAfterWaitLane}
+                  onToggleWaitCompatible={toggleIdleMainTaskCompatibility}
+                  onMarkAllCompatible={markAllIdleMainTasksCompatible}
+                  onClearAllCompatible={clearAllIdleMainTaskCompatible}
+                  onAddToAfterWait={addTaskToAfterWaitLane}
+                  onRemoveFromAfterWait={removeTaskFromAfterWaitLane}
+                />
               )}
               <SidebarTaskSteps />
               <TaskList {...taskProps} />

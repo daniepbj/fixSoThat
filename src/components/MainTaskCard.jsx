@@ -85,8 +85,10 @@ function SortableStepRow({ nodeId, children }) {
 export default function MainTaskCard({ task }) {
   const {
     deleteMainTask,
+    deferMainTask,
     completeMainTask,
     restoreMainTask,
+    toggleMainTaskWaitCompatible,
     incrementTries,
     decrementTries,
     incrementStepTries,
@@ -883,6 +885,26 @@ export default function MainTaskCard({ task }) {
                 onClick={handleFocusTask}
               >
                 {focusedTaskFlash ? "▶ Focused" : "▶ Focus"}
+              </button>
+            )}
+            {!isCompleted && (
+              <button
+                type="button"
+                className={`mtask-action-btn mtask-action-btn--wait-compatible ${task.waitCompatible ? "mtask-action-btn--wait-compatible-on" : ""}`}
+                onClick={() => toggleMainTaskWaitCompatible(task.id)}
+              >
+                {task.waitCompatible
+                  ? "⏳ Compatible while waiting"
+                  : "⏳ Mark wait-compatible"}
+              </button>
+            )}
+            {!isCompleted && (
+              <button
+                type="button"
+                className="mtask-action-btn mtask-action-btn--defer"
+                onClick={() => deferMainTask(task.id)}
+              >
+                ⏸ Not now
               </button>
             )}
             {!isCompleted && (

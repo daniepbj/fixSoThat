@@ -139,6 +139,8 @@ function normalizeTask(task) {
     proof: task?.proof || "",
     priority: task?.priority || "",
     status: deriveTaskStatus({ ...task, steps: flatSteps }),
+    waitCompatible: Boolean(task?.waitCompatible),
+    waitCompatibleUpdatedAt: task?.waitCompatibleUpdatedAt || null,
     tries: Math.max(0, Number(task?.tries) || 0),
     retryReflections: Array.isArray(task?.retryReflections)
       ? task.retryReflections
@@ -171,6 +173,15 @@ export function MainTaskProvider({ children }) {
         deletedAt: t?.deletedAt || t?.updatedAt || new Date().toISOString(),
       })),
   )
+  const [deferredMainTasks, setDeferredMainTasks] = useLocalStorage(
+    "fst_deferred_main",
+    [],
+    (raw) =>
+      (Array.isArray(raw) ? raw : []).map((t) => ({
+        ...normalizeTask(t),
+        deferredAt: t?.deferredAt || t?.updatedAt || new Date().toISOString(),
+      })),
+  )
   const [saveSlots, setSaveSlots] = useLocalStorage("fst_save_slots", [
     null,
     null,
@@ -194,6 +205,13 @@ export function MainTaskProvider({ children }) {
           task?.deletedAt || task?.updatedAt || new Date().toISOString(),
       })),
     )
+    setDeferredMainTasks((prev) =>
+      prev.map((task) => ({
+        ...normalizeTask(task),
+        deferredAt:
+          task?.deferredAt || task?.updatedAt || new Date().toISOString(),
+      })),
+    )
     setSaveSlots((prev) =>
       prev.map((slot) =>
         slot
@@ -204,7 +222,7 @@ export function MainTaskProvider({ children }) {
           : slot,
       ),
     )
-  }, [setDeletedMainTasks, setMainTasks, setSaveSlots])
+  }, [setDeferredMainTasks, setDeletedMainTasks, setMainTasks, setSaveSlots])
 
   useEffect(() => {
     if (!activeMainTaskId) return
@@ -246,6 +264,57 @@ export function MainTaskProvider({ children }) {
     )
   }
 
+  function setMainTaskWaitCompatible(id, compatible) {
+    const nextCompatible = Boolean(compatible)
+    const now = new Date().toISOString()
+    setMainTasks((prev) =>
+      prev.map((t) =>
+        t.id === id
+          ? normalizeTask({
+              ...t,
+              waitCompatible: nextCompatible,
+              waitCompatibleUpdatedAt: now,
+              updatedAt: now,
+            })
+          : t,
+      ),
+    )
+  }
+
+  function toggleMainTaskWaitCompatible(id) {
+    setMainTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== id) return t
+        const now = new Date().toISOString()
+        return normalizeTask({
+          ...t,
+          waitCompatible: !Boolean(t.waitCompatible),
+          waitCompatibleUpdatedAt: now,
+          updatedAt: now,
+        })
+      }),
+    )
+  }
+
+  function bulkSetMainTaskWaitCompatible(ids, compatible) {
+    const idSet = new Set(Array.isArray(ids) ? ids.filter(Boolean) : [])
+    if (!idSet.size) return
+    const nextCompatible = Boolean(compatible)
+    const now = new Date().toISOString()
+    setMainTasks((prev) =>
+      prev.map((t) =>
+        idSet.has(t.id)
+          ? normalizeTask({
+              ...t,
+              waitCompatible: nextCompatible,
+              waitCompatibleUpdatedAt: now,
+              updatedAt: now,
+            })
+          : t,
+      ),
+    )
+  }
+
   function deleteMainTask(id) {
     const task = mainTasks.find((t) => t.id === id)
     if (!task) return
@@ -271,6 +340,40 @@ export function MainTaskProvider({ children }) {
 
   function clearDeletedMainTasks() {
     setDeletedMainTasks([])
+  }
+
+  function deferMainTask(id) {
+    const task = mainTasks.find((t) => t.id === id)
+    if (!task) return
+
+    setDeferredMainTasks((prev) => [
+      ...prev,
+      { ...task, deferredAt: new Date().toISOString() },
+    ])
+    setMainTasks((prev) => prev.filter((t) => t.id !== id))
+    if (activeMainTaskId === id) setActiveMainTaskId("")
+  }
+
+  function restoreDeferredMainTask(id) {
+    const task = deferredMainTasks.find((t) => t.id === id)
+    if (!task) return
+
+    setDeferredMainTasks((prev) => prev.filter((t) => t.id !== id))
+    setMainTasks((prev) => {
+      const { deferredAt, ...restored } = task
+      return [
+        ...prev,
+        normalizeTask({
+          ...restored,
+          status: "active",
+          updatedAt: new Date().toISOString(),
+        }),
+      ]
+    })
+  }
+
+  function clearDeferredMainTasks() {
+    setDeferredMainTasks([])
   }
 
   function completeMainTask(id) {
@@ -441,17 +544,39 @@ export function MainTaskProvider({ children }) {
   }
 
   function removeStepFromTask(taskId, stepId) {
-    setMainTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? normalizeTask({
-              ...t,
-              steps: removeStepById(t.steps, stepId).steps,
-              updatedAt: new Date().toISOString(),
-            })
-          : t,
-      ),
-    )
+    setMainTasks((prev) => {
+      const now = new Date().toISOString()
+      const next = []
+
+      for (const task of prev) {
+        if (task.id !== taskId) {
+          next.push(task)
+          continue
+        }
+
+        const updatedSteps = removeStepById(task.steps, stepId).steps
+        if (updatedSteps.length === 0) {
+          setDeletedMainTasks((deleted) => [
+            ...deleted,
+            { ...task, deletedAt: now, updatedAt: now },
+          ])
+          if (activeMainTaskId === taskId) {
+            setActiveMainTaskId("")
+          }
+          continue
+        }
+
+        next.push(
+          normalizeTask({
+            ...task,
+            steps: updatedSteps,
+            updatedAt: now,
+          }),
+        )
+      }
+
+      return next
+    })
   }
 
   function incrementStepTries(taskId, stepId) {
@@ -853,9 +978,14 @@ export function MainTaskProvider({ children }) {
     }, 520)
   }
 
+  const activeWaitCompatibleMainTasks = mainTasks.filter(
+    (task) => task.status === "active" && Boolean(task.waitCompatible),
+  )
+
   const value = {
     mainTasks,
     deletedMainTasks,
+    deferredMainTasks,
     saveSlots,
     fixaPresets,
     activeMainTaskId,
@@ -865,9 +995,15 @@ export function MainTaskProvider({ children }) {
     addMainTask,
     addMainTaskAndActivate,
     updateMainTask,
+    setMainTaskWaitCompatible,
+    toggleMainTaskWaitCompatible,
+    bulkSetMainTaskWaitCompatible,
     deleteMainTask,
+    deferMainTask,
     undoDeleteMainTask,
     clearDeletedMainTasks,
+    restoreDeferredMainTask,
+    clearDeferredMainTasks,
     completeMainTask,
     restoreMainTask,
     reorderMainTask,
@@ -897,6 +1033,7 @@ export function MainTaskProvider({ children }) {
     deleteFixaPreset,
     loadFixaPreset,
     triggerBigCelebration,
+    activeWaitCompatibleMainTasks,
   }
 
   return (
