@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from "react"
 import SectionMoveControls from "./SectionMoveControls"
 import { parseStepRaw, genStepId, formatStepRaw } from "../utils/stepUtils"
 import { useMainTask } from "../context/MainTaskContext"
+import { fmtTimerDisplay } from "../utils/timeUtils"
 
 function normalizeInput(value) {
   return value.trim()
 }
+
+const PART_KEYS = ["goal", "steps", "proof", "priority"]
 
 function buildPrototypeOutput({ goal, steps, proof, priority }) {
   const trimmedGoal = normalizeInput(goal)
@@ -50,6 +53,8 @@ export default function StructuredTaskPrototype({
   const [proofQueueStepId, setProofQueueStepId] = useState("")
   const [priorityQueueStepId, setPriorityQueueStepId] = useState("")
   const [liveTimerTask, setLiveTimerTask] = useState(null)
+  const [liveTimerQueue, setLiveTimerQueue] = useState([])
+  const [partOrder, setPartOrder] = useState(PART_KEYS)
   const [loadMessage, setLoadMessage] = useState("")
   const stepInputRefs = useRef({})
 
@@ -59,8 +64,10 @@ export default function StructuredTaskPrototype({
         const tasks = JSON.parse(
           window.localStorage.getItem("fst_active") || "[]",
         )
+        setLiveTimerQueue(tasks)
         setLiveTimerTask(tasks[0] ?? null)
       } catch {
+        setLiveTimerQueue([])
         setLiveTimerTask(null)
       }
     }
@@ -204,6 +211,78 @@ export default function StructuredTaskPrototype({
     window.setTimeout(() => setLoadMessage(""), 1700)
   }
 
+  function movePart(part, direction) {
+    setPartOrder((prev) => {
+      const idx = prev.indexOf(part)
+      if (idx < 0) return prev
+      const target = direction === "up" ? idx - 1 : idx + 1
+      if (target < 0 || target >= prev.length) return prev
+      const copy = [...prev]
+      ;[copy[idx], copy[target]] = [copy[target], copy[idx]]
+      return copy
+    })
+  }
+
+  function getPartQueueEntries(part) {
+    const scopedQueue = (liveTimerQueue || []).filter(
+      (item) => item?.sourceMainTaskId === queueTaskId,
+    )
+    if (part === "goal") {
+      return scopedQueue.filter((item) => item?.sourceStepId === goalQueueStepId)
+    }
+    if (part === "steps") {
+      const ids = new Set(queueStepIds || [])
+      return scopedQueue.filter((item) => ids.has(item?.sourceStepId))
+    }
+    if (part === "proof") {
+      return scopedQueue.filter((item) => item?.sourceStepId === proofQueueStepId)
+    }
+    if (part === "priority") {
+      return scopedQueue.filter(
+        (item) => item?.sourceStepId === priorityQueueStepId,
+      )
+    }
+    return []
+  }
+
+  function getPartLiveData(part) {
+    const entries = getPartQueueEntries(part)
+    if (!entries.length) return null
+
+    const active = liveTimerTask && entries.find((item) => item?.id === liveTimerTask.id)
+    const picked = active || entries[0]
+    const totalSeconds = Math.max(
+      1,
+      (Number(picked?.estimatedMinutes) || 1) * 60,
+    )
+    const remaining = Math.max(0, Number(picked?.remainingSeconds) || 0)
+    const ratio = Math.max(0, Math.min(1, remaining / totalSeconds))
+    return {
+      ratio,
+      remaining,
+      color: picked?.color || "#6c63ff",
+      isActive: Boolean(active),
+    }
+  }
+
+  function renderPartProgress(part) {
+    const live = getPartLiveData(part)
+    if (!live) return null
+    return (
+      <div className="prototype-part-progress" aria-hidden="true">
+        <div className="prototype-part-progress__bar">
+          <div
+            className={`prototype-part-progress__fill ${live.isActive ? "prototype-part-progress__fill--head" : ""}`}
+            style={{ width: `${live.ratio * 100}%`, background: live.color }}
+          />
+        </div>
+        <span className="prototype-part-progress__time">
+          {fmtTimerDisplay(live.remaining)} left
+        </span>
+      </div>
+    )
+  }
+
   function handleStartInTimer() {
     createQueueTask()
 
@@ -292,6 +371,39 @@ export default function StructuredTaskPrototype({
   const focusPriority = queueActive && activeSourceStepId === priorityQueueStepId
   const focusSteps = queueActive && queueStepIds.includes(activeSourceStepId)
 
+  function renderPartControls(part) {
+    const idx = partOrder.indexOf(part)
+    return (
+      <span className="task-builder-part-controls">
+        <button
+          type="button"
+          className="task-part-sort-btn"
+          title="Move part up"
+          onClick={() => movePart(part, "up")}
+          disabled={idx <= 0}
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          className="task-part-sort-btn"
+          title="Move part down"
+          onClick={() => movePart(part, "down")}
+          disabled={idx < 0 || idx >= partOrder.length - 1}
+        >
+          ↓
+        </button>
+        <button
+          type="button"
+          className={`task-part-done-btn ${isPartCompleted(part) ? "task-part-done-btn--active" : ""}`}
+          onClick={() => markPartDone(part)}
+        >
+          {isPartCompleted(part) ? "Done ✓" : "Done"}
+        </button>
+      </span>
+    )
+  }
+
   return (
     <section
       className={`task-builder-card${queueActive ? " task-builder-card--timer-active" : ""}`}
@@ -340,120 +452,126 @@ export default function StructuredTaskPrototype({
               handleDoneAndGenerate()
             }}
           >
-            <label
-              className="task-builder-label"
-              htmlFor="prototype-goal-input"
-            >
-              <span className="task-builder-label-row">
-                <span>Fixa sa att jag ...</span>
-                <button
-                  type="button"
-                  className={`task-part-done-btn ${isPartCompleted("goal") ? "task-part-done-btn--active" : ""}`}
-                  onClick={() => markPartDone("goal")}
-                >
-                  {isPartCompleted("goal") ? "Done ✓" : "Done"}
-                </button>
-              </span>
-            </label>
-            <textarea
-              id="prototype-goal-input"
-              className={`task-builder-input task-builder-textarea ${focusGoal ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-              placeholder="laddat mobilen stadat usbn"
-              rows={2}
-            />
+            {partOrder.map((part) => {
+              if (part === "goal") {
+                return (
+                  <div className="task-builder-part-block" key="goal">
+                    <label className="task-builder-label" htmlFor="prototype-goal-input">
+                      <span className="task-builder-label-row">
+                        <span>Fixa sa att jag ...</span>
+                        {renderPartControls("goal")}
+                      </span>
+                    </label>
+                    {renderPartProgress("goal")}
+                    <textarea
+                      id="prototype-goal-input"
+                      className={`task-builder-input task-builder-textarea ${focusGoal ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
+                      value={goal}
+                      onChange={(e) => setGoal(e.target.value)}
+                      placeholder="laddat mobilen stadat usbn"
+                      rows={2}
+                    />
+                  </div>
+                )
+              }
 
-            <fieldset
-              className={`task-builder-steps-section ${focusSteps ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
-            >
-              <div className="task-builder-part-row" role="heading" aria-level={3}>
-                <span className="task-builder-legend">Steps</span>
-                <button
-                  type="button"
-                  className={`task-part-done-btn ${isPartCompleted("steps") ? "task-part-done-btn--active" : ""}`}
-                  onClick={() => markPartDone("steps")}
-                >
-                  {isPartCompleted("steps") ? "Done ✓" : "Done"}
-                </button>
-              </div>
-              <div className="task-step-list">
-                {steps.map((step, idx) => {
-                  const parsed = parseStepRaw(step.raw)
-                  return (
-                    <div className="task-step-row" key={step.id}>
-                      <div className="task-step-number">{idx + 1}</div>
-                      <input
-                        ref={(el) => {
-                          if (el) stepInputRefs.current[step.id] = el
-                        }}
-                        type="text"
-                        className="task-step-input"
-                        value={step.raw}
-                        onChange={(e) => updateStepRaw(step.id, e.target.value)}
-                        onKeyDown={(e) => handleStepKeyDown(e, step.id)}
-                        placeholder="Step name 5"
-                      />
-
-                      {parsed.minutes > 0 && (
-                        <span className="task-step-time-badge">
-                          {parsed.minutes}m
-                        </span>
-                      )}
+              if (part === "steps") {
+                return (
+                  <fieldset
+                    className={`task-builder-steps-section ${focusSteps ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
+                    key="steps"
+                  >
+                    <div className="task-builder-part-row" role="heading" aria-level={3}>
+                      <span className="task-builder-legend">Steps</span>
+                      {renderPartControls("steps")}
                     </div>
-                  )
-                })}
-              </div>
+                    {renderPartProgress("steps")}
+                    <div className="task-step-list">
+                      {steps.map((step, idx) => {
+                        const parsed = parseStepRaw(step.raw)
+                        return (
+                          <div className="task-step-row" key={step.id}>
+                            <div className="task-step-number">{idx + 1}</div>
+                            <input
+                              ref={(el) => {
+                                if (el) stepInputRefs.current[step.id] = el
+                              }}
+                              type="text"
+                              className="task-step-input"
+                              value={step.raw}
+                              onChange={(e) =>
+                                updateStepRaw(step.id, e.target.value)
+                              }
+                              onKeyDown={(e) => handleStepKeyDown(e, step.id)}
+                              placeholder="Step name 5"
+                            />
 
-              <button
-                type="button"
-                className="task-builder-add-step-btn"
-                onClick={() => addStep("")}
-              >
-                + Add step
-              </button>
-            </fieldset>
+                            {parsed.minutes > 0 && (
+                              <span className="task-step-time-badge">
+                                {parsed.minutes}m
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
 
-            <label className="task-builder-label" htmlFor="prototype-proof-input">
-              <span className="task-builder-label-row">
-                <span>Proof</span>
-                <button
-                  type="button"
-                  className={`task-part-done-btn ${isPartCompleted("proof") ? "task-part-done-btn--active" : ""}`}
-                  onClick={() => markPartDone("proof")}
-                >
-                  {isPartCompleted("proof") ? "Done ✓" : "Done"}
-                </button>
-              </span>
-            </label>
-            <textarea
-              id="prototype-proof-input"
-              className={`task-builder-input task-builder-textarea ${focusProof ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
-              value={proof}
-              onChange={(e) => setProof(e.target.value)}
-              placeholder="Proof att jag gjorde det jag sa: ..."
-              rows={2}
-            />
+                    <button
+                      type="button"
+                      className="task-builder-add-step-btn"
+                      onClick={() => addStep("")}
+                    >
+                      + Add step
+                    </button>
+                  </fieldset>
+                )
+              }
 
-            <label className="task-builder-label" htmlFor="prototype-priority-input">
-              <span className="task-builder-label-row">
-                <span>Priority</span>
-                <button
-                  type="button"
-                  className={`task-part-done-btn ${isPartCompleted("priority") ? "task-part-done-btn--active" : ""}`}
-                  onClick={() => markPartDone("priority")}
-                >
-                  {isPartCompleted("priority") ? "Done ✓" : "Done"}
-                </button>
-              </span>
-            </label>
-            <input
-              id="prototype-priority-input"
-              className={`task-builder-input ${focusPriority ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              placeholder="High / Medium / Low"
-            />
+              if (part === "proof") {
+                return (
+                  <div className="task-builder-part-block" key="proof">
+                    <label className="task-builder-label" htmlFor="prototype-proof-input">
+                      <span className="task-builder-label-row">
+                        <span>Proof</span>
+                        {renderPartControls("proof")}
+                      </span>
+                    </label>
+                    {renderPartProgress("proof")}
+                    <textarea
+                      id="prototype-proof-input"
+                      className={`task-builder-input task-builder-textarea ${focusProof ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
+                      value={proof}
+                      onChange={(e) => setProof(e.target.value)}
+                      placeholder="Proof att jag gjorde det jag sa: ..."
+                      rows={2}
+                    />
+                  </div>
+                )
+              }
+
+              if (part === "priority") {
+                return (
+                  <div className="task-builder-part-block" key="priority">
+                    <label className="task-builder-label" htmlFor="prototype-priority-input">
+                      <span className="task-builder-label-row">
+                        <span>Priority</span>
+                        {renderPartControls("priority")}
+                      </span>
+                    </label>
+                    {renderPartProgress("priority")}
+                    <input
+                      id="prototype-priority-input"
+                      className={`task-builder-input ${focusPriority ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
+                      value={priority}
+                      onChange={(e) => setPriority(e.target.value)}
+                      placeholder="High / Medium / Low"
+                    />
+                  </div>
+                )
+              }
+
+              return null
+            })}
 
             <button
               type="submit"

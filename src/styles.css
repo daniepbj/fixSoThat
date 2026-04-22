@@ -371,6 +371,42 @@ body {
   gap: 10px;
 }
 
+.task-builder-part-block {
+  display: grid;
+  gap: 8px;
+}
+
+.task-builder-part-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-part-sort-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+  color: #dbe7ff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.task-part-sort-btn:hover:not(:disabled),
+.task-part-sort-btn:focus-visible:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.45);
+  outline: none;
+}
+
+.task-part-sort-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .task-builder-part-row {
   display: flex;
   align-items: center;
@@ -378,6 +414,37 @@ body {
   gap: 10px;
   width: 100%;
   margin-bottom: 8px;
+}
+
+.prototype-part-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.prototype-part-progress__bar {
+  height: 8px;
+  flex: 1;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.prototype-part-progress__fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.28s ease;
+  opacity: 0.75;
+}
+
+.prototype-part-progress__fill--head {
+  opacity: 1;
+}
+
+.prototype-part-progress__time {
+  font-size: 0.78rem;
+  color: #dce7ff;
+  white-space: nowrap;
 }
 
 .task-part-done-btn {
