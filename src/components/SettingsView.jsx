@@ -178,6 +178,17 @@ export default function SettingsView({ settings, setSettings, music }) {
           />
         </label>
 
+        <label className="settings-row">
+          <span>Insert space when Backspace merges Fixa steps</span>
+          <input
+            type="checkbox"
+            checked={Boolean(settings.insertSpaceOnStepMerge)}
+            onChange={(e) =>
+              update("insertSpaceOnStepMerge", e.target.checked)
+            }
+          />
+        </label>
+
         <div className="settings-row settings-row--block">
           <span className="settings-row__label">Builder card style</span>
           <p className="settings-help-text">

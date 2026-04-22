@@ -4,9 +4,28 @@ import SectionMoveControls from "./SectionMoveControls"
 import { parseStepRaw, genStepId, formatStepRaw } from "../utils/stepUtils"
 
 const MAX_CHUNK_SIZE = 250
+const SETTINGS_KEY = "fst_settings"
 
 function normalizeInput(value) {
   return value.trim()
+}
+
+function shouldInsertSpaceOnStepMerge() {
+  try {
+    const settings = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) || "{}")
+    return Boolean(settings.insertSpaceOnStepMerge)
+  } catch {
+    return false
+  }
+}
+
+function mergeStepRaw(prevRaw, currRaw, insertSpace) {
+  if (!insertSpace) return `${prevRaw}${currRaw}`
+  if (!prevRaw || !currRaw) return `${prevRaw}${currRaw}`
+  if (/\s$/.test(prevRaw) || /^\s/.test(currRaw)) {
+    return `${prevRaw}${currRaw}`
+  }
+  return `${prevRaw} ${currRaw}`
 }
 
 /**
@@ -266,22 +285,41 @@ export default function StructuredTaskBuilder({ sectionControls, sectionCollapse
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
       const idx = steps.findIndex((s) => s.id === id)
-      const newStep = { id: genStepId(), raw: "" }
+      if (idx < 0) return
+
+      const inputRef = stepInputRefs.current[id]
+      const currentRaw = steps[idx]?.raw ?? ""
+      const cursor = inputRef?.selectionStart ?? currentRaw.length
+      const before = currentRaw.slice(0, cursor)
+      const after = currentRaw.slice(cursor)
+      const newStep = { id: genStepId(), raw: after }
+
       setSteps((prev) => [
-        ...prev.slice(0, idx + 1),
+        ...prev.slice(0, idx),
+        { ...prev[idx], raw: before },
         newStep,
         ...prev.slice(idx + 1),
       ])
+
       window.setTimeout(() => {
         const ref = stepInputRefs.current[newStep.id]
-        if (ref) ref.focus()
+        if (ref) {
+          ref.focus()
+          ref.setSelectionRange(0, 0)
+        }
       }, 0)
     }
+
     if (event.key === "Backspace") {
-      const step = steps.find((s) => s.id === id)
-      if (step && step.raw === "" && steps.length > 1) {
+      const idx = steps.findIndex((s) => s.id === id)
+      if (idx < 0) return
+      const step = steps[idx]
+      const inputRef = stepInputRefs.current[id]
+      const cursorStart = inputRef?.selectionStart ?? step.raw.length
+      const cursorEnd = inputRef?.selectionEnd ?? step.raw.length
+
+      if (step.raw === "" && steps.length > 1) {
         event.preventDefault()
-        const idx = steps.findIndex((s) => s.id === id)
         removeStep(id)
         window.setTimeout(() => {
           const prevStep = steps[idx > 0 ? idx - 1 : 0]
@@ -292,6 +330,31 @@ export default function StructuredTaskBuilder({ sectionControls, sectionCollapse
               const len = ref.value.length
               ref.setSelectionRange(len, len)
             }
+          }
+        }, 0)
+        return
+      }
+
+      if (idx > 0 && cursorStart === 0 && cursorEnd === 0) {
+        event.preventDefault()
+        const prevStep = steps[idx - 1]
+        const insertSpace = shouldInsertSpaceOnStepMerge()
+        const mergedRaw = mergeStepRaw(prevStep.raw, step.raw, insertSpace)
+        const mergeCursorPos = prevStep.raw.length
+
+        setSteps((prev) => {
+          const copy = [...prev]
+          copy[idx - 1] = { ...copy[idx - 1], raw: mergedRaw }
+          copy.splice(idx, 1)
+          return copy
+        })
+        delete stepInputRefs.current[id]
+
+        window.setTimeout(() => {
+          const ref = stepInputRefs.current[prevStep.id]
+          if (ref) {
+            ref.focus()
+            ref.setSelectionRange(mergeCursorPos, mergeCursorPos)
           }
         }, 0)
       }
@@ -464,8 +527,8 @@ export default function StructuredTaskBuilder({ sectionControls, sectionCollapse
         <>
           <p className="task-builder-help">
             Type your goal and steps. Use <code>step name 5</code> format for
-            integer minutes. Press <kbd>Enter</kbd> to add a step; paste multiple
-            lines at once.
+            integer minutes. Press <kbd>Enter</kbd> to split or add steps fast;
+            paste multiple lines at once.
           </p>
 
       <form className="task-builder-form" onSubmit={handleGenerate}>
