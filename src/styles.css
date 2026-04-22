@@ -364,6 +364,41 @@ body {
   font-weight: 600;
 }
 
+.task-builder-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.task-part-done-btn {
+  min-width: 92px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(173, 255, 209, 0.42);
+  background: rgba(52, 209, 149, 0.14);
+  color: #e8fff4;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.task-part-done-btn:hover,
+.task-part-done-btn:focus-visible {
+  background: rgba(52, 209, 149, 0.26);
+  box-shadow: 0 0 0 2px rgba(173, 255, 209, 0.3);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.task-part-done-btn--active {
+  background: rgba(52, 209, 149, 0.33);
+}
+
 .task-builder-input {
   width: 100%;
   border: 1px solid var(--card-border);
