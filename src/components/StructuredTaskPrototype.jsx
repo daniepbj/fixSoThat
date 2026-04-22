@@ -40,8 +40,12 @@ export default function StructuredTaskPrototype({
   sectionCollapsed,
   onToggleSectionCollapsed,
 }) {
-  const { addMainTaskAndActivate, updateMainTask, mainTasks, setStepCompleted } =
-    useMainTask()
+  const {
+    addMainTaskAndActivate,
+    updateMainTask,
+    mainTasks,
+    setStepCompleted,
+  } = useMainTask()
   const [goal, setGoal] = useState("")
   const [steps, setSteps] = useState([{ id: genStepId(), raw: "" }])
   const [proof, setProof] = useState("")
@@ -85,7 +89,10 @@ export default function StructuredTaskPrototype({
         .map((step) => {
           const parsed = parseStepRaw(String(step.raw || "").trim())
           if (!parsed.text) return null
-          return [step.id, formatStepRaw(parsed.text, Math.max(1, parsed.minutes || 1))]
+          return [
+            step.id,
+            formatStepRaw(parsed.text, Math.max(1, parsed.minutes || 1)),
+          ]
         })
         .filter(Boolean),
     )
@@ -172,7 +179,8 @@ export default function StructuredTaskPrototype({
   }
 
   function ensureQueueTask() {
-    const exists = Boolean(queueTaskId) && mainTasks.some((t) => t.id === queueTaskId)
+    const exists =
+      Boolean(queueTaskId) && mainTasks.some((t) => t.id === queueTaskId)
     if (exists) {
       syncPrototypeTask(queueTaskId)
       return queueTaskId
@@ -193,7 +201,9 @@ export default function StructuredTaskPrototype({
       return liveId
     }
 
-    return (candidates.find((step) => !step.completed) || candidates[0])?.id || ""
+    return (
+      (candidates.find((step) => !step.completed) || candidates[0])?.id || ""
+    )
   }
 
   function markPartDone(part) {
@@ -228,14 +238,18 @@ export default function StructuredTaskPrototype({
       (item) => item?.sourceMainTaskId === queueTaskId,
     )
     if (part === "goal") {
-      return scopedQueue.filter((item) => item?.sourceStepId === goalQueueStepId)
+      return scopedQueue.filter(
+        (item) => item?.sourceStepId === goalQueueStepId,
+      )
     }
     if (part === "steps") {
       const ids = new Set(queueStepIds || [])
       return scopedQueue.filter((item) => ids.has(item?.sourceStepId))
     }
     if (part === "proof") {
-      return scopedQueue.filter((item) => item?.sourceStepId === proofQueueStepId)
+      return scopedQueue.filter(
+        (item) => item?.sourceStepId === proofQueueStepId,
+      )
     }
     if (part === "priority") {
       return scopedQueue.filter(
@@ -249,7 +263,8 @@ export default function StructuredTaskPrototype({
     const entries = getPartQueueEntries(part)
     if (!entries.length) return null
 
-    const active = liveTimerTask && entries.find((item) => item?.id === liveTimerTask.id)
+    const active =
+      liveTimerTask && entries.find((item) => item?.id === liveTimerTask.id)
     const picked = active || entries[0]
     const totalSeconds = Math.max(
       1,
@@ -273,7 +288,7 @@ export default function StructuredTaskPrototype({
         <div className="prototype-part-progress__bar">
           <div
             className={`prototype-part-progress__fill ${live.isActive ? "prototype-part-progress__fill--head" : ""}`}
-            style={{ width: `${live.ratio * 100}%`, background: live.color }}
+            style={{ '--progress-ratio': live.ratio, background: live.color }}
           />
         </div>
         <span className="prototype-part-progress__time">
@@ -346,16 +361,27 @@ export default function StructuredTaskPrototype({
   const isPartCompleted = (part) => {
     if (!queueTask) return false
     if (part === "goal") {
-      return Boolean((queueTask.steps || []).find((s) => s.id === goalQueueStepId)?.completed)
+      return Boolean(
+        (queueTask.steps || []).find((s) => s.id === goalQueueStepId)
+          ?.completed,
+      )
     }
     if (part === "proof") {
-      return Boolean((queueTask.steps || []).find((s) => s.id === proofQueueStepId)?.completed)
+      return Boolean(
+        (queueTask.steps || []).find((s) => s.id === proofQueueStepId)
+          ?.completed,
+      )
     }
     if (part === "priority") {
-      return Boolean((queueTask.steps || []).find((s) => s.id === priorityQueueStepId)?.completed)
+      return Boolean(
+        (queueTask.steps || []).find((s) => s.id === priorityQueueStepId)
+          ?.completed,
+      )
     }
     if (part === "steps") {
-      const matches = (queueTask.steps || []).filter((s) => queueStepIds.includes(s.id))
+      const matches = (queueTask.steps || []).filter((s) =>
+        queueStepIds.includes(s.id),
+      )
       return matches.length > 0 && matches.every((step) => step.completed)
     }
     return false
@@ -368,7 +394,8 @@ export default function StructuredTaskPrototype({
   const activeSourceStepId = liveTimerTask?.sourceStepId
   const focusGoal = queueActive && activeSourceStepId === goalQueueStepId
   const focusProof = queueActive && activeSourceStepId === proofQueueStepId
-  const focusPriority = queueActive && activeSourceStepId === priorityQueueStepId
+  const focusPriority =
+    queueActive && activeSourceStepId === priorityQueueStepId
   const focusSteps = queueActive && queueStepIds.includes(activeSourceStepId)
   const goalLive = getPartLiveData("goal")
   const stepsLive = getPartLiveData("steps")
@@ -467,7 +494,10 @@ export default function StructuredTaskPrototype({
               if (part === "goal") {
                 return (
                   <div className="task-builder-part-block" key="goal">
-                    <label className="task-builder-label" htmlFor="prototype-goal-input">
+                    <label
+                      className="task-builder-label"
+                      htmlFor="prototype-goal-input"
+                    >
                       <span className="task-builder-label-row">
                         <span>Fixa sa att jag ...</span>
                         {renderPartControls("goal")}
@@ -493,7 +523,11 @@ export default function StructuredTaskPrototype({
                     className={`task-builder-steps-section ${stepsLive?.isActive ? "task-builder-focus-target task-builder-focus-target--active task-builder-steps-section--active" : ""}`}
                     key="steps"
                   >
-                    <div className="task-builder-part-row" role="heading" aria-level={3}>
+                    <div
+                      className="task-builder-part-row"
+                      role="heading"
+                      aria-level={3}
+                    >
                       <span className="task-builder-legend">Steps</span>
                       {renderPartControls("steps")}
                     </div>
@@ -510,7 +544,11 @@ export default function StructuredTaskPrototype({
                               }}
                               type="text"
                               className="task-step-input"
-                              style={stepsLive?.isActive ? activeFieldStyle : undefined}
+                              style={
+                                stepsLive?.isActive
+                                  ? activeFieldStyle
+                                  : undefined
+                              }
                               value={step.raw}
                               onChange={(e) =>
                                 updateStepRaw(step.id, e.target.value)
@@ -543,7 +581,10 @@ export default function StructuredTaskPrototype({
               if (part === "proof") {
                 return (
                   <div className="task-builder-part-block" key="proof">
-                    <label className="task-builder-label" htmlFor="prototype-proof-input">
+                    <label
+                      className="task-builder-label"
+                      htmlFor="prototype-proof-input"
+                    >
                       <span className="task-builder-label-row">
                         <span>Proof</span>
                         {renderPartControls("proof")}
@@ -566,7 +607,10 @@ export default function StructuredTaskPrototype({
               if (part === "priority") {
                 return (
                   <div className="task-builder-part-block" key="priority">
-                    <label className="task-builder-label" htmlFor="prototype-priority-input">
+                    <label
+                      className="task-builder-label"
+                      htmlFor="prototype-priority-input"
+                    >
                       <span className="task-builder-label-row">
                         <span>Priority</span>
                         {renderPartControls("priority")}
@@ -576,7 +620,9 @@ export default function StructuredTaskPrototype({
                     <input
                       id="prototype-priority-input"
                       className={`task-builder-input ${priorityLive?.isActive ? "task-builder-focus-target task-builder-focus-target--active task-builder-input--countdown-active" : ""}`}
-                      style={priorityLive?.isActive ? activeFieldStyle : undefined}
+                      style={
+                        priorityLive?.isActive ? activeFieldStyle : undefined
+                      }
                       value={priority}
                       onChange={(e) => setPriority(e.target.value)}
                       placeholder="High / Medium / Low"
@@ -596,7 +642,9 @@ export default function StructuredTaskPrototype({
             </button>
           </form>
 
-          {loadMessage && <p className="task-builder-load-message">{loadMessage}</p>}
+          {loadMessage && (
+            <p className="task-builder-load-message">{loadMessage}</p>
+          )}
 
           {generatedText && (
             <section
