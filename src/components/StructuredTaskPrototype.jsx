@@ -370,6 +370,17 @@ export default function StructuredTaskPrototype({
   const focusProof = queueActive && activeSourceStepId === proofQueueStepId
   const focusPriority = queueActive && activeSourceStepId === priorityQueueStepId
   const focusSteps = queueActive && queueStepIds.includes(activeSourceStepId)
+  const goalLive = getPartLiveData("goal")
+  const stepsLive = getPartLiveData("steps")
+  const proofLive = getPartLiveData("proof")
+  const priorityLive = getPartLiveData("priority")
+
+  const activeFieldStyle = {
+    borderColor: "rgba(173, 255, 209, 0.9)",
+    background: "rgba(52, 209, 149, 0.2)",
+    boxShadow:
+      "0 0 0 2px rgba(173, 255, 209, 0.42), 0 0 24px rgba(52, 209, 149, 0.38), inset 0 0 20px rgba(52, 209, 149, 0.2)",
+  }
 
   function renderPartControls(part) {
     const idx = partOrder.indexOf(part)
@@ -465,7 +476,8 @@ export default function StructuredTaskPrototype({
                     {renderPartProgress("goal")}
                     <textarea
                       id="prototype-goal-input"
-                      className={`task-builder-input task-builder-textarea ${focusGoal ? "task-builder-focus-target task-builder-focus-target--active task-builder-input--countdown-active" : ""}`}
+                      className={`task-builder-input task-builder-textarea ${goalLive?.isActive ? "task-builder-focus-target task-builder-focus-target--active task-builder-input--countdown-active" : ""}`}
+                      style={goalLive?.isActive ? activeFieldStyle : undefined}
                       value={goal}
                       onChange={(e) => setGoal(e.target.value)}
                       placeholder="laddat mobilen stadat usbn"
@@ -478,7 +490,7 @@ export default function StructuredTaskPrototype({
               if (part === "steps") {
                 return (
                   <fieldset
-                    className={`task-builder-steps-section ${focusSteps ? "task-builder-focus-target task-builder-focus-target--active task-builder-steps-section--active" : ""}`}
+                    className={`task-builder-steps-section ${stepsLive?.isActive ? "task-builder-focus-target task-builder-focus-target--active task-builder-steps-section--active" : ""}`}
                     key="steps"
                   >
                     <div className="task-builder-part-row" role="heading" aria-level={3}>
@@ -498,6 +510,7 @@ export default function StructuredTaskPrototype({
                               }}
                               type="text"
                               className="task-step-input"
+                              style={stepsLive?.isActive ? activeFieldStyle : undefined}
                               value={step.raw}
                               onChange={(e) =>
                                 updateStepRaw(step.id, e.target.value)
@@ -539,7 +552,8 @@ export default function StructuredTaskPrototype({
                     {renderPartProgress("proof")}
                     <textarea
                       id="prototype-proof-input"
-                      className={`task-builder-input task-builder-textarea ${focusProof ? "task-builder-focus-target task-builder-focus-target--active task-builder-input--countdown-active" : ""}`}
+                      className={`task-builder-input task-builder-textarea ${proofLive?.isActive ? "task-builder-focus-target task-builder-focus-target--active task-builder-input--countdown-active" : ""}`}
+                      style={proofLive?.isActive ? activeFieldStyle : undefined}
                       value={proof}
                       onChange={(e) => setProof(e.target.value)}
                       placeholder="Proof att jag gjorde det jag sa: ..."
@@ -561,7 +575,8 @@ export default function StructuredTaskPrototype({
                     {renderPartProgress("priority")}
                     <input
                       id="prototype-priority-input"
-                      className={`task-builder-input ${focusPriority ? "task-builder-focus-target task-builder-focus-target--active task-builder-input--countdown-active" : ""}`}
+                      className={`task-builder-input ${priorityLive?.isActive ? "task-builder-focus-target task-builder-focus-target--active task-builder-input--countdown-active" : ""}`}
+                      style={priorityLive?.isActive ? activeFieldStyle : undefined}
                       value={priority}
                       onChange={(e) => setPriority(e.target.value)}
                       placeholder="High / Medium / Low"
