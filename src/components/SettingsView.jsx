@@ -183,9 +183,7 @@ export default function SettingsView({ settings, setSettings, music }) {
           <input
             type="checkbox"
             checked={Boolean(settings.insertSpaceOnStepMerge)}
-            onChange={(e) =>
-              update("insertSpaceOnStepMerge", e.target.checked)
-            }
+            onChange={(e) => update("insertSpaceOnStepMerge", e.target.checked)}
           />
         </label>
 

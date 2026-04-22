@@ -498,7 +498,7 @@ export default function StructuredTaskBuilder({
   const focusProof =
     queueActive && liveTimerTask?.sourceStepId === proofQueueStepId
   const focusSteps = queueActive && !focusGoal && !focusProof
-  
+
   // Debug: log focus state
   if (queueActive) {
     console.log("Builder queue active:", {
