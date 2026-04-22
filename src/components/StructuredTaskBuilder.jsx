@@ -12,7 +12,9 @@ function normalizeInput(value) {
 
 function shouldInsertSpaceOnStepMerge() {
   try {
-    const settings = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) || "{}")
+    const settings = JSON.parse(
+      window.localStorage.getItem(SETTINGS_KEY) || "{}",
+    )
     return Boolean(settings.insertSpaceOnStepMerge)
   } catch {
     return false
@@ -139,7 +141,11 @@ function buildToDoChunks({ goal, steps, proof }, maxSize = MAX_CHUNK_SIZE) {
   })
 }
 
-export default function StructuredTaskBuilder({ sectionControls, sectionCollapsed, onToggleSectionCollapsed }) {
+export default function StructuredTaskBuilder({
+  sectionControls,
+  sectionCollapsed,
+  onToggleSectionCollapsed,
+}) {
   const { addMainTask, addMainTaskAndActivate } = useMainTask()
 
   const [goal, setGoal] = useState("")
@@ -492,6 +498,19 @@ export default function StructuredTaskBuilder({ sectionControls, sectionCollapse
   const focusProof =
     queueActive && liveTimerTask?.sourceStepId === proofQueueStepId
   const focusSteps = queueActive && !focusGoal && !focusProof
+  
+  // Debug: log focus state
+  if (queueActive) {
+    console.log("Builder queue active:", {
+      queueActive,
+      activeStepId: liveTimerTask?.sourceStepId,
+      goalQueueStepId,
+      proofQueueStepId,
+      focusGoal,
+      focusProof,
+      focusSteps,
+    })
+  }
 
   return (
     <section
@@ -507,7 +526,9 @@ export default function StructuredTaskBuilder({ sectionControls, sectionCollapse
             onClick={onToggleSectionCollapsed}
           >
             Fixa så att jag
-            <span className="section-collapse-arrow">{sectionCollapsed ? "▸" : "▾"}</span>
+            <span className="section-collapse-arrow">
+              {sectionCollapsed ? "▸" : "▾"}
+            </span>
           </button>
         </div>
         <div className="task-builder-header-actions">
@@ -531,236 +552,236 @@ export default function StructuredTaskBuilder({ sectionControls, sectionCollapse
             paste multiple lines at once.
           </p>
 
-      <form className="task-builder-form" onSubmit={handleGenerate}>
-        <label className="task-builder-label" htmlFor="goal-input">
-          Fixa så att jag …
-        </label>
-        <textarea
-          id="goal-input"
-          className={`task-builder-input task-builder-textarea ${focusGoal ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
-          value={goal}
-          onChange={(e) => setGoal(e.target.value)}
-          placeholder="ätit mat"
-          rows={2}
-        />
-
-        <fieldset
-          className={`task-builder-steps-section ${focusSteps ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
-        >
-          <legend className="task-builder-legend">Steps</legend>
-          <p className="task-builder-hint">
-            Format: <code>Diska 10</code> · Paste a block of lines to fill all
-            at once.
-          </p>
-
-          <div className="task-step-list">
-            {steps.map((step, idx) => {
-              const parsed = parseStepRaw(step.raw)
-              return (
-                <div
-                  className={`task-step-row ${draggedStepId === step.id ? "task-step-row--dragging" : ""}`}
-                  key={step.id}
-                  onDragOver={(e) => handleStepDragOver(step.id, e)}
-                  onDrop={(e) => handleStepDrop(step.id, e)}
-                >
-                  <div className="task-step-number">{idx + 1}</div>
-                  <button
-                    type="button"
-                    className="task-step-drag-btn"
-                    draggable
-                    onDragStart={(e) => handleStepDragStart(step.id, e)}
-                    onDragEnd={clearStepDrag}
-                    title="Drag to reorder steps"
-                  >
-                    ⋮⋮
-                  </button>
-
-                  <input
-                    ref={(el) => {
-                      if (el) stepInputRefs.current[step.id] = el
-                    }}
-                    type="text"
-                    className="task-step-input"
-                    value={step.raw}
-                    onChange={(e) => updateStepRaw(step.id, e.target.value)}
-                    onKeyDown={(e) => handleStepKeyDown(e, step.id)}
-                    onPaste={(e) => handleStepPaste(e, step.id)}
-                    placeholder="Step name 5"
-                  />
-
-                  {parsed.minutes > 0 && (
-                    <span className="task-step-time-badge">
-                      {parsed.minutes}m
-                    </span>
-                  )}
-
-                  <div className="task-step-controls">
-                    <button
-                      type="button"
-                      className="task-control-btn"
-                      onClick={() => moveStepUp(step.id)}
-                      title="Move up"
-                      disabled={idx === 0}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      className="task-control-btn"
-                      onClick={() => moveStepDown(step.id)}
-                      title="Move down"
-                      disabled={idx === steps.length - 1}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      className="task-control-btn task-control-btn--remove"
-                      onClick={() => removeStep(step.id)}
-                      title="Remove step"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          <button
-            type="button"
-            className="task-builder-add-step-btn"
-            onClick={addStep}
-          >
-            + Add step
-          </button>
-        </fieldset>
-
-        <label className="task-builder-label" htmlFor="proof-input">
-          Proof
-        </label>
-        <textarea
-          id="proof-input"
-          className={`task-builder-input task-builder-textarea ${focusProof ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
-          value={proof}
-          onChange={(e) => setProof(e.target.value)}
-          placeholder="Proof att jag gjorde det jag sa: ..."
-          rows={2}
-        />
-
-        <label className="task-builder-label" htmlFor="priority-input">
-          Priority
-        </label>
-        <input
-          id="priority-input"
-          className="task-builder-input"
-          value={priority}
-          onChange={(e) => setPriority(e.target.value)}
-          placeholder="High / Medium / Low"
-        />
-
-        <div className="task-builder-actions">
-          <button className="task-builder-generate" type="submit">
-            Generate output
-          </button>
-          <button
-            type="button"
-            className="task-builder-load-btn"
-            onClick={handleLoadIntoTasks}
-            disabled={!hasContent}
-            title="Add this task to the internal task list below"
-          >
-            Load into task list ↓
-          </button>
-          <label className="task-check-label task-builder-clear-after-load">
-            <input
-              type="checkbox"
-              checked={clearAfterLoad}
-              onChange={(e) => setClearAfterLoad(e.target.checked)}
-            />
-            Clear form after loading
-          </label>
-        </div>
-      </form>
-
-      {loadMessage && (
-        <p className="task-builder-load-message">{loadMessage}</p>
-      )}
-
-      {copyMessage && (
-        <p className="task-builder-copy-message">{copyMessage}</p>
-      )}
-
-      {generatedText && (
-        <>
-          <section
-            className="task-builder-output"
-            aria-label="Full formatted output"
-          >
-            <h3>1. Full formatted text preview</h3>
-            <pre className="task-builder-pre">{generatedText}</pre>
-          </section>
-
-          <section
-            className="task-builder-output"
-            aria-label="Microsoft To Do chunks"
-          >
-            <h3>2. Microsoft To Do chunks</h3>
-            <p className="task-builder-help">
-              Paste these chunks into Microsoft To Do as steps, in order.
-            </p>
-            <div className="task-chunk-list">
-              {todoChunks.map((chunk, index) => (
-                <article className="task-chunk-box" key={`chunk-${index}`}>
-                  <pre className="task-builder-pre task-builder-pre--chunk">
-                    {chunk}
-                  </pre>
-                  <div className="task-chunk-actions">
-                    <button
-                      type="button"
-                      className="task-builder-copy-button"
-                      onClick={() => copyText(chunk, "Chunk copied")}
-                    >
-                      Copy chunk
-                    </button>
-                    <label className="task-check-label">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(todoChecks[index])}
-                        onChange={() => toggleTodoCheck(index)}
-                      />
-                      Added to Microsoft To Do
-                    </label>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="task-builder-output" aria-label="Llama copy">
-            <h3>3. Llama copy section</h3>
-            <p className="task-builder-help">
-              Copy this text for Llama. Each item is formatted as{" "}
-              <code>taskname minutes</code> for easy parsing.
-            </p>
-            <button
-              type="button"
-              className="task-builder-copy-button"
-              onClick={() => copyText(llamaText, "Llama format copied")}
-            >
-              Copy for Llama
-            </button>
-            <label className="task-check-label task-check-label--llama">
-              <input
-                type="checkbox"
-                checked={llamaPasted}
-                onChange={() => setLlamaPasted((prev) => !prev)}
-              />
-              Pasted into Llama
+          <form className="task-builder-form" onSubmit={handleGenerate}>
+            <label className="task-builder-label" htmlFor="goal-input">
+              Fixa så att jag …
             </label>
-          </section>
-        </>
-      )}
+            <textarea
+              id="goal-input"
+              className={`task-builder-input task-builder-textarea ${focusGoal ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              placeholder="ätit mat"
+              rows={2}
+            />
+
+            <fieldset
+              className={`task-builder-steps-section ${focusSteps ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
+            >
+              <legend className="task-builder-legend">Steps</legend>
+              <p className="task-builder-hint">
+                Format: <code>Diska 10</code> · Paste a block of lines to fill
+                all at once.
+              </p>
+
+              <div className="task-step-list">
+                {steps.map((step, idx) => {
+                  const parsed = parseStepRaw(step.raw)
+                  return (
+                    <div
+                      className={`task-step-row ${draggedStepId === step.id ? "task-step-row--dragging" : ""}`}
+                      key={step.id}
+                      onDragOver={(e) => handleStepDragOver(step.id, e)}
+                      onDrop={(e) => handleStepDrop(step.id, e)}
+                    >
+                      <div className="task-step-number">{idx + 1}</div>
+                      <button
+                        type="button"
+                        className="task-step-drag-btn"
+                        draggable
+                        onDragStart={(e) => handleStepDragStart(step.id, e)}
+                        onDragEnd={clearStepDrag}
+                        title="Drag to reorder steps"
+                      >
+                        ⋮⋮
+                      </button>
+
+                      <input
+                        ref={(el) => {
+                          if (el) stepInputRefs.current[step.id] = el
+                        }}
+                        type="text"
+                        className="task-step-input"
+                        value={step.raw}
+                        onChange={(e) => updateStepRaw(step.id, e.target.value)}
+                        onKeyDown={(e) => handleStepKeyDown(e, step.id)}
+                        onPaste={(e) => handleStepPaste(e, step.id)}
+                        placeholder="Step name 5"
+                      />
+
+                      {parsed.minutes > 0 && (
+                        <span className="task-step-time-badge">
+                          {parsed.minutes}m
+                        </span>
+                      )}
+
+                      <div className="task-step-controls">
+                        <button
+                          type="button"
+                          className="task-control-btn"
+                          onClick={() => moveStepUp(step.id)}
+                          title="Move up"
+                          disabled={idx === 0}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="task-control-btn"
+                          onClick={() => moveStepDown(step.id)}
+                          title="Move down"
+                          disabled={idx === steps.length - 1}
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          className="task-control-btn task-control-btn--remove"
+                          onClick={() => removeStep(step.id)}
+                          title="Remove step"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <button
+                type="button"
+                className="task-builder-add-step-btn"
+                onClick={addStep}
+              >
+                + Add step
+              </button>
+            </fieldset>
+
+            <label className="task-builder-label" htmlFor="proof-input">
+              Proof
+            </label>
+            <textarea
+              id="proof-input"
+              className={`task-builder-input task-builder-textarea ${focusProof ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
+              value={proof}
+              onChange={(e) => setProof(e.target.value)}
+              placeholder="Proof att jag gjorde det jag sa: ..."
+              rows={2}
+            />
+
+            <label className="task-builder-label" htmlFor="priority-input">
+              Priority
+            </label>
+            <input
+              id="priority-input"
+              className="task-builder-input"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              placeholder="High / Medium / Low"
+            />
+
+            <div className="task-builder-actions">
+              <button className="task-builder-generate" type="submit">
+                Generate output
+              </button>
+              <button
+                type="button"
+                className="task-builder-load-btn"
+                onClick={handleLoadIntoTasks}
+                disabled={!hasContent}
+                title="Add this task to the internal task list below"
+              >
+                Load into task list ↓
+              </button>
+              <label className="task-check-label task-builder-clear-after-load">
+                <input
+                  type="checkbox"
+                  checked={clearAfterLoad}
+                  onChange={(e) => setClearAfterLoad(e.target.checked)}
+                />
+                Clear form after loading
+              </label>
+            </div>
+          </form>
+
+          {loadMessage && (
+            <p className="task-builder-load-message">{loadMessage}</p>
+          )}
+
+          {copyMessage && (
+            <p className="task-builder-copy-message">{copyMessage}</p>
+          )}
+
+          {generatedText && (
+            <>
+              <section
+                className="task-builder-output"
+                aria-label="Full formatted output"
+              >
+                <h3>1. Full formatted text preview</h3>
+                <pre className="task-builder-pre">{generatedText}</pre>
+              </section>
+
+              <section
+                className="task-builder-output"
+                aria-label="Microsoft To Do chunks"
+              >
+                <h3>2. Microsoft To Do chunks</h3>
+                <p className="task-builder-help">
+                  Paste these chunks into Microsoft To Do as steps, in order.
+                </p>
+                <div className="task-chunk-list">
+                  {todoChunks.map((chunk, index) => (
+                    <article className="task-chunk-box" key={`chunk-${index}`}>
+                      <pre className="task-builder-pre task-builder-pre--chunk">
+                        {chunk}
+                      </pre>
+                      <div className="task-chunk-actions">
+                        <button
+                          type="button"
+                          className="task-builder-copy-button"
+                          onClick={() => copyText(chunk, "Chunk copied")}
+                        >
+                          Copy chunk
+                        </button>
+                        <label className="task-check-label">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(todoChecks[index])}
+                            onChange={() => toggleTodoCheck(index)}
+                          />
+                          Added to Microsoft To Do
+                        </label>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className="task-builder-output" aria-label="Llama copy">
+                <h3>3. Llama copy section</h3>
+                <p className="task-builder-help">
+                  Copy this text for Llama. Each item is formatted as{" "}
+                  <code>taskname minutes</code> for easy parsing.
+                </p>
+                <button
+                  type="button"
+                  className="task-builder-copy-button"
+                  onClick={() => copyText(llamaText, "Llama format copied")}
+                >
+                  Copy for Llama
+                </button>
+                <label className="task-check-label task-check-label--llama">
+                  <input
+                    type="checkbox"
+                    checked={llamaPasted}
+                    onChange={() => setLlamaPasted((prev) => !prev)}
+                  />
+                  Pasted into Llama
+                </label>
+              </section>
+            </>
+          )}
         </>
       )}
     </section>
