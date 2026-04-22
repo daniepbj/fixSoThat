@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { useMainTask } from "../context/MainTaskContext"
+import { useLiveTimer } from "../context/LiveTimerContext"
 import SectionMoveControls from "./SectionMoveControls"
 import { parseStepRaw, genStepId, formatStepRaw } from "../utils/stepUtils"
 
@@ -164,25 +165,8 @@ export default function StructuredTaskBuilder({
   const [builderQueueTaskId, setBuilderQueueTaskId] = useState("")
   const [goalQueueStepId, setGoalQueueStepId] = useState("")
   const [proofQueueStepId, setProofQueueStepId] = useState("")
-  const [liveTimerTask, setLiveTimerTask] = useState(null)
+  const { liveTimerTask } = useLiveTimer()
   const stepInputRefs = useRef({})
-
-  useEffect(() => {
-    function readActiveTimerTask() {
-      try {
-        const tasks = JSON.parse(
-          window.localStorage.getItem("fst_active") || "[]",
-        )
-        setLiveTimerTask(tasks[0] ?? null)
-      } catch {
-        setLiveTimerTask(null)
-      }
-    }
-
-    readActiveTimerTask()
-    const id = setInterval(readActiveTimerTask, 1000)
-    return () => clearInterval(id)
-  }, [])
 
   function resetStructuredWriterForm() {
     setGoal("")

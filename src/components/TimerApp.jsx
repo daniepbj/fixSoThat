@@ -552,7 +552,7 @@ export default function TimerApp({ sidebarMode = false }) {
     return () => clearInterval(id)
   }, [timerRunning, onBreak, settings.idlePromptSeconds])
 
-  // ── Timer tick (wall-clock anchored — no drift, head-change safe) ───────
+  // ── Timer tick (Temporal-anchored — no drift, head-change safe) ─────────
   useEffect(() => {
     if (!timerRunning || onBreak) return
     // Re-anchor whenever the current head task changes so the interval can't
@@ -560,7 +560,7 @@ export default function TimerApp({ sidebarMode = false }) {
     const head = activeTasks[0] ?? null
     if (!head || head.remainingSeconds <= 0) return
     timerEpochRef.current = {
-      startedAt: Date.now(),
+      startedAtISO: nowISO(), // Temporal Instant — no drift on wake
       startingRemaining: head.remainingSeconds,
       startingSpent: head.spentSeconds,
       headId: head.id,
@@ -568,7 +568,7 @@ export default function TimerApp({ sidebarMode = false }) {
     const id = setInterval(() => {
       const epoch = timerEpochRef.current
       if (!epoch) return
-      const elapsedSecs = Math.floor((Date.now() - epoch.startedAt) / 1000)
+      const elapsedSecs = secondsSince(epoch.startedAtISO)
       setActiveTasks((prev) => {
         if (!prev.length) return prev
         const [h, ...tail] = prev
