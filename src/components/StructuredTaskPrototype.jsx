@@ -455,10 +455,7 @@ export default function StructuredTaskPrototype({
             {partOrder.map((part) => {
               if (part === "goal") {
                 return (
-                  <div
-                    className={`task-builder-part-block ${focusGoal ? "task-builder-part-block--active" : ""}`}
-                    key="goal"
-                  >
+                  <div className="task-builder-part-block" key="goal">
                     <label className="task-builder-label" htmlFor="prototype-goal-input">
                       <span className="task-builder-label-row">
                         <span>Fixa sa att jag ...</span>
@@ -468,7 +465,7 @@ export default function StructuredTaskPrototype({
                     {renderPartProgress("goal")}
                     <textarea
                       id="prototype-goal-input"
-                      className={`task-builder-input task-builder-textarea ${focusGoal ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
+                      className={`task-builder-input task-builder-textarea ${focusGoal ? "task-builder-focus-target task-builder-focus-target--active task-builder-input--countdown-active" : ""}`}
                       value={goal}
                       onChange={(e) => setGoal(e.target.value)}
                       placeholder="laddat mobilen stadat usbn"
@@ -532,10 +529,7 @@ export default function StructuredTaskPrototype({
 
               if (part === "proof") {
                 return (
-                  <div
-                    className={`task-builder-part-block ${focusProof ? "task-builder-part-block--active" : ""}`}
-                    key="proof"
-                  >
+                  <div className="task-builder-part-block" key="proof">
                     <label className="task-builder-label" htmlFor="prototype-proof-input">
                       <span className="task-builder-label-row">
                         <span>Proof</span>
@@ -545,7 +539,7 @@ export default function StructuredTaskPrototype({
                     {renderPartProgress("proof")}
                     <textarea
                       id="prototype-proof-input"
-                      className={`task-builder-input task-builder-textarea ${focusProof ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
+                      className={`task-builder-input task-builder-textarea ${focusProof ? "task-builder-focus-target task-builder-focus-target--active task-builder-input--countdown-active" : ""}`}
                       value={proof}
                       onChange={(e) => setProof(e.target.value)}
                       placeholder="Proof att jag gjorde det jag sa: ..."
@@ -557,10 +551,7 @@ export default function StructuredTaskPrototype({
 
               if (part === "priority") {
                 return (
-                  <div
-                    className={`task-builder-part-block ${focusPriority ? "task-builder-part-block--active" : ""}`}
-                    key="priority"
-                  >
+                  <div className="task-builder-part-block" key="priority">
                     <label className="task-builder-label" htmlFor="prototype-priority-input">
                       <span className="task-builder-label-row">
                         <span>Priority</span>
@@ -570,7 +561,7 @@ export default function StructuredTaskPrototype({
                     {renderPartProgress("priority")}
                     <input
                       id="prototype-priority-input"
-                      className={`task-builder-input ${focusPriority ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
+                      className={`task-builder-input ${focusPriority ? "task-builder-focus-target task-builder-focus-target--active task-builder-input--countdown-active" : ""}`}
                       value={priority}
                       onChange={(e) => setPriority(e.target.value)}
                       placeholder="High / Medium / Low"

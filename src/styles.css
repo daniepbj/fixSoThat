@@ -376,14 +376,6 @@ body {
   gap: 8px;
 }
 
-.task-builder-part-block--active {
-  border: 1px solid rgba(173, 255, 209, 0.45);
-  border-radius: 12px;
-  padding: 8px;
-  background: rgba(52, 209, 149, 0.08);
-  box-shadow: 0 0 0 1px rgba(173, 255, 209, 0.2);
-}
-
 .task-builder-steps-section--active {
   border: 1px solid rgba(173, 255, 209, 0.45);
   border-radius: 12px;
@@ -502,6 +494,15 @@ body {
 .task-builder-input:focus,
 .task-builder-input:focus-visible {
   outline: none;
+}
+
+.task-builder-input--countdown-active {
+  border-color: rgba(173, 255, 209, 0.78) !important;
+  background: rgba(52, 209, 149, 0.18) !important;
+  box-shadow:
+    0 0 0 2px rgba(173, 255, 209, 0.42),
+    0 0 22px rgba(52, 209, 149, 0.34),
+    inset 0 0 18px rgba(52, 209, 149, 0.18);
 }
 
 .task-builder-textarea {
