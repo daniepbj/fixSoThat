@@ -376,6 +376,20 @@ body {
   gap: 8px;
 }
 
+.task-builder-part-block--active {
+  border: 1px solid rgba(173, 255, 209, 0.45);
+  border-radius: 12px;
+  padding: 8px;
+  background: rgba(52, 209, 149, 0.08);
+  box-shadow: 0 0 0 1px rgba(173, 255, 209, 0.2);
+}
+
+.task-builder-steps-section--active {
+  border: 1px solid rgba(173, 255, 209, 0.45);
+  border-radius: 12px;
+  padding: 8px;
+}
+
 .task-builder-part-controls {
   display: inline-flex;
   align-items: center;
@@ -483,6 +497,11 @@ body {
   color: var(--text-main);
   padding: 10px 12px;
   font: inherit;
+}
+
+.task-builder-input:focus,
+.task-builder-input:focus-visible {
+  outline: none;
 }
 
 .task-builder-textarea {

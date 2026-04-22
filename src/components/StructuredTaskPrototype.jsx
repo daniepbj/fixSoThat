@@ -260,7 +260,7 @@ export default function StructuredTaskPrototype({
     return {
       ratio,
       remaining,
-      color: picked?.color || "#6c63ff",
+      color: active ? "#34d195" : picked?.color || "#6c63ff",
       isActive: Boolean(active),
     }
   }
@@ -455,7 +455,10 @@ export default function StructuredTaskPrototype({
             {partOrder.map((part) => {
               if (part === "goal") {
                 return (
-                  <div className="task-builder-part-block" key="goal">
+                  <div
+                    className={`task-builder-part-block ${focusGoal ? "task-builder-part-block--active" : ""}`}
+                    key="goal"
+                  >
                     <label className="task-builder-label" htmlFor="prototype-goal-input">
                       <span className="task-builder-label-row">
                         <span>Fixa sa att jag ...</span>
@@ -478,7 +481,7 @@ export default function StructuredTaskPrototype({
               if (part === "steps") {
                 return (
                   <fieldset
-                    className={`task-builder-steps-section ${focusSteps ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
+                    className={`task-builder-steps-section ${focusSteps ? "task-builder-focus-target task-builder-focus-target--active task-builder-steps-section--active" : ""}`}
                     key="steps"
                   >
                     <div className="task-builder-part-row" role="heading" aria-level={3}>
@@ -529,7 +532,10 @@ export default function StructuredTaskPrototype({
 
               if (part === "proof") {
                 return (
-                  <div className="task-builder-part-block" key="proof">
+                  <div
+                    className={`task-builder-part-block ${focusProof ? "task-builder-part-block--active" : ""}`}
+                    key="proof"
+                  >
                     <label className="task-builder-label" htmlFor="prototype-proof-input">
                       <span className="task-builder-label-row">
                         <span>Proof</span>
@@ -551,7 +557,10 @@ export default function StructuredTaskPrototype({
 
               if (part === "priority") {
                 return (
-                  <div className="task-builder-part-block" key="priority">
+                  <div
+                    className={`task-builder-part-block ${focusPriority ? "task-builder-part-block--active" : ""}`}
+                    key="priority"
+                  >
                     <label className="task-builder-label" htmlFor="prototype-priority-input">
                       <span className="task-builder-label-row">
                         <span>Priority</span>
