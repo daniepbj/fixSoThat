@@ -3,6 +3,7 @@ import FeatureHello from "./components/FeatureHello"
 import AppLinks from "./components/AppLinks"
 import TimerApp from "./components/TimerApp"
 import StructuredTaskBuilder from "./components/StructuredTaskBuilder"
+import StructuredTaskPrototype from "./components/StructuredTaskPrototype"
 import GuidedCategoryBuilder from "./components/GuidedCategoryBuilder"
 import AdhdBridgeBuilder from "./components/AdhdBridgeBuilder"
 import GuidedSmallImprovementBuilder from "./components/GuidedSmallImprovementBuilder"
@@ -17,6 +18,7 @@ import { getTimezoneOverride, setTimezoneOverride } from "./utils/timeUtils"
 
 const DEFAULT_SECTION_ORDER = [
   "structured-task-builder",
+  "structured-task-prototype",
   "main-task-list",
   "guided-small-improvement-builder",
   "guided-category-builder",
@@ -29,6 +31,7 @@ const DEFAULT_SECTION_ORDER = [
 
 const SECTION_LABELS = {
   "structured-task-builder": "Structured task writer",
+  "structured-task-prototype": "Fixa prototype done flow",
   "guided-small-improvement-builder": "Build a small improvement",
   "guided-category-builder": "Guided category builder",
   "adhd-bridge-builder": "ADHD bridge builder",
@@ -41,6 +44,7 @@ const SECTION_LABELS = {
 
 const DEFAULT_SECTION_COLLAPSED = {
   "structured-task-builder": false,
+  "structured-task-prototype": false,
   "guided-small-improvement-builder": true,
   "guided-category-builder": true,
   "adhd-bridge-builder": true,
@@ -165,6 +169,14 @@ function AppContent() {
       case "structured-task-builder":
         return (
           <StructuredTaskBuilder
+            key={id}
+            sectionControls={controls}
+            {...props}
+          />
+        )
+      case "structured-task-prototype":
+        return (
+          <StructuredTaskPrototype
             key={id}
             sectionControls={controls}
             {...props}

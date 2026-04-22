@@ -709,6 +709,59 @@ body {
   outline: none;
 }
 
+.task-step-row--completed {
+  border-color: rgba(173, 255, 209, 0.45);
+  background: rgba(52, 209, 149, 0.14);
+}
+
+.task-step-input--completed {
+  color: rgba(214, 255, 232, 0.9);
+  text-decoration: line-through;
+}
+
+.task-step-done-btn {
+  min-width: 92px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(173, 255, 209, 0.42);
+  background: rgba(52, 209, 149, 0.14);
+  color: #e8fff4;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.task-step-done-btn:hover,
+.task-step-done-btn:focus-visible {
+  background: rgba(52, 209, 149, 0.26);
+  box-shadow: 0 0 0 2px rgba(173, 255, 209, 0.3);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.task-step-done-btn--active {
+  background: rgba(52, 209, 149, 0.33);
+}
+
+.task-builder-generate--big {
+  width: 100%;
+  padding: 14px 18px;
+  margin-top: 18px;
+  font-size: 1.06rem;
+  font-weight: 800;
+  border-color: rgba(173, 255, 209, 0.5);
+  background: rgba(52, 209, 149, 0.22);
+}
+
+.task-builder-generate--big:hover,
+.task-builder-generate--big:focus-visible {
+  background: rgba(52, 209, 149, 0.32);
+}
+
 @media (max-width: 640px) {
   .task-builder-card {
     padding: 18px;
