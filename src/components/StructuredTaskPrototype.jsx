@@ -1,6 +1,7 @@
 import { useRef, useState } from "react"
 import SectionMoveControls from "./SectionMoveControls"
 import { parseStepRaw, genStepId } from "../utils/stepUtils"
+import { useMainTask } from "../context/MainTaskContext"
 
 function normalizeInput(value) {
   return value.trim()
@@ -31,11 +32,57 @@ export default function StructuredTaskPrototype({
   sectionCollapsed,
   onToggleSectionCollapsed,
 }) {
+  const { addMainTaskAndActivate, updateMainTask, mainTasks } = useMainTask()
   const [goal, setGoal] = useState("")
   const [steps, setSteps] = useState([{ id: genStepId(), raw: "" }])
   const [doneSteps, setDoneSteps] = useState({})
   const [generatedText, setGeneratedText] = useState("")
+  const [queueTaskId, setQueueTaskId] = useState("")
   const stepInputRefs = useRef({})
+
+  function buildTaskSteps(doneMap) {
+    return (steps || [])
+      .map((step) => ({
+        id: step.id,
+        raw: String(step.raw || "").trim(),
+        completed: Boolean(doneMap[step.id]),
+      }))
+      .filter((step) => step.raw.length > 0)
+  }
+
+  function syncPrototypeTask(taskId, doneMap) {
+    if (!taskId) return
+    updateMainTask(taskId, {
+      title: normalizeInput(goal) || "Fixa prototype",
+      steps: buildTaskSteps(doneMap),
+      proof: "",
+      priority: "",
+      status: "active",
+    })
+  }
+
+  function ensurePrototypeTask(doneMap) {
+    const exists = Boolean(queueTaskId) && mainTasks.some((t) => t.id === queueTaskId)
+    if (exists) {
+      syncPrototypeTask(queueTaskId, doneMap)
+      return queueTaskId
+    }
+
+    const created = addMainTaskAndActivate({
+      title: normalizeInput(goal) || "Fixa prototype",
+      now: "",
+      steps: buildTaskSteps(doneMap),
+      proof: "",
+      priority: "",
+    })
+
+    if (created?.id) {
+      window.localStorage.setItem("fst_autostart_main_task", created.id)
+      setQueueTaskId(created.id)
+      return created.id
+    }
+    return ""
+  }
 
   function addStep(nextRaw = "") {
     const newStep = { id: genStepId(), raw: nextRaw }
@@ -57,7 +104,9 @@ export default function StructuredTaskPrototype({
     const idx = steps.findIndex((s) => s.id === id)
     if (idx < 0) return
 
-    setDoneSteps((prev) => ({ ...prev, [id]: true }))
+    const nextDoneMap = { ...doneSteps, [id]: true }
+    setDoneSteps(nextDoneMap)
+    ensurePrototypeTask(nextDoneMap)
 
     const nextStep = steps[idx + 1]
     if (nextStep) {
@@ -105,6 +154,7 @@ export default function StructuredTaskPrototype({
   }
 
   function handleDoneAndGenerate() {
+    ensurePrototypeTask(doneSteps)
     const nextOutput = buildPrototypeOutput({ goal, steps })
     setGeneratedText(nextOutput)
   }
