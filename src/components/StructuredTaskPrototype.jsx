@@ -288,7 +288,7 @@ export default function StructuredTaskPrototype({
         <div className="prototype-part-progress__bar">
           <div
             className={`prototype-part-progress__fill ${live.isActive ? "prototype-part-progress__fill--head" : ""}`}
-            style={{ '--progress-ratio': live.ratio, background: live.color }}
+            style={{ "--progress-ratio": live.ratio, background: live.color }}
           />
         </div>
         <span className="prototype-part-progress__time">
@@ -402,11 +402,14 @@ export default function StructuredTaskPrototype({
   const proofLive = getPartLiveData("proof")
   const priorityLive = getPartLiveData("priority")
 
-  const activeFieldStyle = {
-    borderColor: "rgba(173, 255, 209, 0.9)",
-    background: "rgba(52, 209, 149, 0.2)",
-    boxShadow:
-      "0 0 0 2px rgba(173, 255, 209, 0.42), 0 0 24px rgba(52, 209, 149, 0.38), inset 0 0 20px rgba(52, 209, 149, 0.2)",
+  function activeFieldStyle(live) {
+    const pct = `${Math.round((live?.ratio ?? 1) * 100)}%`
+    return {
+      borderColor: "rgba(173, 255, 209, 0.9)",
+      background: `linear-gradient(to right, rgba(52,209,149,0.22) ${pct}, rgba(52,209,149,0.04) ${pct})`,
+      boxShadow:
+        "0 0 0 2px rgba(173, 255, 209, 0.42), 0 0 24px rgba(52, 209, 149, 0.28)",
+    }
   }
 
   function renderPartControls(part) {
@@ -507,7 +510,11 @@ export default function StructuredTaskPrototype({
                     <textarea
                       id="prototype-goal-input"
                       className={`task-builder-input task-builder-textarea ${goalLive?.isActive ? "task-builder-focus-target task-builder-focus-target--active task-builder-input--countdown-active" : ""}`}
-                      style={goalLive?.isActive ? activeFieldStyle : undefined}
+                      style={
+                        goalLive?.isActive
+                          ? activeFieldStyle(goalLive)
+                          : undefined
+                      }
                       value={goal}
                       onChange={(e) => setGoal(e.target.value)}
                       placeholder="laddat mobilen stadat usbn"
@@ -546,7 +553,7 @@ export default function StructuredTaskPrototype({
                               className="task-step-input"
                               style={
                                 stepsLive?.isActive
-                                  ? activeFieldStyle
+                                  ? activeFieldStyle(stepsLive)
                                   : undefined
                               }
                               value={step.raw}
@@ -594,7 +601,11 @@ export default function StructuredTaskPrototype({
                     <textarea
                       id="prototype-proof-input"
                       className={`task-builder-input task-builder-textarea ${proofLive?.isActive ? "task-builder-focus-target task-builder-focus-target--active task-builder-input--countdown-active" : ""}`}
-                      style={proofLive?.isActive ? activeFieldStyle : undefined}
+                      style={
+                        proofLive?.isActive
+                          ? activeFieldStyle(proofLive)
+                          : undefined
+                      }
                       value={proof}
                       onChange={(e) => setProof(e.target.value)}
                       placeholder="Proof att jag gjorde det jag sa: ..."
@@ -621,7 +632,9 @@ export default function StructuredTaskPrototype({
                       id="prototype-priority-input"
                       className={`task-builder-input ${priorityLive?.isActive ? "task-builder-focus-target task-builder-focus-target--active task-builder-input--countdown-active" : ""}`}
                       style={
-                        priorityLive?.isActive ? activeFieldStyle : undefined
+                        priorityLive?.isActive
+                          ? activeFieldStyle(priorityLive)
+                          : undefined
                       }
                       value={priority}
                       onChange={(e) => setPriority(e.target.value)}
