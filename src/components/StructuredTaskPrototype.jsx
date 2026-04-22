@@ -367,18 +367,16 @@ export default function StructuredTaskPrototype({
             <fieldset
               className={`task-builder-steps-section ${focusSteps ? "task-builder-focus-target task-builder-focus-target--active" : ""}`}
             >
-              <legend className="task-builder-legend">
-                <span className="task-builder-label-row">
-                  <span>Steps</span>
-                  <button
-                    type="button"
-                    className={`task-part-done-btn ${isPartCompleted("steps") ? "task-part-done-btn--active" : ""}`}
-                    onClick={() => markPartDone("steps")}
-                  >
-                    {isPartCompleted("steps") ? "Done ✓" : "Done"}
-                  </button>
-                </span>
-              </legend>
+              <div className="task-builder-part-row" role="heading" aria-level={3}>
+                <span className="task-builder-legend">Steps</span>
+                <button
+                  type="button"
+                  className={`task-part-done-btn ${isPartCompleted("steps") ? "task-part-done-btn--active" : ""}`}
+                  onClick={() => markPartDone("steps")}
+                >
+                  {isPartCompleted("steps") ? "Done ✓" : "Done"}
+                </button>
+              </div>
               <div className="task-step-list">
                 {steps.map((step, idx) => {
                   const parsed = parseStepRaw(step.raw)

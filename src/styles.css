@@ -371,6 +371,15 @@ body {
   gap: 10px;
 }
 
+.task-builder-part-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
 .task-part-done-btn {
   min-width: 92px;
   padding: 7px 12px;
