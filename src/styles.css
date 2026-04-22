@@ -442,7 +442,7 @@ body {
   height: 100%;
   width: 100%;
   border-radius: inherit;
-  transform-origin: right center;
+  transform-origin: left center;
   transform: scaleX(var(--progress-ratio, 1));
   transition: transform 0.5s linear;
   opacity: 0.75;
@@ -503,11 +503,9 @@ body {
 
 .task-builder-input--countdown-active {
   border-color: rgba(173, 255, 209, 0.78) !important;
-  background: rgba(52, 209, 149, 0.18) !important;
   box-shadow:
     0 0 0 2px rgba(173, 255, 209, 0.42),
-    0 0 22px rgba(52, 209, 149, 0.34),
-    inset 0 0 18px rgba(52, 209, 149, 0.18);
+    0 0 22px rgba(52, 209, 149, 0.34);
 }
 
 .task-builder-textarea {
@@ -524,7 +522,6 @@ body {
 
 .task-builder-focus-target--active {
   border-color: rgba(173, 255, 209, 0.7) !important;
-  background: rgba(52, 209, 149, 0.16) !important;
   box-shadow:
     0 0 0 2px rgba(173, 255, 209, 0.35),
     0 0 18px rgba(52, 209, 149, 0.28);

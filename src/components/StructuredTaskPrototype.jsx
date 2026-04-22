@@ -282,7 +282,7 @@ export default function StructuredTaskPrototype({
 
   function renderPartProgress(part) {
     const live = getPartLiveData(part)
-    if (!live) return null
+    if (!live || !live.isActive) return null
     return (
       <div className="prototype-part-progress" aria-hidden="true">
         <div className="prototype-part-progress__bar">
