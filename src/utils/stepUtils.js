@@ -189,3 +189,27 @@ export function sortStepsWithLinks(steps, options = {}) {
     const workingSet = includeCompleted ? steps : steps.filter((s) => !s.completed)
     return sortStepsByOrder(workingSet)
 }
+
+/**
+ * Given an ordered list of items (tasks or steps), return the pivot boundary
+ * indices so auto-sort can respect them.
+ *
+ * Returns an array of { index, type, itemId } for each active (non-completed)
+ * pivot in the list.  A "before" pivot at index N means items [0..N-1] should
+ * be done before items[N..].  An "after" pivot at index N means items[N+1..]
+ * should be done before items[0..N].
+ *
+ * Usage for future sort-suggest/auto:
+ *   const boundaries = getPivotBoundaries(orderedList)
+ *   // Do not move items across a boundary unless the user explicitly requests it.
+ */
+export function getPivotBoundaries(orderedList) {
+    const boundaries = []
+    for (let i = 0; i < (orderedList || []).length; i++) {
+        const item = orderedList[i]
+        if (item?.pivot && !item.pivot.completed) {
+            boundaries.push({ index: i, type: item.pivot.type, itemId: item.id })
+        }
+    }
+    return boundaries
+}

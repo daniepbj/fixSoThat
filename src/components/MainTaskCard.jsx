@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, Fragment } from "react"
 import {
   DndContext,
   PointerSensor,
@@ -109,6 +109,14 @@ export default function MainTaskCard({ task }) {
     orderedTasks,
     moveMainTaskUp,
     moveMainTaskDown,
+    setPivotOnTask,
+    completePivotOnTask,
+    setPivotOnStep,
+    completePivotOnStep,
+    requestPlay,
+    activeFocusFlash,
+    triggerFocusFlash,
+    queuedSteps,
   } = useMainTask()
 
   const [expanded, setExpanded] = useState(false)
@@ -123,12 +131,18 @@ export default function MainTaskCard({ task }) {
   const [newStepRaw, setNewStepRaw] = useState("")
   const [addingSubstepFor, setAddingSubstepFor] = useState(null) // stepId | null
   const [newSubstepRaw, setNewSubstepRaw] = useState("")
-  const [queueByStepId, setQueueByStepId] = useState(() => new Map())
-  const [taskHeadQueueItem, setTaskHeadQueueItem] = useState(null)
   const [retryHistoryOpen, setRetryHistoryOpen] = useState(false)
-  const [focusedTaskFlash, setFocusedTaskFlash] = useState(false)
-  const [focusedStepFlashId, setFocusedStepFlashId] = useState(null)
-  const focusFlashTimeoutRef = useRef(0)
+  // Live timer data from context queue (no localStorage polling needed)
+  const taskQueueEntries = queuedSteps.filter((e) => e.mainTask.id === task.id)
+  const queueByStepId = new Map(taskQueueEntries.map((e) => [e.step.id, e]))
+  const taskHeadEntry = taskQueueEntries[0] ?? null
+
+  const focusedTaskFlash =
+    activeFocusFlash?.taskId === task.id && !activeFocusFlash?.stepId
+  const focusedStepFlashId =
+    activeFocusFlash?.taskId === task.id
+      ? (activeFocusFlash.stepId ?? null)
+      : null
   const status = computeStatus(task)
   const isActive = activeMainTaskId === task.id
   const isCompleted = task.status === "completed"
@@ -167,45 +181,6 @@ export default function MainTaskCard({ task }) {
     setExpanded(isActive)
   }, [isActive])
 
-  useEffect(
-    () => () => {
-      if (focusFlashTimeoutRef.current) {
-        window.clearTimeout(focusFlashTimeoutRef.current)
-      }
-    },
-    [],
-  )
-
-  useEffect(() => {
-    function syncQueueSnapshot() {
-      try {
-        const raw = window.localStorage.getItem("fst_active") || "[]"
-        const tasks = JSON.parse(raw)
-        if (!Array.isArray(tasks)) return
-
-        const linked = tasks.filter(
-          (entry) => entry?.sourceMainTaskId && entry?.sourceStepId,
-        )
-
-        const nextMap = new Map(
-          linked.map((entry) => [entry.sourceStepId, entry]),
-        )
-
-        setQueueByStepId(nextMap)
-        setTaskHeadQueueItem(
-          linked.find((entry) => entry.sourceMainTaskId === task.id) || null,
-        )
-      } catch {
-        setQueueByStepId(new Map())
-        setTaskHeadQueueItem(null)
-      }
-    }
-
-    syncQueueSnapshot()
-    const id = window.setInterval(syncQueueSnapshot, 500)
-    return () => window.clearInterval(id)
-  }, [task.id])
-
   function handleSetActive() {
     if (isActive) {
       setActiveMainTaskId("")
@@ -214,44 +189,16 @@ export default function MainTaskCard({ task }) {
     activateMainTask(task.id)
   }
 
-  function queueFocusRequest(stepId = null) {
-    try {
-      window.localStorage.setItem(
-        "fst_focus_request",
-        JSON.stringify({
-          mainTaskId: task.id,
-          stepId: stepId || null,
-          requestedAt: Date.now(),
-        }),
-      )
-    } catch {
-      // no-op
-    }
-  }
-
-  function triggerFocusFlash(stepId = null) {
-    setFocusedTaskFlash(!stepId)
-    setFocusedStepFlashId(stepId || null)
-    if (focusFlashTimeoutRef.current) {
-      window.clearTimeout(focusFlashTimeoutRef.current)
-    }
-    focusFlashTimeoutRef.current = window.setTimeout(() => {
-      setFocusedTaskFlash(false)
-      setFocusedStepFlashId(null)
-      focusFlashTimeoutRef.current = 0
-    }, 1100)
-  }
-
   function handleFocusTask() {
     activateMainTask(task.id)
-    triggerFocusFlash(null)
-    queueFocusRequest(null)
+    triggerFocusFlash(task.id, null)
+    requestPlay(task.id)
   }
 
   function handleFocusStep(stepId) {
     activateMainTask(task.id)
-    triggerFocusFlash(stepId)
-    queueFocusRequest(stepId)
+    triggerFocusFlash(task.id, stepId)
+    requestPlay(task.id)
   }
 
   function handleAddSubstep(parentStepId) {
@@ -314,11 +261,21 @@ export default function MainTaskCard({ task }) {
     const parsed = parseStepRaw(node.raw)
     const stepDepth = getDepth(flatSteps, node.id)
     const hasPrevSibling = siblingIndex > 0
-    const liveQueueItem = queueByStepId.get(node.id)
-    const isLiveHead = taskHeadQueueItem?.sourceStepId === node.id
+    const stepPivotLabel =
+      node.pivot?.type === "before"
+        ? "everything above first"
+        : "everything below first"
+    const liveEntry = queueByStepId.get(node.id)
+    const liveQueueItem = liveEntry
+      ? {
+          remainingSeconds: liveEntry.remainingSeconds,
+          estimatedMinutes: parseStepRaw(liveEntry.step.raw).minutes || 1,
+        }
+      : null
+    const isLiveHead = taskHeadEntry?.step.id === node.id
     const liveTotalSeconds = Math.max(
       60,
-      Number(liveQueueItem?.estimatedMinutes || 1) * 60,
+      (liveQueueItem?.estimatedMinutes || 1) * 60,
     )
     const liveProgressRatio = liveQueueItem
       ? Math.max(
@@ -328,206 +285,301 @@ export default function MainTaskCard({ task }) {
       : 0
 
     return (
-      <div key={node.id} className="mtask-step-tree-node">
-        <SortableStepRow nodeId={node.id}>
-          {({
-            setNodeRef,
-            style,
-            attributes,
-            listeners,
-            isDragging,
-            isOver,
-          }) => (
-            <div
-              ref={setNodeRef}
-              data-main-step-id={node.id}
-              className={`mtask-step-row mtask-step-row--accent ${focusedStepFlashId === node.id ? "mtask-step-row--focus-flash" : ""} ${isDragging ? "mtask-step-row--dragging" : ""} ${isOver ? "mtask-step-row--drop-target" : ""}`}
-              style={{
-                ...style,
-                marginLeft: `${depth * 18}px`,
-                "--step-accent": task.color,
-              }}
-            >
+      <Fragment key={node.id}>
+        {node.pivot?.type === "before" && (
+          <div
+            className={`step-pivot-divider${node.pivot.completed ? " step-pivot-divider--completed" : ""}`}
+            style={{ marginLeft: `${depth * 18}px` }}
+          >
+            <span className="step-pivot-divider__label">
+              ── {stepPivotLabel} ──
+            </span>
+            <span className="step-pivot-divider__actions">
+              {!node.pivot.completed && (
+                <button
+                  type="button"
+                  className="pivot-divider__btn"
+                  onClick={() => completePivotOnStep(task.id, node.id)}
+                  title="Mark done"
+                >
+                  ✓
+                </button>
+              )}
               <button
                 type="button"
-                className="mtask-step-drag"
-                title="Drag to reorder"
-                {...attributes}
-                {...listeners}
+                className="pivot-divider__btn pivot-divider__btn--remove"
+                onClick={() => setPivotOnStep(task.id, node.id, null)}
+                title="Remove pivot"
               >
-                ⋮⋮
+                ×
               </button>
-              {depth > 0 && <span className="mtask-step-indent">↳</span>}
-              <input
-                type="checkbox"
-                className="mtask-step-check"
-                checked={node.completed}
-                onChange={() => toggleStepComplete(task.id, node.id)}
-              />
-              <input
-                type="text"
-                className={`mtask-step-edit ${node.completed ? "mtask-step-text--done" : ""}`}
-                value={node.raw}
-                onChange={(e) => updateStep(task.id, node.id, e.target.value)}
-                placeholder="Step name 5"
-              />
-              {parsed.minutes > 0 && (
-                <span className="mtask-step-time">{parsed.minutes}m</span>
-              )}
-              {liveQueueItem && (
-                <span
-                  className={`mtask-step-time-live ${isLiveHead ? "mtask-step-time-live--head" : ""}`}
-                >
-                  {fmtDuration(liveQueueItem.remainingSeconds)} left
-                </span>
-              )}
-              <div className="mtask-step-right">
+            </span>
+          </div>
+        )}
+        <div className="mtask-step-tree-node">
+          <SortableStepRow nodeId={node.id}>
+            {({
+              setNodeRef,
+              style,
+              attributes,
+              listeners,
+              isDragging,
+              isOver,
+            }) => (
+              <div
+                ref={setNodeRef}
+                data-main-step-id={node.id}
+                className={`mtask-step-row mtask-step-row--accent ${focusedStepFlashId === node.id ? "mtask-step-row--focus-flash" : ""} ${isDragging ? "mtask-step-row--dragging" : ""} ${isOver ? "mtask-step-row--drop-target" : ""}`}
+                style={{
+                  ...style,
+                  marginLeft: `${depth * 18}px`,
+                  "--step-accent": task.color,
+                }}
+              >
                 <button
                   type="button"
-                  className="mtask-step-ctrl"
-                  onClick={() => reorderStep(task.id, node.id, "up")}
-                  disabled={siblingIndex === 0}
-                  title="Move up"
+                  className="mtask-step-drag"
+                  title="Drag to reorder"
+                  {...attributes}
+                  {...listeners}
                 >
-                  ↑
+                  ⋮⋮
                 </button>
-                <button
-                  type="button"
-                  className="mtask-step-ctrl"
-                  onClick={() => reorderStep(task.id, node.id, "down")}
-                  disabled={siblingIndex === siblingCount - 1}
-                  title="Move down"
-                >
-                  ↓
-                </button>
-                {stepDepth > 0 && (
+                {depth > 0 && <span className="mtask-step-indent">↳</span>}
+                <input
+                  type="checkbox"
+                  className="mtask-step-check"
+                  checked={node.completed}
+                  onChange={() => toggleStepComplete(task.id, node.id)}
+                />
+                <input
+                  type="text"
+                  className={`mtask-step-edit ${node.completed ? "mtask-step-text--done" : ""}`}
+                  value={node.raw}
+                  onChange={(e) => updateStep(task.id, node.id, e.target.value)}
+                  placeholder="Step name 5"
+                />
+                {parsed.minutes > 0 && (
+                  <span className="mtask-step-time">{parsed.minutes}m</span>
+                )}
+                {liveQueueItem && (
+                  <span
+                    className={`mtask-step-time-live ${isLiveHead ? "mtask-step-time-live--head" : ""}`}
+                  >
+                    {fmtDuration(liveQueueItem.remainingSeconds)} left
+                  </span>
+                )}
+                <div className="mtask-step-right">
                   <button
                     type="button"
                     className="mtask-step-ctrl"
-                    onClick={() => promoteStep(task.id, node.id)}
-                    title="Promote (move up one level)"
+                    onClick={() => reorderStep(task.id, node.id, "up")}
+                    disabled={siblingIndex === 0}
+                    title="Move up"
                   >
-                    ←
+                    ↑
                   </button>
-                )}
-                {hasPrevSibling && (
                   <button
                     type="button"
                     className="mtask-step-ctrl"
-                    onClick={() => demoteStep(task.id, node.id)}
-                    title="Demote (nest under previous sibling)"
+                    onClick={() => reorderStep(task.id, node.id, "down")}
+                    disabled={siblingIndex === siblingCount - 1}
+                    title="Move down"
                   >
-                    →
+                    ↓
                   </button>
-                )}
-                <span className="mtask-step-tries-count">
-                  {node.tries || 0}×
-                </span>
-                <button
-                  type="button"
-                  className="mtask-step-ctrl"
-                  onClick={() => decrementStepTries(task.id, node.id)}
-                  title="Decrease step tries"
-                >
-                  -
-                </button>
-                <button
-                  type="button"
-                  className="mtask-step-ctrl"
-                  onClick={() => incrementStepTries(task.id, node.id)}
-                  title="Increase step tries"
-                >
-                  +
-                </button>
-                {!isCompleted && !node.completed && (
+                  {stepDepth > 0 && (
+                    <button
+                      type="button"
+                      className="mtask-step-ctrl"
+                      onClick={() => promoteStep(task.id, node.id)}
+                      title="Promote (move up one level)"
+                    >
+                      ←
+                    </button>
+                  )}
+                  {hasPrevSibling && (
+                    <button
+                      type="button"
+                      className="mtask-step-ctrl"
+                      onClick={() => demoteStep(task.id, node.id)}
+                      title="Demote (nest under previous sibling)"
+                    >
+                      →
+                    </button>
+                  )}
+                  <span className="mtask-step-tries-count">
+                    {node.tries || 0}×
+                  </span>
                   <button
                     type="button"
-                    className={`mtask-step-ctrl mtask-step-ctrl--label mtask-step-ctrl--focus ${focusedStepFlashId === node.id ? "mtask-step-ctrl--focus-on" : ""}`}
-                    onClick={() => handleFocusStep(node.id)}
-                    title="Focus this step in timer"
+                    className="mtask-step-ctrl"
+                    onClick={() => decrementStepTries(task.id, node.id)}
+                    title="Decrease step tries"
                   >
-                    ▶ Focus
+                    -
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="mtask-step-ctrl mtask-step-ctrl--label"
-                  onClick={() => {
-                    setAddingSubstepFor(
-                      addingSubstepFor === node.id ? null : node.id,
-                    )
-                    setNewSubstepRaw("")
-                  }}
-                  title="Add child substep"
-                >
-                  + Sub
-                </button>
-                <button
-                  type="button"
-                  className="mtask-step-remove"
-                  onClick={() => removeStepFromTask(task.id, node.id)}
-                  title="Remove step"
-                >
-                  ×
-                </button>
+                  <button
+                    type="button"
+                    className="mtask-step-ctrl"
+                    onClick={() => incrementStepTries(task.id, node.id)}
+                    title="Increase step tries"
+                  >
+                    +
+                  </button>
+                  {!isCompleted && !node.completed && (
+                    <button
+                      type="button"
+                      className={`mtask-step-ctrl mtask-step-ctrl--label mtask-step-ctrl--focus ${focusedStepFlashId === node.id ? "mtask-step-ctrl--focus-on" : ""}`}
+                      onClick={() => handleFocusStep(node.id)}
+                      title="Focus this step in timer"
+                    >
+                      ▶ Focus
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="mtask-step-ctrl mtask-step-ctrl--label"
+                    onClick={() => {
+                      setAddingSubstepFor(
+                        addingSubstepFor === node.id ? null : node.id,
+                      )
+                      setNewSubstepRaw("")
+                    }}
+                    title="Add child substep"
+                  >
+                    + Sub
+                  </button>
+                  {node.pivot ? (
+                    <button
+                      type="button"
+                      className="mtask-step-ctrl mtask-step-ctrl--label mtask-step-ctrl--pivot-on"
+                      onClick={() => setPivotOnStep(task.id, node.id, null)}
+                      title="Remove step pivot"
+                    >
+                      ÷×
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="mtask-step-ctrl"
+                        onClick={() =>
+                          setPivotOnStep(task.id, node.id, "before")
+                        }
+                        title="Pivot: everything above this step first"
+                      >
+                        ÷↑
+                      </button>
+                      <button
+                        type="button"
+                        className="mtask-step-ctrl"
+                        onClick={() =>
+                          setPivotOnStep(task.id, node.id, "after")
+                        }
+                        title="Pivot: everything below this step first"
+                      >
+                        ÷↓
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    className="mtask-step-remove"
+                    onClick={() => removeStepFromTask(task.id, node.id)}
+                    title="Remove step"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
+            )}
+          </SortableStepRow>
+          {liveQueueItem && (
+            <div
+              className="mtask-step-live-progress"
+              style={{ marginLeft: `${depth * 18}px` }}
+              aria-hidden="true"
+            >
+              <div
+                className={`mtask-step-live-progress__fill ${isLiveHead ? "mtask-step-live-progress__fill--head" : ""}`}
+                style={{
+                  width: `${Math.max(0, Math.min(100, liveProgressRatio * 100))}%`,
+                  background: task.color,
+                }}
+              />
             </div>
           )}
-        </SortableStepRow>
-        {liveQueueItem && (
-          <div
-            className="mtask-step-live-progress"
-            style={{ marginLeft: `${depth * 18}px` }}
-            aria-hidden="true"
-          >
+          {addingSubstepFor === node.id && (
             <div
-              className={`mtask-step-live-progress__fill ${isLiveHead ? "mtask-step-live-progress__fill--head" : ""}`}
-              style={{
-                width: `${Math.max(0, Math.min(100, liveProgressRatio * 100))}%`,
-                background: task.color,
-              }}
-            />
-          </div>
-        )}
-        {addingSubstepFor === node.id && (
+              className="mtask-step-add-child"
+              style={{ marginLeft: `${(depth + 1) * 18}px` }}
+            >
+              <input
+                className="mtask-add-step-input"
+                value={newSubstepRaw}
+                onChange={(e) => setNewSubstepRaw(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    handleAddSubstep(node.id)
+                  }
+                  if (e.key === "Escape") setAddingSubstepFor(null)
+                }}
+                placeholder="Add substep (e.g. Diska 5)"
+                autoFocus
+              />
+              <button
+                type="button"
+                className="mtask-add-step-btn"
+                onClick={() => handleAddSubstep(node.id)}
+              >
+                +
+              </button>
+              <button
+                type="button"
+                className="mtask-step-ctrl"
+                onClick={() => setAddingSubstepFor(null)}
+              >
+                ×
+              </button>
+            </div>
+          )}
+          {(node.children || []).map((child, ci) =>
+            renderStepNode(child, ci, node.children.length, depth + 1),
+          )}
+        </div>
+        {node.pivot?.type === "after" && (
           <div
-            className="mtask-step-add-child"
-            style={{ marginLeft: `${(depth + 1) * 18}px` }}
+            className={`step-pivot-divider${node.pivot.completed ? " step-pivot-divider--completed" : ""}`}
+            style={{ marginLeft: `${depth * 18}px` }}
           >
-            <input
-              className="mtask-add-step-input"
-              value={newSubstepRaw}
-              onChange={(e) => setNewSubstepRaw(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault()
-                  handleAddSubstep(node.id)
-                }
-                if (e.key === "Escape") setAddingSubstepFor(null)
-              }}
-              placeholder="Add substep (e.g. Diska 5)"
-              autoFocus
-            />
-            <button
-              type="button"
-              className="mtask-add-step-btn"
-              onClick={() => handleAddSubstep(node.id)}
-            >
-              +
-            </button>
-            <button
-              type="button"
-              className="mtask-step-ctrl"
-              onClick={() => setAddingSubstepFor(null)}
-            >
-              ×
-            </button>
+            <span className="step-pivot-divider__label">
+              ── {stepPivotLabel} ──
+            </span>
+            <span className="step-pivot-divider__actions">
+              {!node.pivot.completed && (
+                <button
+                  type="button"
+                  className="pivot-divider__btn"
+                  onClick={() => completePivotOnStep(task.id, node.id)}
+                  title="Mark done"
+                >
+                  ✓
+                </button>
+              )}
+              <button
+                type="button"
+                className="pivot-divider__btn pivot-divider__btn--remove"
+                onClick={() => setPivotOnStep(task.id, node.id, null)}
+                title="Remove pivot"
+              >
+                ×
+              </button>
+            </span>
           </div>
         )}
-        {(node.children || []).map((child, ci) =>
-          renderStepNode(child, ci, node.children.length, depth + 1),
-        )}
-      </div>
+      </Fragment>
     )
   }
 
@@ -556,9 +608,9 @@ export default function MainTaskCard({ task }) {
           </span>
         </div>
         <div className="mtask-card__header-meta">
-          {taskHeadQueueItem && (
+          {taskHeadEntry && (
             <span className="mtask-card__live-countdown">
-              {fmtDuration(taskHeadQueueItem.remainingSeconds)} live
+              {fmtDuration(taskHeadEntry.remainingSeconds)} live
             </span>
           )}
           {totalSteps > 0 && (
@@ -598,6 +650,27 @@ export default function MainTaskCard({ task }) {
             title="Move task down"
           >
             ▼
+          </button>
+          <button
+            type="button"
+            className={`mtask-card__order-btn${task.pivot ? " mtask-card__order-btn--pivot-on" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              // Cycle: none → before → after → none
+              const next = !task.pivot
+                ? "before"
+                : task.pivot.type === "before"
+                  ? "after"
+                  : null
+              setPivotOnTask(task.id, next)
+            }}
+            title={
+              !task.pivot
+                ? "Add pivot divider"
+                : `Pivot: ${task.pivot.type === "before" ? "↑ above first" : "↓ below first"} — click to cycle`
+            }
+          >
+            ÷
           </button>
           <button
             type="button"
@@ -900,6 +973,58 @@ export default function MainTaskCard({ task }) {
                 )}
               </div>
             )}
+
+          {/* Pivot */}
+          <div className="mtask-card__field">
+            <span className="mtask-field-label">Pivot</span>
+            {task.pivot ? (
+              <span className="mtask-pivot-status">
+                <span className="mtask-pivot-type-label">
+                  {task.pivot.type === "before"
+                    ? "↑ above first"
+                    : "↓ below first"}
+                </span>
+                {task.pivot.completed && (
+                  <em className="mtask-pivot-done"> (done)</em>
+                )}
+                {!task.pivot.completed && (
+                  <button
+                    type="button"
+                    className="mtask-edit-btn"
+                    onClick={() => completePivotOnTask(task.id)}
+                  >
+                    ✓ Done
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="mtask-edit-btn mtask-edit-btn--cancel"
+                  onClick={() => setPivotOnTask(task.id, null)}
+                >
+                  × Remove
+                </button>
+              </span>
+            ) : (
+              <span className="mtask-pivot-add-row">
+                <button
+                  type="button"
+                  className="mtask-tries-btn"
+                  onClick={() => setPivotOnTask(task.id, "before")}
+                  title="Pivot: everything above this task should be done first"
+                >
+                  ÷ ↑ above first
+                </button>
+                <button
+                  type="button"
+                  className="mtask-tries-btn"
+                  onClick={() => setPivotOnTask(task.id, "after")}
+                  title="Pivot: everything below this task should be done first"
+                >
+                  ÷ ↓ below first
+                </button>
+              </span>
+            )}
+          </div>
 
           {/* Actions */}
           <div className="mtask-card__actions">

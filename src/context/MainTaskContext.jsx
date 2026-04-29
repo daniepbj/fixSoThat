@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useRef, useState } from "react"
 import { playPowerUpSound, playCompletionSound } from "../utils/soundEffects"
 import confetti from "canvas-confetti"
 import { useLocalStorage } from "../hooks/useLocalStorage"
@@ -8,6 +8,8 @@ import {
   parseStepBlockTree,
   flattenTreeToSteps,
   getDescendants,
+  parseStepRaw,
+  getChildren,
 } from "../utils/stepUtils"
 
 const MainTaskContext = createContext(null)
@@ -26,6 +28,7 @@ function makeStep(raw, order, parentId = null, options = {}) {
     parentId: parentId ?? null,
     order: typeof order === "number" ? order : 0,
     tries: Math.max(0, Number(options.tries) || 0),
+    pivot: options.pivot ?? null,
   }
 }
 
@@ -42,6 +45,7 @@ function normalizeStep(step, order) {
           ? order
           : 0,
     tries: Math.max(0, Number(step?.tries) || 0),
+    pivot: step?.pivot ?? null,
   }
 }
 
@@ -145,7 +149,39 @@ function normalizeTask(task) {
       : [],
     createdAt: task?.createdAt || new Date().toISOString(),
     updatedAt: task?.updatedAt || new Date().toISOString(),
+    pivot: task?.pivot ?? null,
   }
+}
+
+// ── Queue derivation helpers ────────────────────────────────────────────
+
+// DFS through flat step list, yields { step, depth } in render order
+function flattenActionableSteps(steps) {
+  const flattened = []
+  const visit = (parentId, depth) => {
+    const children = getChildren(steps, parentId)
+    for (const step of children) {
+      flattened.push({ step, depth })
+      visit(step.id, depth + 1)
+    }
+  }
+  visit(null, 0)
+  return flattened
+}
+
+const MAX_STEP_SECONDS = 60 * 60
+const DEFAULT_STEP_MINUTES = 2
+
+function clampStepSeconds(v) {
+  const n = Number(v)
+  if (!Number.isFinite(n) || n < 0) return 0
+  return Math.min(MAX_STEP_SECONDS, Math.round(n))
+}
+
+function defaultRemainingForStep(step) {
+  const parsed = parseStepRaw(step?.raw || "")
+  const mins = parsed.minutes > 0 ? parsed.minutes : DEFAULT_STEP_MINUTES
+  return mins * 60
 }
 
 // Max order among siblings of a given parentId
@@ -184,10 +220,69 @@ export function MainTaskProvider({ children }) {
     "",
   )
   const [retryReflectionTaskId, setRetryReflectionTaskId] = useState(null)
+  const [stepTimers, setStepTimers] = useLocalStorage("fst_step_timers", {})
+  // playRequested: set by MainTaskCard when user clicks Focus; consumed by TimerApp.
+  // Format: { mainTaskId: string } | null
+  const [playRequested, setPlayRequested] = useState(null)
+
+  function requestPlay(mainTaskId) {
+    setPlayRequested({ mainTaskId, requestedAt: Date.now() })
+  }
+  function clearPlayRequest() {
+    setPlayRequested(null)
+  }
+
+  // ── Focus flash (global — no prop drilling) ─────────────────────────────
+  // Set by TimerApp on play/queue-advance; consumed by MainTaskCard to highlight
+  // the active step without prop drilling.
+  const [activeFocusFlash, setActiveFocusFlash] = useState(null)
+  const focusFlashTimerRef = useRef(null)
+
+  function triggerFocusFlash(taskId, stepId = null) {
+    if (focusFlashTimerRef.current) clearTimeout(focusFlashTimerRef.current)
+    setActiveFocusFlash({ taskId, stepId: stepId ?? null })
+    focusFlashTimerRef.current = setTimeout(() => {
+      setActiveFocusFlash(null)
+      focusFlashTimerRef.current = null
+    }, 1100)
+  }
+
+  function clearFocusFlash() {
+    if (focusFlashTimerRef.current) {
+      clearTimeout(focusFlashTimerRef.current)
+      focusFlashTimerRef.current = null
+    }
+    setActiveFocusFlash(null)
+  }
 
   // Raw array IS the truth — active task is always at index 0.
   // No sort needed here; activateMainTask and reorderMainTask maintain this invariant.
   const orderedTasks = [...mainTasks]
+
+  // ── Derived queue ──────────────────────────────────────────────────────
+  // Single source of truth for what the timer should execute.
+  // Each entry: { step, mainTask, remainingSeconds, spentSeconds, depth }
+  const queuedSteps = mainTasks
+    .filter((t) => t.status === "active")
+    .flatMap((mainTask) =>
+      flattenActionableSteps(mainTask.steps)
+        .filter(({ step }) => !step.completed)
+        .map(({ step, depth }) => {
+          const timer = stepTimers[step.id]
+          const remaining = timer
+            ? clampStepSeconds(timer.remainingSeconds)
+            : defaultRemainingForStep(step)
+          return {
+            step,
+            mainTask,
+            depth,
+            remainingSeconds: remaining,
+            spentSeconds: timer
+              ? Math.max(0, Number(timer.spentSeconds) || 0)
+              : 0,
+          }
+        }),
+    )
 
   useEffect(() => {
     setMainTasks((prev) => prev.map((task) => normalizeTask(task)))
@@ -253,6 +348,16 @@ export function MainTaskProvider({ children }) {
   function deleteMainTask(id) {
     const task = mainTasks.find((t) => t.id === id)
     if (!task) return
+
+    // Clean up step timers so fst_step_timers doesn't accumulate orphaned entries
+    const stepIds = new Set((task.steps || []).map((s) => s.id))
+    if (stepIds.size > 0) {
+      setStepTimers((prev) => {
+        const next = { ...prev }
+        for (const sid of stepIds) delete next[sid]
+        return next
+      })
+    }
 
     setDeletedMainTasks((prev) => [
       ...prev,
@@ -352,6 +457,119 @@ export function MainTaskProvider({ children }) {
     const idx = orderedTasks.findIndex((t) => t.id === id)
     if (idx < 0 || idx >= orderedTasks.length - 1) return
     reorderMainTask(id, orderedTasks[idx + 1].id)
+  }
+
+  // ── Step timer operations ───────────────────────────────────────────────
+
+  function updateStepTimer(stepId, patch) {
+    if (!stepId) return
+    setStepTimers((prev) => ({
+      ...prev,
+      [stepId]: {
+        remainingSeconds: clampStepSeconds(
+          patch.remainingSeconds ?? prev[stepId]?.remainingSeconds ?? 0,
+        ),
+        spentSeconds: Math.max(
+          0,
+          Number(patch.spentSeconds ?? prev[stepId]?.spentSeconds ?? 0),
+        ),
+      },
+    }))
+  }
+
+  function resetStepTimer(stepId, estimatedMinutes) {
+    if (!stepId) return
+    const mins = Math.max(
+      1,
+      Math.min(
+        60,
+        Math.round(Number(estimatedMinutes) || DEFAULT_STEP_MINUTES),
+      ),
+    )
+    setStepTimers((prev) => ({
+      ...prev,
+      [stepId]: { remainingSeconds: mins * 60, spentSeconds: 0 },
+    }))
+  }
+
+  function clearStepTimersForTask(taskId) {
+    const task = mainTasks.find((t) => t.id === taskId)
+    if (!task) return
+    const stepIds = new Set((task.steps || []).map((s) => s.id))
+    setStepTimers((prev) => {
+      const next = { ...prev }
+      for (const sid of stepIds) delete next[sid]
+      return next
+    })
+  }
+
+  // ── Pivot operations ────────────────────────────────────────────────────
+
+  function setPivotOnTask(taskId, pivotType) {
+    setMainTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              pivot: pivotType ? { type: pivotType, completed: false } : null,
+              updatedAt: new Date().toISOString(),
+            }
+          : t,
+      ),
+    )
+  }
+
+  function completePivotOnTask(taskId) {
+    setMainTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId && t.pivot
+          ? {
+              ...t,
+              pivot: { ...t.pivot, completed: true },
+              updatedAt: new Date().toISOString(),
+            }
+          : t,
+      ),
+    )
+  }
+
+  function setPivotOnStep(taskId, stepId, pivotType) {
+    setMainTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t
+        return {
+          ...t,
+          steps: t.steps.map((s) =>
+            s.id === stepId
+              ? {
+                  ...s,
+                  pivot: pivotType
+                    ? { type: pivotType, completed: false }
+                    : null,
+                }
+              : s,
+          ),
+          updatedAt: new Date().toISOString(),
+        }
+      }),
+    )
+  }
+
+  function completePivotOnStep(taskId, stepId) {
+    setMainTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t
+        return {
+          ...t,
+          steps: t.steps.map((s) =>
+            s.id === stepId && s.pivot
+              ? { ...s, pivot: { ...s.pivot, completed: true } }
+              : s,
+          ),
+          updatedAt: new Date().toISOString(),
+        }
+      }),
+    )
   }
 
   function incrementTries(id) {
@@ -909,6 +1127,15 @@ export function MainTaskProvider({ children }) {
     activateMainTask,
     moveMainTaskUp,
     moveMainTaskDown,
+    queuedSteps,
+    stepTimers,
+    updateStepTimer,
+    resetStepTimer,
+    clearStepTimersForTask,
+    setPivotOnTask,
+    completePivotOnTask,
+    setPivotOnStep,
+    completePivotOnStep,
     reorderMainTaskStep,
     orderedTasks,
     incrementTries,
@@ -936,6 +1163,12 @@ export function MainTaskProvider({ children }) {
     deleteFixaPreset,
     loadFixaPreset,
     triggerBigCelebration,
+    playRequested,
+    requestPlay,
+    clearPlayRequest,
+    activeFocusFlash,
+    triggerFocusFlash,
+    clearFocusFlash,
   }
 
   return (

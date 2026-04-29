@@ -46,6 +46,36 @@ function SortableMainTaskRow({ task, isFocusedTop }) {
   )
 }
 
+function PivotDivider({ label, completed, onDone, onRemove }) {
+  return (
+    <div
+      className={`pivot-divider${completed ? " pivot-divider--completed" : ""}`}
+    >
+      <span className="pivot-divider__label">──── PIVOT: {label} ────</span>
+      <span className="pivot-divider__actions">
+        {!completed && (
+          <button
+            type="button"
+            className="pivot-divider__btn"
+            onClick={onDone}
+            title="Mark pivot done"
+          >
+            ✓ Done
+          </button>
+        )}
+        <button
+          type="button"
+          className="pivot-divider__btn pivot-divider__btn--remove"
+          onClick={onRemove}
+          title="Remove pivot"
+        >
+          × Remove
+        </button>
+      </span>
+    </div>
+  )
+}
+
 export default function MainTaskList({
   sectionControls,
   sectionCollapsed,
@@ -59,6 +89,8 @@ export default function MainTaskList({
     undoDeleteMainTask,
     clearDeletedMainTasks,
     orderedTasks,
+    setPivotOnTask,
+    completePivotOnTask,
   } = useMainTask()
   const [filter, setFilter] = useState("active")
   const [showDeleted, setShowDeleted] = useState(false)
@@ -158,13 +190,39 @@ export default function MainTaskList({
                 items={displayList.map((task) => task.id)}
                 strategy={verticalListSortingStrategy}
               >
-                {displayList.map((task, idx) => (
-                  <SortableMainTaskRow
-                    key={task.id}
-                    task={task}
-                    isFocusedTop={idx === 0 && task.id === activeMainTaskId}
-                  />
-                ))}
+                {displayList.flatMap((task, idx) => {
+                  const rows = []
+                  if (task.pivot?.type === "before") {
+                    rows.push(
+                      <PivotDivider
+                        key={`pivot-before-${task.id}`}
+                        label="everything above first"
+                        completed={task.pivot.completed}
+                        onDone={() => completePivotOnTask(task.id)}
+                        onRemove={() => setPivotOnTask(task.id, null)}
+                      />,
+                    )
+                  }
+                  rows.push(
+                    <SortableMainTaskRow
+                      key={task.id}
+                      task={task}
+                      isFocusedTop={idx === 0 && task.id === activeMainTaskId}
+                    />,
+                  )
+                  if (task.pivot?.type === "after") {
+                    rows.push(
+                      <PivotDivider
+                        key={`pivot-after-${task.id}`}
+                        label="everything below first"
+                        completed={task.pivot.completed}
+                        onDone={() => completePivotOnTask(task.id)}
+                        onRemove={() => setPivotOnTask(task.id, null)}
+                      />,
+                    )
+                  }
+                  return rows
+                })}
               </SortableContext>
             </DndContext>
           </div>

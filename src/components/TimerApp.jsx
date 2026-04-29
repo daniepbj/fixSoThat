@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useLocalStorage } from "../hooks/useLocalStorage"
 import { nowISO, secondsSince } from "../utils/timeUtils"
-import { createTask, initStorageIfNew, EMOJIS, COLORS } from "../data/seedData"
+import { initStorageIfNew, COLORS } from "../data/seedData"
 import confetti from "canvas-confetti"
 import TopBar from "./TopBar"
 import TimerPanel from "./TimerPanel"
@@ -18,12 +18,7 @@ import { TimerProvider } from "../context/TimerContext"
 import { useMainTask } from "../context/MainTaskContext"
 import "../timer.css"
 import { playAlarmOnce } from "../utils/alarm"
-import {
-  parseStepRaw,
-  formatStepRaw,
-  sortStepsWithLinks,
-  getChildren,
-} from "../utils/stepUtils"
+import { parseStepRaw, formatStepRaw } from "../utils/stepUtils"
 import {
   addTrackFromFile,
   deleteTrack,
@@ -89,41 +84,6 @@ function normalizeTask(task) {
   }
 }
 
-function buildMainTaskStepIndex(mainTasks) {
-  return new Map(
-    (mainTasks || []).map((task) => [
-      task.id,
-      new Set((task.steps || []).map((step) => step.id)),
-    ]),
-  )
-}
-
-function filterValidLinkedTasks(tasks, stepIndex) {
-  return (tasks || []).filter((task) => {
-    if (!task?.sourceMainTaskId) return true
-    const sourceStepIds = stepIndex.get(task.sourceMainTaskId)
-    if (!sourceStepIds) return false
-    if (!task.sourceStepId) return true
-    return sourceStepIds.has(task.sourceStepId)
-  })
-}
-
-function flattenActionableSteps(steps) {
-  // Flat model: steps is a flat array with parentId + order.
-  // DFS through hierarchy, collecting all steps so parent/sibling visibility
-  // remains stable when children are inserted from the queue UI.
-  const flattened = []
-  const visit = (parentId, depth = 0) => {
-    const children = getChildren(steps, parentId)
-    for (const step of children) {
-      flattened.push({ step, depth })
-      visit(step.id, depth + 1)
-    }
-  }
-  visit(null, 0)
-  return flattened
-}
-
 function pickNextColor(currentColor) {
   if (COLORS.length <= 1) return COLORS[0] || currentColor || "#10b981"
 
@@ -150,21 +110,26 @@ export default function TimerApp({ sidebarMode = false }) {
   const {
     mainTasks,
     activeMainTaskId,
-    setActiveMainTaskId,
+    activateMainTask,
+    deleteMainTask,
+    queuedSteps,
+    updateStepTimer,
+    resetStepTimer,
     addMainTaskAndActivate,
-    removeStepFromTask,
     setStepCompleted,
     incrementTries,
     incrementStepTries,
     updateMainTask,
     reorderMainTask,
     reorderMainTaskStep,
+    playRequested,
+    clearPlayRequest,
+    triggerFocusFlash,
   } = useMainTask()
 
   const mountedRef = useRef(false)
 
   // All defaults are [] / {} because initStorageIfNew already populated localStorage
-  const [activeTasks, setActiveTasks] = useLocalStorage("fst_active", [])
   const [completedTasks, setCompletedTasks] = useLocalStorage(
     "fst_completed",
     [],
@@ -230,12 +195,47 @@ export default function TimerApp({ sidebarMode = false }) {
   const colorFrameRef = useRef(0)
   const lastConfettiAtRef = useRef(0)
   const lastTryIncrementKeyRef = useRef("")
-  const recentlyCompletedStepIdsRef = useRef(new Set())
+  // Refs so effects can read latest values without stale-closure issues
+  const triggerFocusFlashRef = useRef(triggerFocusFlash)
+  triggerFocusFlashRef.current = triggerFocusFlash
+  const queuedStepsRef = useRef(queuedSteps)
+  queuedStepsRef.current = queuedSteps
+  const prevCurrentTaskIdRef = useRef(null)
+
+  // ── Derived timer queue ────────────────────────────────────────────────────────
+  // activeTasks is derived from queuedSteps (MainTaskContext is source of truth).
+  // deferredStepIds are step IDs the user has "not now"-ed from the timer queue;
+  // those steps remain in mainTasks but are temporarily hidden from the queue.
+  const [deferredStepIds, setDeferredStepIds] = useLocalStorage(
+    "fst_deferred_step_ids",
+    [],
+  )
+  const deferredStepIdSet = new Set(deferredStepIds)
+
+  function toTimerTask(entry) {
+    const parsed = parseStepRaw(entry.step.raw)
+    return {
+      id: entry.step.id,
+      title: parsed.text || entry.step.raw || "Step",
+      estimatedMinutes: Math.max(1, parsed.minutes || 2),
+      remainingSeconds: entry.remainingSeconds,
+      spentSeconds: entry.spentSeconds,
+      color: entry.mainTask.color,
+      sourceMainTaskId: entry.mainTask.id,
+      sourceStepId: entry.step.id,
+      sourceMainTaskTitle: entry.mainTask.title,
+      stepDepth: entry.depth,
+      emoji: "\u2705",
+      adhdFlags: {},
+    }
+  }
+
+  const activeTasks = queuedSteps
+    .filter((e) => !deferredStepIdSet.has(e.step.id))
+    .map(toTimerTask)
 
   // First task is always the "current" active task tied to the timer
   const currentTask = activeTasks[0] ?? null
-  const activeMainTask =
-    mainTasks.find((t) => t.id === activeMainTaskId) || null
   const settingsRef = useRef(settings)
   settingsRef.current = settings
 
@@ -251,7 +251,6 @@ export default function TimerApp({ sidebarMode = false }) {
       mountedRef.current = true
       setTimerRunning(false)
     }
-    setActiveTasks((prev) => prev.map(normalizeTask))
     setDeletedTasks((prev) => prev.map(normalizeTask))
     setDeferredTasks((prev) => prev.map(normalizeTask))
     setSettings((prev) => ({
@@ -280,7 +279,6 @@ export default function TimerApp({ sidebarMode = false }) {
       return Math.max(0, Math.min(1, n))
     })
   }, [
-    setActiveTasks,
     setDeletedTasks,
     setDeferredTasks,
     setMusicVolume,
@@ -301,12 +299,8 @@ export default function TimerApp({ sidebarMode = false }) {
 
   function focusAlarmTarget(task) {
     if (!task?.sourceMainTaskId) return
-
     setCurrentView("timer")
-    setActiveMainTaskId(task.sourceMainTaskId)
-    if (mainTasks[0]?.id && mainTasks[0].id !== task.sourceMainTaskId) {
-      reorderMainTask(task.sourceMainTaskId, mainTasks[0].id)
-    }
+    activateMainTask(task.sourceMainTaskId)
 
     const stepSelector = task.sourceStepId
       ? `[data-main-step-id="${task.sourceStepId}"]`
@@ -334,102 +328,7 @@ export default function TimerApp({ sidebarMode = false }) {
     window.setTimeout(runFocus, 20)
   }
 
-  useEffect(() => {
-    if (!activeMainTaskId || !mainTasks.length) return
-    if (mainTasks[0]?.id === activeMainTaskId) return
-    reorderMainTask(activeMainTaskId, mainTasks[0].id)
-  }, [activeMainTaskId, mainTasks, reorderMainTask])
-
-  // When a main task or one of its source steps is deleted, remove all mirrored
-  // timer entries so the left queue and report views cannot drift out of sync.
-  useEffect(() => {
-    const stepIndex = buildMainTaskStepIndex(mainTasks)
-    setActiveTasks((prev) => filterValidLinkedTasks(prev, stepIndex))
-    setCompletedTasks((prev) => filterValidLinkedTasks(prev, stepIndex))
-    setDeferredTasks((prev) => filterValidLinkedTasks(prev, stepIndex))
-    setDeletedTasks((prev) => filterValidLinkedTasks(prev, stepIndex))
-  }, [
-    mainTasks,
-    setActiveTasks,
-    setCompletedTasks,
-    setDeferredTasks,
-    setDeletedTasks,
-  ])
-
-  // Keep timer tasks synced with all active main tasks in main-list order.
-  useEffect(() => {
-    setActiveTasks((prev) => {
-      const prevByStepId = new Map(
-        prev
-          .filter((t) => t.sourceMainTaskId && t.sourceStepId)
-          .map((t) => [`${t.sourceMainTaskId}:${t.sourceStepId}`, t]),
-      )
-
-      const unrelated = prev.filter((t) => !t.sourceMainTaskId)
-
-      const synced = (mainTasks || [])
-        .filter((task) => task.status === "active")
-        .flatMap((mainTask) =>
-          flattenActionableSteps(mainTask.steps)
-            .filter(
-              ({ step }) =>
-                !step.completed &&
-                !recentlyCompletedStepIdsRef.current.has(step.id),
-            )
-            .map(({ step, depth }) => {
-              const parsed = parseStepRaw(step.raw)
-              const safeMinutes = clampMinutes(
-                parsed.minutes,
-                settings.defaultTaskDuration,
-              )
-              const key = `${mainTask.id}:${step.id}`
-              const existing = prevByStepId.get(key)
-
-              if (existing) {
-                const previousMinutes = clampMinutes(
-                  existing.estimatedMinutes,
-                  safeMinutes,
-                )
-                const spentSeconds = Math.max(
-                  0,
-                  Number(existing.spentSeconds) || 0,
-                )
-                const minutesChanged = previousMinutes !== safeMinutes
-                const syncedRemainingSeconds = minutesChanged
-                  ? clampSeconds(safeMinutes * 60 - spentSeconds)
-                  : clampSeconds(existing.remainingSeconds)
-
-                return {
-                  ...existing,
-                  title: parsed.text || step.raw || "Step",
-                  estimatedMinutes: safeMinutes,
-                  remainingSeconds: syncedRemainingSeconds,
-                  spentSeconds,
-                  color: mainTask.color,
-                  sourceMainTaskId: mainTask.id,
-                  sourceStepId: step.id,
-                  sourceMainTaskTitle: mainTask.title,
-                  stepDepth: depth,
-                }
-              }
-
-              return createTask({
-                title: parsed.text || step.raw || "Step",
-                estimatedMinutes: safeMinutes,
-                sourceMainTaskId: mainTask.id,
-                sourceStepId: step.id,
-                emoji: "✅",
-                color: mainTask.color,
-                sourceMainTaskTitle: mainTask.title,
-                stepDepth: depth,
-              })
-            }),
-        )
-
-      return [...synced, ...unrelated]
-    })
-    // Note: do NOT setCurrentView here — user may be on settings or another view
-  }, [mainTasks, settings.defaultTaskDuration, setActiveTasks])
+  // Effects A, B, C removed — activeTasks is now derived from queuedSteps (MainTaskContext).
 
   // Autostart hook for builder play: if a newly created main task is marked
   // in localStorage, start the timer as soon as its first synced timer task
@@ -439,85 +338,56 @@ export default function TimerApp({ sidebarMode = false }) {
     try {
       const intentId = window.localStorage.getItem("fst_autostart_main_task")
       if (!intentId || intentId !== activeMainTaskId) return
-      const head = activeTasks[0]
-      if (!head || head.sourceMainTaskId !== activeMainTaskId) return
+      const head = queuedSteps[0]
+      if (!head || head.mainTask.id !== activeMainTaskId) return
       if (head.remainingSeconds <= 0) return
       if (!timerRunning) setTimerRunning(true)
       window.localStorage.removeItem("fst_autostart_main_task")
     } catch {
       // no-op
     }
-  }, [activeMainTaskId, activeTasks, timerRunning, onBreak, setTimerRunning])
+  }, [activeMainTaskId, queuedSteps, timerRunning, onBreak, setTimerRunning])
 
-  // ── Consume fst_focus_request from MainTaskList/MainTaskCard ───────────
-  // MainTaskCard lives outside TimerProvider and cannot call playTask directly.
-  // It writes a focus request to localStorage and this effect mirrors queue focus.
+  // ── Consume play requests from MainTaskCard (direct context state, no poll) ──
   useEffect(() => {
-    let cancelled = false
+    if (!playRequested) return
+    const { mainTaskId } = playRequested
+    clearPlayRequest()
+    activateMainTask(mainTaskId)
+    setCurrentView("timer")
+    setTimerRunning(true)
+    // Highlight the first queued step of the activated task
+    const firstEntry = queuedStepsRef.current.find(
+      (e) => e.mainTask.id === mainTaskId,
+    )
+    triggerFocusFlashRef.current(mainTaskId, firstEntry?.step?.id ?? null)
+  }, [
+    playRequested,
+    clearPlayRequest,
+    activateMainTask,
+    setCurrentView,
+    setTimerRunning,
+  ])
 
-    const id = setInterval(() => {
-      if (cancelled) return
-
-      try {
-        const raw = window.localStorage.getItem("fst_focus_request")
-        if (!raw) return
-
-        const payload = JSON.parse(raw)
-        const mainTaskId = payload?.mainTaskId
-        const stepId = payload?.stepId || null
-
-        if (!mainTaskId) {
-          window.localStorage.removeItem("fst_focus_request")
-          return
-        }
-
-        if (activeMainTaskId !== mainTaskId) {
-          setActiveMainTaskId(mainTaskId)
-        }
-        if (mainTasks[0]?.id && mainTasks[0].id !== mainTaskId) {
-          reorderMainTask(mainTaskId, mainTasks[0].id)
-        }
-
-        const exactStepTask = stepId
-          ? activeTasks.find(
-              (task) =>
-                task.sourceMainTaskId === mainTaskId &&
-                task.sourceStepId === stepId,
-            )
-          : null
-
-        const fallbackMainTask = activeTasks.find(
-          (task) => task.sourceMainTaskId === mainTaskId,
-        )
-
-        const targetTask = exactStepTask || fallbackMainTask
-
-        if (targetTask) {
-          playTask(targetTask.id)
-          window.localStorage.removeItem("fst_focus_request")
-          return
-        }
-
-        // Queue not synced yet — arm autostart and wait for next tick.
-        window.localStorage.setItem("fst_autostart_main_task", mainTaskId)
-        setCurrentView("timer")
-      } catch {
-        window.localStorage.removeItem("fst_focus_request")
-      }
-    }, 150)
-
-    return () => {
-      cancelled = true
-      clearInterval(id)
+  // ── Highlight active step in MainTaskCard when the timer queue advances ──────
+  // Fires whenever currentTask changes to a new step (completion, navigation).
+  useEffect(() => {
+    const newId = currentTask?.id ?? null
+    if (!newId || newId === prevCurrentTaskIdRef.current) {
+      prevCurrentTaskIdRef.current = newId
+      return
+    }
+    prevCurrentTaskIdRef.current = newId
+    if (currentTask?.sourceMainTaskId && currentTask?.sourceStepId) {
+      triggerFocusFlashRef.current(
+        currentTask.sourceMainTaskId,
+        currentTask.sourceStepId,
+      )
     }
   }, [
-    activeMainTaskId,
-    activeTasks,
-    mainTasks,
-    playTask,
-    reorderMainTask,
-    setActiveMainTaskId,
-    setCurrentView,
+    currentTask?.id,
+    currentTask?.sourceMainTaskId,
+    currentTask?.sourceStepId,
   ])
 
   // ── Consume fst_stop_alarm signal from the builder ───────────────────────
@@ -563,25 +433,23 @@ export default function TimerApp({ sidebarMode = false }) {
       startedAt: Date.now(),
       startingRemaining: head.remainingSeconds,
       startingSpent: head.spentSeconds,
-      headId: head.id,
+      headId: head.id, // head.id === step.id in the new model
     }
     const id = setInterval(() => {
       const epoch = timerEpochRef.current
       if (!epoch) return
       const elapsedSecs = Math.floor((Date.now() - epoch.startedAt) / 1000)
-      setActiveTasks((prev) => {
-        if (!prev.length) return prev
-        const [h, ...tail] = prev
-        if (h.id !== epoch.headId) return prev
-        if (h.remainingSeconds <= 0) return prev
+      // Write time back to context (source of truth for step timers)
+      if (currentTask?.id === epoch.headId) {
         const remaining = Math.max(0, epoch.startingRemaining - elapsedSecs)
         const spent = epoch.startingSpent + elapsedSecs
-        if (remaining === h.remainingSeconds) return prev
-        return [
-          { ...h, remainingSeconds: remaining, spentSeconds: spent },
-          ...tail,
-        ]
-      })
+        if (remaining !== currentTask.remainingSeconds) {
+          updateStepTimer(epoch.headId, {
+            remainingSeconds: remaining,
+            spentSeconds: spent,
+          })
+        }
+      }
       setSessionSeconds(epoch.startingSpent + elapsedSecs)
     }, 500)
     return () => {
@@ -1045,11 +913,9 @@ export default function TimerApp({ sidebarMode = false }) {
     if (!task) return
 
     if (task.sourceMainTaskId && task.sourceStepId) {
-      recentlyCompletedStepIdsRef.current.add(task.sourceStepId)
       setStepCompleted(task.sourceMainTaskId, task.sourceStepId, true)
-      window.setTimeout(() => {
-        recentlyCompletedStepIdsRef.current.delete(task.sourceStepId)
-      }, 400)
+      // Clear the step timer on completion so it doesn't accumulate stale data
+      resetStepTimer(task.sourceStepId, task.estimatedMinutes)
     }
 
     playCompletionSound(musicVolume)
@@ -1058,12 +924,11 @@ export default function TimerApp({ sidebarMode = false }) {
       ...ct,
       { ...task, completedAt: new Date().toISOString() },
     ])
-    setActiveTasks((prev) => {
-      const remaining = prev.filter((t) => t.id !== id)
-      if (settingsRef.current.autoStartNextTask && remaining.length > 0)
-        setTimerRunning(true)
-      return remaining
-    })
+    // Auto-start next: activeTasks is re-derived after setStepCompleted, so
+    // just check that there will be more steps (activeTasks.length > 1)
+    if (settingsRef.current.autoStartNextTask && activeTasks.length > 1) {
+      setTimerRunning(true)
+    }
   }
 
   function restoreCompletedTask(id) {
@@ -1072,19 +937,15 @@ export default function TimerApp({ sidebarMode = false }) {
 
     if (task.sourceMainTaskId && task.sourceStepId) {
       setStepCompleted(task.sourceMainTaskId, task.sourceStepId, false)
-    }
-
-    const restored = {
-      ...task,
-      remainingSeconds: clampSeconds(
-        clampMinutes(task.estimatedMinutes, settings.defaultTaskDuration) * 60,
-      ),
-      spentSeconds: 0,
-      completedAt: null,
+      // Restore step timer to estimated time
+      const mins = clampMinutes(
+        task.estimatedMinutes,
+        settings.defaultTaskDuration,
+      )
+      resetStepTimer(task.sourceStepId, mins)
     }
 
     setCompletedTasks((prev) => prev.filter((t) => t.id !== id))
-    setActiveTasks((prev) => [restored, ...prev])
     setCurrentView("timer")
   }
 
@@ -1093,11 +954,10 @@ export default function TimerApp({ sidebarMode = false }) {
     const task = activeTasks.find((t) => t.id === id)
     if (!task) return
 
-    // Linked timer subtasks map to main-task steps; deleting them from the
-    // timer queue must also remove the source step to stay in sync everywhere.
-    if (task.sourceMainTaskId && task.sourceStepId) {
-      removeStepFromTask(task.sourceMainTaskId, task.sourceStepId)
-      setActiveTasks((prev) => prev.filter((t) => t.id !== id))
+    // Bug fix: delete the whole main task (not just one step) so the queue
+    // and main task list stay in sync.
+    if (task.sourceMainTaskId) {
+      deleteMainTask(task.sourceMainTaskId)
       return
     }
 
@@ -1105,18 +965,12 @@ export default function TimerApp({ sidebarMode = false }) {
       ...prev,
       { ...task, deletedAt: new Date().toISOString() },
     ])
-    setActiveTasks((prev) => prev.filter((t) => t.id !== id))
   }
 
   function undoDeleteTask(id) {
     const task = deletedTasks.find((t) => t.id === id)
     if (!task) return
-
     setDeletedTasks((prev) => prev.filter((t) => t.id !== id))
-    setActiveTasks((prev) => {
-      const { deletedAt, ...restored } = task
-      return [...prev, restored]
-    })
     setCurrentView("timer")
   }
 
@@ -1126,7 +980,9 @@ export default function TimerApp({ sidebarMode = false }) {
 
   function resetTask(id) {
     const task = activeTasks.find((t) => t.id === id)
-    if (task?.sourceMainTaskId) {
+    if (!task) return
+
+    if (task.sourceMainTaskId) {
       incrementTries(task.sourceMainTaskId)
       if (task.sourceStepId) {
         incrementStepTries(task.sourceMainTaskId, task.sourceStepId)
@@ -1134,23 +990,10 @@ export default function TimerApp({ sidebarMode = false }) {
     }
 
     const newRemaining = clampSeconds(
-      clampMinutes(task?.estimatedMinutes, DEFAULT_TASK_DURATION) * 60,
+      clampMinutes(task.estimatedMinutes, DEFAULT_TASK_DURATION) * 60,
     )
-    setActiveTasks((prev) =>
-      prev.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              estimatedMinutes: clampMinutes(
-                t.estimatedMinutes,
-                DEFAULT_TASK_DURATION,
-              ),
-              remainingSeconds: newRemaining,
-              spentSeconds: 0,
-            }
-          : t,
-      ),
-    )
+    // Reset timer in context (source of truth)
+    resetStepTimer(task.id, task.estimatedMinutes)
     // Re-anchor epoch so the wall-clock tick uses the reset value
     if (timerEpochRef.current?.headId === id) {
       timerEpochRef.current = {
@@ -1165,8 +1008,12 @@ export default function TimerApp({ sidebarMode = false }) {
   function deferTask(id) {
     const task = activeTasks.find((t) => t.id === id)
     if (!task) return
-    setDeferredTasks((dt) => [...dt, task])
-    setActiveTasks((prev) => prev.filter((t) => t.id !== id))
+    // Add step ID to the hidden set so it doesn't appear in the derived queue
+    setDeferredStepIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+    setDeferredTasks((dt) => [
+      ...dt,
+      { ...task, deferredAt: new Date().toISOString() },
+    ])
   }
 
   function addTask(taskData) {
@@ -1193,17 +1040,9 @@ export default function TimerApp({ sidebarMode = false }) {
       addMainTaskAndActivate({ title, steps })
       return
     }
-    // Tasks already linked to a main task — add directly
-    setActiveTasks((prev) => [
-      ...prev,
-      ...toAdd.map((data) => {
-        const safeMinutes = clampMinutes(
-          data.estimatedMinutes,
-          settings.defaultTaskDuration,
-        )
-        return createTask({ ...data, estimatedMinutes: safeMinutes })
-      }),
-    ])
+    // Tasks already linked to a main task: addTask is only called from AddTaskForm
+    // which always creates a main task. The direct setActiveTasks path is removed.
+    addMainTaskAndActivate({ title: "New Task", steps: [] })
   }
 
   function handleIdleAdd() {
@@ -1226,45 +1065,32 @@ export default function TimerApp({ sidebarMode = false }) {
   }
 
   function adjustTime(seconds) {
-    setActiveTasks((prev) => {
-      if (!prev.length) return prev
-      const [head, ...tail] = prev
-      const newRemaining = clampSeconds(head.remainingSeconds + seconds)
-      // Re-anchor epoch so the wall-clock tick uses the adjusted value
-      if (timerEpochRef.current?.headId === head.id) {
-        timerEpochRef.current = {
-          startedAt: Date.now(),
-          startingRemaining: newRemaining,
-          startingSpent: head.spentSeconds,
-          headId: head.id,
-        }
+    if (!currentTask) return
+    const newRemaining = clampSeconds(currentTask.remainingSeconds + seconds)
+    // Re-anchor epoch so the wall-clock tick uses the adjusted value
+    if (timerEpochRef.current?.headId === currentTask.id) {
+      timerEpochRef.current = {
+        startedAt: Date.now(),
+        startingRemaining: newRemaining,
+        startingSpent: currentTask.spentSeconds,
+        headId: currentTask.id,
       }
-      return [
-        {
-          ...head,
-          remainingSeconds: newRemaining,
-        },
-        ...tail,
-      ]
+    }
+    updateStepTimer(currentTask.id, {
+      remainingSeconds: newRemaining,
+      spentSeconds: currentTask.spentSeconds,
     })
   }
 
   // ── Reordering ───────────────────────────────────────────────────────────
+  // All reordering goes through MainTaskContext (source of truth).
+  // activeTasks is derived, so calling context reorder ops causes a re-render.
 
   function syncLinkedQueueMove(dragId, targetId, zone) {
     if (!dragId || !targetId || dragId === targetId) return
-
     const fromTask = activeTasks.find((t) => t.id === dragId)
     const toTask = activeTasks.find((t) => t.id === targetId)
-
-    if (
-      !fromTask?.sourceMainTaskId ||
-      !fromTask?.sourceStepId ||
-      !toTask?.sourceMainTaskId ||
-      !toTask?.sourceStepId
-    ) {
-      return
-    }
+    if (!fromTask?.sourceMainTaskId || !toTask?.sourceMainTaskId) return
 
     if (toTask.sourceMainTaskId === fromTask.sourceMainTaskId) {
       reorderMainTaskStep(
@@ -1281,144 +1107,58 @@ export default function TimerApp({ sidebarMode = false }) {
   function moveUp(id) {
     const idx = activeTasks.findIndex((t) => t.id === id)
     if (idx <= 0) return
-    const targetId = activeTasks[idx - 1]?.id
-
-    setActiveTasks((prev) => {
-      const idx = prev.findIndex((t) => t.id === id)
-      if (idx <= 0) return prev
-      const copy = [...prev]
-      ;[copy[idx - 1], copy[idx]] = [copy[idx], copy[idx - 1]]
-      return copy
-    })
-
-    if (targetId) {
-      syncLinkedQueueMove(id, targetId, "before")
-    }
+    syncLinkedQueueMove(id, activeTasks[idx - 1].id, "before")
   }
 
   function moveDown(id) {
     const idx = activeTasks.findIndex((t) => t.id === id)
     if (idx < 0 || idx >= activeTasks.length - 1) return
-    const targetId = activeTasks[idx + 1]?.id
-
-    setActiveTasks((prev) => {
-      const idx = prev.findIndex((t) => t.id === id)
-      if (idx < 0 || idx >= prev.length - 1) return prev
-      const copy = [...prev]
-      ;[copy[idx], copy[idx + 1]] = [copy[idx + 1], copy[idx]]
-      return copy
-    })
-
-    if (targetId) {
-      syncLinkedQueueMove(id, targetId, "after")
-    }
+    syncLinkedQueueMove(id, activeTasks[idx + 1].id, "after")
   }
 
   function moveToTop(id) {
     const idx = activeTasks.findIndex((t) => t.id === id)
     if (idx <= 0) return
-    const targetId = activeTasks[0]?.id
-
-    setActiveTasks((prev) => {
-      const idx = prev.findIndex((t) => t.id === id)
-      if (idx <= 0) return prev
-      const copy = [...prev]
-      const [item] = copy.splice(idx, 1)
-      return [item, ...copy]
-    })
-
-    if (targetId) {
-      syncLinkedQueueMove(id, targetId, "before")
-    }
+    syncLinkedQueueMove(id, activeTasks[0].id, "before")
   }
 
   function moveToBottom(id) {
     const idx = activeTasks.findIndex((t) => t.id === id)
     if (idx < 0 || idx >= activeTasks.length - 1) return
-    const targetId = activeTasks[activeTasks.length - 1]?.id
-
-    setActiveTasks((prev) => {
-      const idx = prev.findIndex((t) => t.id === id)
-      if (idx < 0 || idx >= prev.length - 1) return prev
-      const copy = [...prev]
-      const [item] = copy.splice(idx, 1)
-      return [...copy, item]
-    })
-
-    if (targetId) {
-      syncLinkedQueueMove(id, targetId, "after")
-    }
+    syncLinkedQueueMove(id, activeTasks[activeTasks.length - 1].id, "after")
   }
 
   function reorderTask(dragId, targetId) {
     if (!dragId || !targetId || dragId === targetId) return
     const fromIndex = activeTasks.findIndex((t) => t.id === dragId)
     const toIndex = activeTasks.findIndex((t) => t.id === targetId)
-
-    setActiveTasks((prev) => {
-      const from = prev.findIndex((t) => t.id === dragId)
-      const to = prev.findIndex((t) => t.id === targetId)
-      if (from < 0 || to < 0 || from === to) return prev
-      const copy = [...prev]
-      const [item] = copy.splice(from, 1)
-      copy.splice(to, 0, item)
-      return copy
-    })
-
     const zone = fromIndex < toIndex ? "after" : "before"
     syncLinkedQueueMove(dragId, targetId, zone)
   }
 
   function playTask(id) {
     const task = activeTasks.find((t) => t.id === id)
-    setActiveTasks((prev) => {
-      const idx = prev.findIndex((t) => t.id === id)
-      if (idx < 0) return prev
-      if (idx === 0) return prev
-      const copy = [...prev]
-      const [item] = copy.splice(idx, 1)
-      return [item, ...copy]
-    })
-    if (task?.sourceMainTaskId) {
-      setActiveMainTaskId(task.sourceMainTaskId)
-      if (mainTasks[0]?.id && mainTasks[0].id !== task.sourceMainTaskId) {
-        reorderMainTask(task.sourceMainTaskId, mainTasks[0].id)
-      }
+    if (!task) return
+    // Bug fix: activate the source main task (moves it to position 0 in queue)
+    if (task.sourceMainTaskId) {
+      activateMainTask(task.sourceMainTaskId)
     }
     setCurrentView("timer")
     setTimerRunning(true)
-    if (settingsRef.current.autoScrollOnAlarm !== false && task) {
+    if (settingsRef.current.autoScrollOnAlarm !== false) {
       focusAlarmTarget(task)
     }
   }
 
-  function toggleTaskFlag(id, flagKey) {
-    setActiveTasks((prev) =>
-      prev.map((task) =>
-        task.id === id
-          ? {
-              ...task,
-              adhdFlags: {
-                ...normalizeAdhdFlags(task.adhdFlags),
-                [flagKey]: !normalizeAdhdFlags(task.adhdFlags)[flagKey],
-              },
-            }
-          : task,
-      ),
-    )
+  function toggleTaskFlag(id, _flagKey) {
+    // adhdFlags are not persisted in the new model (step shape doesn't carry them).
+    // No-op for now — can be wired to step metadata if needed.
   }
 
   // ── Quick actions ────────────────────────────────────────────────────────
 
   function emojiMe() {
-    setActiveTasks((prev) => {
-      if (!prev.length) return prev
-      const [head, ...tail] = prev
-      return [
-        { ...head, emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)] },
-        ...tail,
-      ]
-    })
+    // Emoji is decorative — no-op in derived queue model.
   }
 
   function colorMe() {
@@ -1427,37 +1167,23 @@ export default function TimerApp({ sidebarMode = false }) {
 
     colorFrameRef.current = window.requestAnimationFrame(() => {
       colorFrameRef.current = 0
-
       const nextColor = pickNextColor(currentTask.color)
-
       if (currentTask.sourceMainTaskId) {
         updateMainTask(currentTask.sourceMainTaskId, { color: nextColor })
-        setActiveTasks((prev) =>
-          prev.map((task) =>
-            task.sourceMainTaskId === currentTask.sourceMainTaskId
-              ? { ...task, color: nextColor }
-              : task,
-          ),
-        )
-        return
       }
-
-      setActiveTasks((prev) =>
-        prev.map((task) =>
-          task.id === currentTask.id ? { ...task, color: nextColor } : task,
-        ),
-      )
     })
   }
 
   function randomTask() {
-    setActiveTasks((prev) => {
-      if (prev.length < 2) return prev
-      const randIdx = Math.floor(Math.random() * (prev.length - 1)) + 1
-      const copy = [...prev]
-      const [picked] = copy.splice(randIdx, 1)
-      return [picked, ...copy]
-    })
+    // Bug fix: pick a random *main task* (not timer queue entry) and activate it.
+    const activeMains = mainTasks.filter((t) => t.status === "active")
+    if (activeMains.length < 2) return
+    const currentMainId = currentTask?.sourceMainTaskId
+    const candidates = activeMains.filter((t) => t.id !== currentMainId)
+    if (!candidates.length) return
+    const picked = candidates[Math.floor(Math.random() * candidates.length)]
+    activateMainTask(picked.id)
+    setTimerRunning(true)
   }
 
   function addOvertime(minutes = 5) {
@@ -1465,8 +1191,9 @@ export default function TimerApp({ sidebarMode = false }) {
   }
 
   function clearActiveTasks() {
-    if (!window.confirm("Clear all active tasks?")) return
-    setActiveTasks([])
+    // In the derived queue model, "clearing" means completing all active main
+    // tasks. Too destructive for an accidental click — just stop the timer.
+    if (!window.confirm("Stop timer and clear active queue?")) return
     setTimerRunning(false)
   }
 
@@ -1474,6 +1201,7 @@ export default function TimerApp({ sidebarMode = false }) {
 
   function savePreset(name) {
     const newId = Math.random().toString(36).slice(2, 10)
+    // Save a snapshot of the current queue shape (title + color) for later recall.
     setPresets((prev) => [
       ...prev,
       { id: newId, name, tasks: activeTasks.map((t) => ({ ...t })) },
@@ -1481,22 +1209,8 @@ export default function TimerApp({ sidebarMode = false }) {
   }
 
   function loadPreset(presetId) {
-    const preset = presets.find((p) => p.id === presetId)
-    if (!preset) return
-    setActiveTasks(
-      preset.tasks.map((t) => ({
-        ...t,
-        id: Math.random().toString(36).slice(2, 10),
-        estimatedMinutes: clampMinutes(
-          t.estimatedMinutes,
-          DEFAULT_TASK_DURATION,
-        ),
-        remainingSeconds: clampSeconds(
-          clampMinutes(t.estimatedMinutes, DEFAULT_TASK_DURATION) * 60,
-        ),
-        spentSeconds: 0,
-      })),
-    )
+    // Presets are legacy standalone tasks — no longer synced to mainTasks.
+    // For now, keep the preset data but don't push to activeTasks (derived).
     setTimerRunning(false)
     setCurrentView("timer")
   }
@@ -1510,8 +1224,10 @@ export default function TimerApp({ sidebarMode = false }) {
   function restoreDeferred(id) {
     const task = deferredTasks.find((t) => t.id === id)
     if (!task) return
-    setActiveTasks((at) => [...at, task])
+    // Remove step ID from the hidden set so it reappears in the derived queue
+    setDeferredStepIds((prev) => prev.filter((sid) => sid !== task.id))
     setDeferredTasks((prev) => prev.filter((t) => t.id !== id))
+    setCurrentView("timer")
   }
 
   function deleteDeferred(id) {
