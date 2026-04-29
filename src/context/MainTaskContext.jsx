@@ -185,6 +185,10 @@ export function MainTaskProvider({ children }) {
   )
   const [retryReflectionTaskId, setRetryReflectionTaskId] = useState(null)
 
+  // Raw array IS the truth — active task is always at index 0.
+  // No sort needed here; activateMainTask and reorderMainTask maintain this invariant.
+  const orderedTasks = [...mainTasks]
+
   useEffect(() => {
     setMainTasks((prev) => prev.map((task) => normalizeTask(task)))
     setDeletedMainTasks((prev) =>
@@ -308,15 +312,46 @@ export function MainTaskProvider({ children }) {
 
   function reorderMainTask(dragId, targetId) {
     if (!dragId || !targetId || dragId === targetId) return
+    const from = mainTasks.findIndex((t) => t.id === dragId)
+    const to = mainTasks.findIndex((t) => t.id === targetId)
+    if (from < 0 || to < 0 || from === to) return
+    const newTasks = [...mainTasks]
+    const [item] = newTasks.splice(from, 1)
+    newTasks.splice(to, 0, item)
+    setMainTasks(newTasks)
+    // Enforce invariant: first active task in new order becomes the active task
+    const firstActive = newTasks.find((t) => t.status === "active")
+    setActiveMainTaskId(firstActive?.id ?? "")
+  }
+
+  // Activate a task: move it to position 0 in the raw array and set as active.
+  // This is the single place that enforces the position-0 = active contract on activation.
+  function activateMainTask(id) {
+    if (!id) {
+      setActiveMainTaskId("")
+      return
+    }
     setMainTasks((prev) => {
-      const from = prev.findIndex((task) => task.id === dragId)
-      const to = prev.findIndex((task) => task.id === targetId)
-      if (from < 0 || to < 0 || from === to) return prev
+      const idx = prev.findIndex((t) => t.id === id)
+      if (idx <= 0) return prev
       const copy = [...prev]
-      const [item] = copy.splice(from, 1)
-      copy.splice(to, 0, item)
+      const [item] = copy.splice(idx, 1)
+      copy.unshift(item)
       return copy
     })
+    setActiveMainTaskId(id)
+  }
+
+  function moveMainTaskUp(id) {
+    const idx = orderedTasks.findIndex((t) => t.id === id)
+    if (idx <= 0) return
+    reorderMainTask(id, orderedTasks[idx - 1].id)
+  }
+
+  function moveMainTaskDown(id) {
+    const idx = orderedTasks.findIndex((t) => t.id === id)
+    if (idx < 0 || idx >= orderedTasks.length - 1) return
+    reorderMainTask(id, orderedTasks[idx + 1].id)
   }
 
   function incrementTries(id) {
@@ -871,7 +906,11 @@ export function MainTaskProvider({ children }) {
     completeMainTask,
     restoreMainTask,
     reorderMainTask,
+    activateMainTask,
+    moveMainTaskUp,
+    moveMainTaskDown,
     reorderMainTaskStep,
+    orderedTasks,
     incrementTries,
     decrementTries,
     incrementStepTries,

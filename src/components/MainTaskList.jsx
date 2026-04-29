@@ -58,6 +58,7 @@ export default function MainTaskList({
     reorderMainTask,
     undoDeleteMainTask,
     clearDeletedMainTasks,
+    orderedTasks,
   } = useMainTask()
   const [filter, setFilter] = useState("active")
   const [showDeleted, setShowDeleted] = useState(false)
@@ -75,16 +76,10 @@ export default function MainTaskList({
     }
   }, [activeMainTaskId, filter])
 
-  const filtered = mainTasks.filter((t) => {
+  const displayList = orderedTasks.filter((t) => {
     if (filter === "active") return t.status === "active"
     if (filter === "completed") return t.status === "completed"
     return true
-  })
-
-  const orderedFiltered = [...filtered].sort((a, b) => {
-    if (a.id === activeMainTaskId) return -1
-    if (b.id === activeMainTaskId) return 1
-    return 0
   })
 
   const activeCount = mainTasks.filter((t) => t.status === "active").length
@@ -145,7 +140,7 @@ export default function MainTaskList({
 
       {!sectionCollapsed && (
         <>
-          {filtered.length === 0 && (
+          {displayList.length === 0 && (
             <p className="mtask-empty-state">
               {filter === "active"
                 ? "No active tasks. Load a Fixa output above to add one."
@@ -160,10 +155,10 @@ export default function MainTaskList({
               onDragEnd={handleDragEnd}
             >
               <SortableContext
-                items={orderedFiltered.map((task) => task.id)}
+                items={displayList.map((task) => task.id)}
                 strategy={verticalListSortingStrategy}
               >
-                {orderedFiltered.map((task, idx) => (
+                {displayList.map((task, idx) => (
                   <SortableMainTaskRow
                     key={task.id}
                     task={task}

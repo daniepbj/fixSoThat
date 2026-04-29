@@ -105,6 +105,10 @@ export default function MainTaskCard({ task }) {
     reorderMainTask,
     setActiveMainTaskId,
     activeMainTaskId,
+    activateMainTask,
+    orderedTasks,
+    moveMainTaskUp,
+    moveMainTaskDown,
   } = useMainTask()
 
   const [expanded, setExpanded] = useState(false)
@@ -128,6 +132,11 @@ export default function MainTaskCard({ task }) {
   const status = computeStatus(task)
   const isActive = activeMainTaskId === task.id
   const isCompleted = task.status === "completed"
+  const visibleIdx = orderedTasks.findIndex((t) => t.id === task.id)
+  const isFirst = visibleIdx === 0
+  const isLast = visibleIdx === orderedTasks.length - 1
+  const moveUpDisabled = isFirst
+  const moveDownDisabled = isLast
   const flatSteps = Array.isArray(task?.steps) ? task.steps : []
   const completedSteps = flatSteps.filter((s) => s.completed).length
   const totalSteps = flatSteps.length
@@ -202,10 +211,7 @@ export default function MainTaskCard({ task }) {
       setActiveMainTaskId("")
       return
     }
-    setActiveMainTaskId(task.id)
-    if (mainTasks[0]?.id && mainTasks[0].id !== task.id) {
-      reorderMainTask(task.id, mainTasks[0].id)
-    }
+    activateMainTask(task.id)
   }
 
   function queueFocusRequest(stepId = null) {
@@ -237,19 +243,13 @@ export default function MainTaskCard({ task }) {
   }
 
   function handleFocusTask() {
-    setActiveMainTaskId(task.id)
-    if (mainTasks[0]?.id && mainTasks[0].id !== task.id) {
-      reorderMainTask(task.id, mainTasks[0].id)
-    }
+    activateMainTask(task.id)
     triggerFocusFlash(null)
     queueFocusRequest(null)
   }
 
   function handleFocusStep(stepId) {
-    setActiveMainTaskId(task.id)
-    if (mainTasks[0]?.id && mainTasks[0].id !== task.id) {
-      reorderMainTask(task.id, mainTasks[0].id)
-    }
+    activateMainTask(task.id)
     triggerFocusFlash(stepId)
     queueFocusRequest(stepId)
   }
@@ -544,7 +544,10 @@ export default function MainTaskCard({ task }) {
       }}
     >
       {/* Header */}
-      <div className="mtask-card__header" onClick={handleSetActive}>
+      <div
+        className="mtask-card__header"
+        onClick={() => setExpanded((v) => !v)}
+      >
         <div className="mtask-card__title-row">
           <span className="mtask-card__expand">{expanded ? "▾" : "▸"}</span>
           <span className="mtask-card__title">
@@ -572,6 +575,30 @@ export default function MainTaskCard({ task }) {
             <StatusBadge label="Proof" isGreen={status.hasProof} />
             <StatusBadge label="Priority" isGreen={status.hasPriority} />
           </div>
+          <button
+            type="button"
+            className="mtask-card__order-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              moveMainTaskUp(task.id)
+            }}
+            disabled={moveUpDisabled}
+            title="Move task up"
+          >
+            ▲
+          </button>
+          <button
+            type="button"
+            className="mtask-card__order-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              moveMainTaskDown(task.id)
+            }}
+            disabled={moveDownDisabled}
+            title="Move task down"
+          >
+            ▼
+          </button>
           <button
             type="button"
             className="mtask-card__header-delete"
@@ -882,7 +909,7 @@ export default function MainTaskCard({ task }) {
                 className={`mtask-action-btn mtask-action-btn--focus ${focusedTaskFlash ? "mtask-action-btn--focus-on" : ""} ${isActive ? "mtask-action-btn--active-on" : ""}`}
                 onClick={handleFocusTask}
               >
-                {focusedTaskFlash ? "▶ Focused" : "▶ Focus"}
+                {isActive ? "▶ Focused" : "▶ Focus"}
               </button>
             )}
             {!isCompleted && (
