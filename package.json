@@ -5,7 +5,9 @@
   "packageManager": "pnpm@10.33.0",
   "type": "module",
   "scripts": {
+    "predev": "pnpm test",
     "dev": "vite",
+    "prebuild": "pnpm test",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run"
