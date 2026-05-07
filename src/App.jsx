@@ -11,6 +11,7 @@ import FixaPresetPanel from "./components/FixaPresetPanel"
 import SaveLoadPanel from "./components/SaveLoadPanel"
 import RetryReflectionModal from "./components/RetryReflectionModal"
 import { MainTaskProvider, useMainTask } from "./context/MainTaskContext"
+import { AppSyncProvider } from "./context/AppSyncContext"
 import { useLocalStorage } from "./hooks/useLocalStorage"
 import { playClickSound } from "./utils/soundEffects"
 import { getTimezoneOverride, setTimezoneOverride } from "./utils/timeUtils"
@@ -90,9 +91,11 @@ export default function App() {
   }, [])
 
   return (
-    <MainTaskProvider>
-      <AppContent />
-    </MainTaskProvider>
+    <AppSyncProvider>
+      <MainTaskProvider>
+        <AppContent />
+      </MainTaskProvider>
+    </AppSyncProvider>
   )
 }
 

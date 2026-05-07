@@ -1527,6 +1527,10 @@ export default function TimerApp({ sidebarMode = false }) {
 
   const timerContextValue = {
     currentTask,
+    activeTasks,
+    completedTasks,
+    deletedTasks,
+    settings,
     timerRunning,
     setTimerRunning,
     toggleTimerWithClick,
@@ -1540,6 +1544,27 @@ export default function TimerApp({ sidebarMode = false }) {
     pomoWorkDuration,
     hasSelectedTrack: Boolean(selectedTrackId),
     hasUploadedTracks: uploadedTracks.length > 0,
+    completeTask,
+    restoreCompletedTask,
+    deleteTask: softDeleteTask,
+    undoDeleteTask,
+    clearDeletedTasks,
+    resetTask,
+    deferTask,
+    moveUp,
+    moveDown,
+    moveToTop,
+    moveToBottom,
+    reorderTask,
+    playTask,
+    toggleTaskFlag,
+    emojiMe,
+    colorMe,
+    randomTask,
+    addOvertime,
+    clearActiveTasks,
+    showAddForm,
+    setShowAddForm,
   }
 
   function skipBreak() {
@@ -1568,35 +1593,6 @@ export default function TimerApp({ sidebarMode = false }) {
     ),
     audioBlockedMessage,
     musicUiMessage,
-  }
-
-  const taskProps = {
-    activeTasks,
-    completedTasks,
-    deletedTasks,
-    settings,
-    completeTask,
-    restoreCompletedTask,
-    deleteTask: softDeleteTask,
-    undoDeleteTask,
-    clearDeletedTasks,
-    resetTask,
-    deferTask,
-    adjustTime,
-    moveUp,
-    moveDown,
-    moveToTop,
-    moveToBottom,
-    reorderTask,
-    playTask,
-    toggleTaskFlag,
-    emojiMe,
-    colorMe,
-    randomTask,
-    addOvertime,
-    clearActiveTasks,
-    showAddForm,
-    setShowAddForm,
   }
 
   return (
@@ -1658,7 +1654,7 @@ export default function TimerApp({ sidebarMode = false }) {
                 </div>
               )}
               <SidebarTaskSteps />
-              <TaskList {...taskProps} />
+              <TaskList />
             </>
           )}
           {currentView === "not-now" && (

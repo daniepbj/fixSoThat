@@ -7,23 +7,21 @@ import {
   projectedEndTimeLocal,
 } from "../utils/timeUtils"
 
-export default function TaskCard({
-  task,
-  isFirst,
-  index,
-  totalTasks,
-  completeTask,
-  deleteTask,
-  resetTask,
-  deferTask,
-  moveUp,
-  moveDown,
-  moveToTop,
-  moveToBottom,
-  playTask,
-  toggleTaskFlag,
-}) {
-  const { currentTask, timerRunning } = useTimerContext()
+export default function TaskCard({ task, isFirst, index, totalTasks }) {
+  const {
+    currentTask,
+    timerRunning,
+    completeTask,
+    deleteTask,
+    resetTask,
+    deferTask,
+    moveUp,
+    moveDown,
+    moveToTop,
+    moveToBottom,
+    playTask,
+    toggleTaskFlag,
+  } = useTimerContext()
   const { addSubstep } = useMainTask()
   const [showSubstepInput, setShowSubstepInput] = useState(false)
   const [substepRaw, setSubstepRaw] = useState("")

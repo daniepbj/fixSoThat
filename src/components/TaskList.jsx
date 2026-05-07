@@ -13,23 +13,10 @@ import {
   useSortable,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import { useTimerContext } from "../context/TimerContext"
 import TaskCard from "./TaskCard"
 
-function SortableTaskRow({
-  task,
-  idx,
-  totalTasks,
-  completeTask,
-  deleteTask,
-  resetTask,
-  deferTask,
-  moveUp,
-  moveDown,
-  moveToTop,
-  moveToBottom,
-  playTask,
-  toggleTaskFlag,
-}) {
+function SortableTaskRow({ task, idx, totalTasks }) {
   const {
     attributes,
     listeners,
@@ -59,48 +46,29 @@ function SortableTaskRow({
         isFirst={idx === 0}
         index={idx}
         totalTasks={totalTasks}
-        completeTask={completeTask}
-        deleteTask={deleteTask}
-        resetTask={resetTask}
-        deferTask={deferTask}
-        moveUp={moveUp}
-        moveDown={moveDown}
-        moveToTop={moveToTop}
-        moveToBottom={moveToBottom}
-        playTask={playTask}
-        toggleTaskFlag={toggleTaskFlag}
       />
     </div>
   )
 }
 
-export default function TaskList({
-  activeTasks,
-  completedTasks,
-  deletedTasks,
-  settings,
-  completeTask,
-  restoreCompletedTask,
-  deleteTask,
-  undoDeleteTask,
-  clearDeletedTasks,
-  resetTask,
-  deferTask,
-  moveUp,
-  moveDown,
-  moveToTop,
-  moveToBottom,
-  reorderTask,
-  playTask,
-  toggleTaskFlag,
-  emojiMe,
-  colorMe,
-  randomTask,
-  addOvertime,
-  clearActiveTasks,
-  showAddForm,
-  setShowAddForm,
-}) {
+export default function TaskList() {
+  const {
+    activeTasks,
+    completedTasks,
+    deletedTasks,
+    settings,
+    restoreCompletedTask,
+    undoDeleteTask,
+    clearDeletedTasks,
+    reorderTask,
+    emojiMe,
+    colorMe,
+    randomTask,
+    addOvertime,
+    clearActiveTasks,
+    setShowAddForm,
+  } = useTimerContext()
+
   const [showCompleted, setShowCompleted] = useState(
     settings.showCompletedByDefault,
   )
@@ -180,16 +148,6 @@ export default function TaskList({
                 task={task}
                 idx={idx}
                 totalTasks={activeTasks.length}
-                completeTask={completeTask}
-                deleteTask={deleteTask}
-                resetTask={resetTask}
-                deferTask={deferTask}
-                moveUp={moveUp}
-                moveDown={moveDown}
-                moveToTop={moveToTop}
-                moveToBottom={moveToBottom}
-                playTask={playTask}
-                toggleTaskFlag={toggleTaskFlag}
               />
             ))}
           </SortableContext>

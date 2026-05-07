@@ -357,13 +357,15 @@ export function MainTaskProvider({ children }) {
   // ── Step operations ─────────────────────────────────────────────────────
 
   function toggleStepComplete(taskId, stepId) {
+    const task = mainTasks.find((t) => t.id === taskId)
+    const step = task ? findStepById(task.steps, stepId) : null
+    const nextCompleted = step ? !step.completed : false
+
     setMainTasks((prev) =>
       prev.map((t) =>
         t.id === taskId
           ? (() => {
-              const step = findStepById(t.steps, stepId)
               if (!step) return t
-              const nextCompleted = !step.completed
               const branchedSteps = setBranchCompleted(
                 t.steps,
                 stepId,
@@ -378,6 +380,34 @@ export function MainTaskProvider({ children }) {
           : t,
       ),
     )
+
+    if (!task || !step) return
+
+    const branchedSteps = setBranchCompleted(task.steps, stepId, nextCompleted)
+    const shouldRunFullComplete =
+      nextCompleted &&
+      branchedSteps.every((s) => s.completed) &&
+      task.status !== "completed"
+
+    if (shouldRunFullComplete) {
+      // Reuse the Done-button path so side effects stay consistent.
+      completeMainTask(taskId)
+    }
+
+    if (nextCompleted) {
+      // Signal TimerApp to complete the linked queue item using the same
+      // completeTask path as clicking the timer-card Done button.
+      try {
+        window.localStorage.setItem(
+          "fst_complete_timer_step",
+          JSON.stringify({
+            mainTaskId: taskId,
+            stepId,
+            requestedAt: Date.now(),
+          }),
+        )
+      } catch {}
+    }
   }
 
   function setStepCompleted(taskId, stepId, completed) {
