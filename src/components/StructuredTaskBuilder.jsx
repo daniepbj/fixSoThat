@@ -146,7 +146,8 @@ export default function StructuredTaskBuilder({
   sectionCollapsed,
   onToggleSectionCollapsed,
 }) {
-  const { addMainTask, addMainTaskAndActivate } = useMainTask()
+  const { addMainTask, addMainTaskAndActivate, completeMainTask } =
+    useMainTask()
 
   const [goal, setGoal] = useState("")
   const [steps, setSteps] = useState([{ id: genStepId(), raw: "" }])
@@ -405,6 +406,7 @@ export default function StructuredTaskBuilder({
   }
 
   function handleLoadIntoTasks() {
+    if (builderQueueTaskId) completeMainTask(builderQueueTaskId)
     try {
       const validSteps = (steps || [])
         .map((s) => ({ raw: String(s?.raw || "").trim() }))

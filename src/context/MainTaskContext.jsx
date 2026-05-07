@@ -10,7 +10,7 @@ import {
   getDescendants,
 } from "../utils/stepUtils"
 
-const MainTaskContext = createContext(null)
+export const MainTaskContext = createContext(null)
 
 function genTaskId() {
   return `mt-${Math.random().toString(36).slice(2, 10)}`
