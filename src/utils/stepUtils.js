@@ -11,6 +11,17 @@ export function parseStepRaw(raw) {
     return { text: trimmed, minutes: 0 }
 }
 
+export function parseRawStep(raw) {
+    const trimmed = String(raw || "").trim()
+    const parsed = parseStepRaw(trimmed)
+    return {
+        id: genStepId(),
+        text: parsed.text,
+        minutes: parsed.minutes > 0 ? parsed.minutes : undefined,
+        completed: false,
+    }
+}
+
 /**
  * Format step back to raw string: "Diska tallrikar 10"
  */
@@ -19,6 +30,41 @@ export function formatStepRaw(text, minutes) {
     const m = parseInt(minutes, 10) || 0
     if (!t) return ""
     return m > 0 ? `${t} ${m}` : t
+}
+
+export function formatStepsForPreview(steps) {
+    if (!Array.isArray(steps) || steps.length === 0) return ""
+    return steps
+        .map((step) => {
+            const text = String(step?.text || "").trim()
+            const prefix = step?.completed ? "[x]" : "[ ]"
+            const minutes = Number(step?.minutes)
+            const suffix = Number.isFinite(minutes) && minutes > 0 ? ` (${minutes}m)` : ""
+            return `${prefix} ${text}${suffix}`.trim()
+        })
+        .join("\n")
+}
+
+export function orderSteps(steps, orderIds = []) {
+    if (!Array.isArray(steps) || steps.length === 0) return []
+
+    const orderIndex = new Map(
+        (Array.isArray(orderIds) ? orderIds : []).map((id, index) => [id, index]),
+    )
+
+    const ordered = []
+    const unordered = []
+
+    for (const step of steps) {
+        if (orderIndex.has(step.id)) {
+            ordered.push(step)
+        } else {
+            unordered.push(step)
+        }
+    }
+
+    ordered.sort((left, right) => orderIndex.get(left.id) - orderIndex.get(right.id))
+    return [...ordered, ...unordered]
 }
 
 /**

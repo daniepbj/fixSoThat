@@ -2,6 +2,7 @@ import React from "react"
 import { describe, it, expect, beforeEach, vi } from "vitest"
 import { render, waitFor, act } from "@testing-library/react"
 import { MainTaskProvider, useMainTask } from "../context/MainTaskContext"
+import { AppSyncProvider, useAppSync } from "../context/AppSyncContext"
 
 vi.mock("../utils/soundEffects", () => ({
   playPowerUpSound: vi.fn(() => Promise.resolve()),
@@ -16,14 +17,24 @@ function CaptureContext({ refObj }) {
   return null
 }
 
+function CaptureAppSyncContext({ refObj }) {
+  const ctx = useAppSync()
+  refObj.current = ctx
+  return null
+}
+
 function renderMainTaskContext() {
   const refObj = { current: null }
+  const appSyncRef = { current: null }
   render(
-    <MainTaskProvider>
-      <CaptureContext refObj={refObj} />
-    </MainTaskProvider>,
+    <AppSyncProvider>
+      <MainTaskProvider>
+        <CaptureContext refObj={refObj} />
+        <CaptureAppSyncContext refObj={appSyncRef} />
+      </MainTaskProvider>
+    </AppSyncProvider>,
   )
-  return refObj
+  return { refObj, appSyncRef }
 }
 
 describe("MainTaskContext regression coverage", () => {
@@ -33,7 +44,7 @@ describe("MainTaskContext regression coverage", () => {
   })
 
   it("completeMainTask matches Done behavior (completed status + all steps completed)", async () => {
-    const ctxRef = renderMainTaskContext()
+    const { refObj: ctxRef } = renderMainTaskContext()
 
     act(() => {
       ctxRef.current.addMainTask({
@@ -63,8 +74,7 @@ describe("MainTaskContext regression coverage", () => {
   })
 
   it("toggleStepComplete emits linked timer completion signal when checking a step", async () => {
-    const setItemSpy = vi.spyOn(Storage.prototype, "setItem")
-    const ctxRef = renderMainTaskContext()
+    const { refObj: ctxRef, appSyncRef } = renderMainTaskContext()
 
     act(() => {
       ctxRef.current.addMainTask({
@@ -86,19 +96,16 @@ describe("MainTaskContext regression coverage", () => {
     })
 
     await waitFor(() => {
-      const matchingCall = setItemSpy.mock.calls.find(
-        (call) => call[0] === "fst_complete_timer_step",
+      expect(appSyncRef.current.completeTimerStepRequest).toBeTruthy()
+      expect(appSyncRef.current.completeTimerStepRequest.mainTaskId).toBe(
+        taskId,
       )
-      expect(matchingCall).toBeTruthy()
-      const payload = JSON.parse(matchingCall[1])
-      expect(payload.mainTaskId).toBe(taskId)
-      expect(payload.stepId).toBe(stepId)
+      expect(appSyncRef.current.completeTimerStepRequest.stepId).toBe(stepId)
     })
   })
 
   it("toggleStepComplete does not emit timer completion signal when unchecking", async () => {
-    const setItemSpy = vi.spyOn(Storage.prototype, "setItem")
-    const ctxRef = renderMainTaskContext()
+    const { refObj: ctxRef, appSyncRef } = renderMainTaskContext()
 
     act(() => {
       ctxRef.current.addMainTask({
@@ -115,22 +122,17 @@ describe("MainTaskContext regression coverage", () => {
       stepId = ctxRef.current.mainTasks[0].steps[0].id
     })
 
-    setItemSpy.mockClear()
     act(() => {
       ctxRef.current.toggleStepComplete(taskId, stepId)
     })
 
     await waitFor(() => {
-      expect(
-        setItemSpy.mock.calls.some(
-          (call) => call[0] === "fst_complete_timer_step",
-        ),
-      ).toBe(false)
+      expect(appSyncRef.current.completeTimerStepRequest).toBeNull()
     })
   })
 
   it("last-step check auto-completes the task status", async () => {
-    const ctxRef = renderMainTaskContext()
+    const { refObj: ctxRef } = renderMainTaskContext()
 
     act(() => {
       ctxRef.current.addMainTask({

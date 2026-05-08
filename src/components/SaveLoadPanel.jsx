@@ -60,12 +60,13 @@ function buildExportJSON() {
 }
 
 export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onToggleSectionCollapsed }) {
-  const { saveSlots, saveSlot, loadSlot, clearSlot, mainTasks } = useMainTask()
+  const { saveSlots, saveSlot, loadSlot, clearSlot, mainTasks, resetMainTaskData } = useMainTask()
   const [slotNames, setSlotNames] = useState(["", "", "", "", ""])
   const [message, setMessage] = useState("")
   const [musicMsg, setMusicMsg] = useState("")
   const [includeMusic, setIncludeMusic] = useState(true)
   const [clearMusic, setClearMusic] = useState(true)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
   const importRef = useRef(null)
   const flashTimerRef = useRef(null)
 
@@ -73,9 +74,8 @@ export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onTog
   const exportFileName = `fixsothat-backup-${new Date().toISOString().slice(0, 10)}.json`
   const exportJSON = buildExportJSON()
   const exportBlob = new Blob([exportJSON], { type: "application/json" })
-  const exportHref = URL.createObjectURL(exportBlob)
-  // Clean up URL on unmount
-  // (no useMemo/useEffect to keep it always fresh, since it's only fallback)
+  let exportHref = ""
+  try { exportHref = URL.createObjectURL(exportBlob) } catch { /* not available in test/SSR environments */ }
 
   function flash(msg, duration = 3000) {
     clearTimeout(flashTimerRef.current)
@@ -196,13 +196,10 @@ export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onTog
   }
 
   async function handleClearAllData() {
-    const ok = window.confirm(
-      "Clear all app data now? This permanently removes tasks, settings, saves, and queue state.",
-    )
-    if (!ok) return
-
+    setShowClearConfirm(false)
     let musicClearFailed = false
     try {
+      resetMainTaskData()
       if (clearMusic) {
         try {
           await clearAllTracks()
@@ -226,7 +223,7 @@ export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onTog
           ? `Cleared ${keys.length} data key(s). Music clear failed — reloading…`
           : `Cleared ${keys.length} data key(s)${clearMusic ? " + music" : ""} — reloading…`,
       )
-      setTimeout(() => window.location.reload(), 350)
+      setTimeout(() => { try { window.location.reload() } catch {} }, 350)
     } catch {
       flash("Failed to clear all data. Please try again.")
     }
@@ -237,6 +234,7 @@ export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onTog
       <div className="save-load-panel__header">
         <button
           type="button"
+          aria-label="Toggle data section"
           className="section-collapse-toggle"
           onClick={onToggleSectionCollapsed}
         >
@@ -292,7 +290,7 @@ export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onTog
                 className="save-slot-btn save-slot-btn--save"
                 onClick={() => handleSave(index)}
               >
-                Save here
+                Store here
               </button>
               {slot && (
                 <>
@@ -386,15 +384,35 @@ export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onTog
               onChange={(e) => setClearMusic(e.target.checked)}
               style={{ marginRight: 4 }}
             />
-            Also clear uploaded music
+            Also clear saved music
           </label>
-          <button
-            type="button"
-            className="save-slot-btn save-slot-btn--danger"
-            onClick={handleClearAllData}
-          >
-            Clear All Data
-          </button>
+          {showClearConfirm ? (
+            <div style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: "0.9em", color: "var(--ta-danger, #c0392b)" }}>Permanently delete all app data?</span>
+              <button
+                type="button"
+                className="save-slot-btn save-slot-btn--danger"
+                onClick={handleClearAllData}
+              >
+                Yes, delete all data
+              </button>
+              <button
+                type="button"
+                className="save-slot-btn"
+                onClick={() => setShowClearConfirm(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="save-slot-btn save-slot-btn--danger"
+              onClick={() => setShowClearConfirm(true)}
+            >
+              Clear All Data
+            </button>
+          )}
         </div>
       </div>
         </>

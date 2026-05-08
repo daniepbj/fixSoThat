@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { useMainTask } from "../context/MainTaskContext"
+import { useAppSync } from "../context/AppSyncContext"
 import SectionMoveControls from "./SectionMoveControls"
 import { parseStepRaw, genStepId, formatStepRaw } from "../utils/stepUtils"
 
@@ -146,6 +147,7 @@ export default function StructuredTaskBuilder({
   sectionCollapsed,
   onToggleSectionCollapsed,
 }) {
+  const { timerActiveTasks, requestAutoStartMainTask } = useAppSync()
   const { addMainTask, addMainTaskAndActivate, completeMainTask } =
     useMainTask()
 
@@ -165,25 +167,8 @@ export default function StructuredTaskBuilder({
   const [builderQueueTaskId, setBuilderQueueTaskId] = useState("")
   const [goalQueueStepId, setGoalQueueStepId] = useState("")
   const [proofQueueStepId, setProofQueueStepId] = useState("")
-  const [liveTimerTask, setLiveTimerTask] = useState(null)
+  const liveTimerTask = timerActiveTasks[0] ?? null
   const stepInputRefs = useRef({})
-
-  useEffect(() => {
-    function readActiveTimerTask() {
-      try {
-        const tasks = JSON.parse(
-          window.localStorage.getItem("fst_active") || "[]",
-        )
-        setLiveTimerTask(tasks[0] ?? null)
-      } catch {
-        setLiveTimerTask(null)
-      }
-    }
-
-    readActiveTimerTask()
-    const id = setInterval(readActiveTimerTask, 1000)
-    return () => clearInterval(id)
-  }, [])
 
   function resetStructuredWriterForm() {
     setGoal("")
@@ -472,7 +457,7 @@ export default function StructuredTaskBuilder({
     })
 
     if (createdTask?.id) {
-      window.localStorage.setItem("fst_autostart_main_task", createdTask.id)
+      requestAutoStartMainTask(createdTask.id)
       setBuilderQueueTaskId(createdTask.id)
       setGoalQueueStepId(goalStepId)
       setProofQueueStepId(proofStepId)

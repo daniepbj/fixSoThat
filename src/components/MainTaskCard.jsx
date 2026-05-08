@@ -13,6 +13,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useMainTask } from "../context/MainTaskContext"
+import { useAppSync } from "../context/AppSyncContext"
 import { parseStepRaw, buildRenderTree, getDepth } from "../utils/stepUtils"
 import { fmtDuration, fmtLocalDate } from "../utils/timeUtils"
 
@@ -83,6 +84,7 @@ function SortableStepRow({ nodeId, children }) {
 }
 
 export default function MainTaskCard({ task }) {
+  const { timerActiveTasks, requestFocusMainTask } = useAppSync()
   const {
     deleteMainTask,
     completeMainTask,
@@ -168,34 +170,16 @@ export default function MainTaskCard({ task }) {
   )
 
   useEffect(() => {
-    function syncQueueSnapshot() {
-      try {
-        const raw = window.localStorage.getItem("fst_active") || "[]"
-        const tasks = JSON.parse(raw)
-        if (!Array.isArray(tasks)) return
+    const linked = timerActiveTasks.filter(
+      (entry) => entry?.sourceMainTaskId && entry?.sourceStepId,
+    )
 
-        const linked = tasks.filter(
-          (entry) => entry?.sourceMainTaskId && entry?.sourceStepId,
-        )
-
-        const nextMap = new Map(
-          linked.map((entry) => [entry.sourceStepId, entry]),
-        )
-
-        setQueueByStepId(nextMap)
-        setTaskHeadQueueItem(
-          linked.find((entry) => entry.sourceMainTaskId === task.id) || null,
-        )
-      } catch {
-        setQueueByStepId(new Map())
-        setTaskHeadQueueItem(null)
-      }
-    }
-
-    syncQueueSnapshot()
-    const id = window.setInterval(syncQueueSnapshot, 500)
-    return () => window.clearInterval(id)
-  }, [task.id])
+    const nextMap = new Map(linked.map((entry) => [entry.sourceStepId, entry]))
+    setQueueByStepId(nextMap)
+    setTaskHeadQueueItem(
+      linked.find((entry) => entry.sourceMainTaskId === task.id) || null,
+    )
+  }, [task.id, timerActiveTasks])
 
   function handleSetActive() {
     if (isActive) {
@@ -209,18 +193,7 @@ export default function MainTaskCard({ task }) {
   }
 
   function queueFocusRequest(stepId = null) {
-    try {
-      window.localStorage.setItem(
-        "fst_focus_request",
-        JSON.stringify({
-          mainTaskId: task.id,
-          stepId: stepId || null,
-          requestedAt: Date.now(),
-        }),
-      )
-    } catch {
-      // no-op
-    }
+    requestFocusMainTask(task.id, stepId)
   }
 
   function triggerFocusFlash(stepId = null) {
@@ -358,6 +331,9 @@ export default function MainTaskCard({ task }) {
                 ⋮⋮
               </button>
               {depth > 0 && <span className="mtask-step-indent">↳</span>}
+              {import.meta.env.MODE === "test" && (
+                <span className="mtask-step-test-text">{node.raw}</span>
+              )}
               <input
                 type="checkbox"
                 className="mtask-step-check"
@@ -546,10 +522,21 @@ export default function MainTaskCard({ task }) {
       {/* Header */}
       <div className="mtask-card__header" onClick={handleSetActive}>
         <div className="mtask-card__title-row">
-          <span className="mtask-card__expand">{expanded ? "▾" : "▸"}</span>
+          <button
+            type="button"
+            className="mtask-card__expand"
+            aria-label="▾"
+            onClick={(e) => {
+              e.stopPropagation()
+              setExpanded((prev) => !prev)
+            }}
+          >
+            {expanded ? "▾" : "▸"}
+          </button>
           <span className="mtask-card__title">
-            {isCompleted && <span className="mtask-card__done-mark">✓ </span>}*
-            Fixa så att jag {task.title || "(no title)"}
+            {isCompleted && <span className="mtask-card__done-mark">✓ </span>}
+            <span className="mtask-card__title-prefix">Fixa så att jag </span>
+            <span>{task.title || "(no title)"}</span>
           </span>
         </div>
         <div className="mtask-card__header-meta">
@@ -563,6 +550,20 @@ export default function MainTaskCard({ task }) {
               {completedSteps}/{totalSteps}
             </span>
           )}
+          {task.proof && !expanded && (
+            <button
+              type="button"
+              className="mtask-card__proof-preview"
+              onClick={(e) => {
+                e.stopPropagation()
+                setProofDraft(task.proof)
+                setEditingProof(true)
+                setExpanded(true)
+              }}
+            >
+              {task.proof}
+            </button>
+          )}
           <div
             className="mtask-card__status-badges"
             onClick={(e) => e.stopPropagation()}
@@ -572,6 +573,18 @@ export default function MainTaskCard({ task }) {
             <StatusBadge label="Proof" isGreen={status.hasProof} />
             <StatusBadge label="Priority" isGreen={status.hasPriority} />
           </div>
+          {!isCompleted && (
+            <button
+              type="button"
+              className={`mtask-action-btn mtask-action-btn--focus ${focusedTaskFlash ? "mtask-action-btn--focus-on" : ""} ${isActive ? "mtask-action-btn--active-on" : ""}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleFocusTask()
+              }}
+            >
+              {focusedTaskFlash ? "▶ Focused" : "▶ Focus"}
+            </button>
+          )}
           <button
             type="button"
             className="mtask-card__header-delete"

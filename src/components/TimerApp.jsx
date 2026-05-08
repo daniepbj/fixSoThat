@@ -16,6 +16,7 @@ import SidebarTaskSteps from "./SidebarTaskSteps"
 import BreakOverlay from "./BreakOverlay"
 import { TimerProvider } from "../context/TimerContext"
 import { useMainTask } from "../context/MainTaskContext"
+import { useAppSync } from "../context/AppSyncContext"
 import "../timer.css"
 import { playAlarmOnce } from "../utils/alarm"
 import {
@@ -148,6 +149,14 @@ function pickNextColor(currentColor) {
 
 export default function TimerApp({ sidebarMode = false }) {
   const {
+    completeTimerStepRequest,
+    stopAlarmSignal,
+    focusMainTaskRequest,
+    autoStartMainTaskRequest,
+    requestAutoStartMainTask,
+    publishTimerSnapshot,
+  } = useAppSync()
+  const {
     mainTasks,
     activeMainTaskId,
     setActiveMainTaskId,
@@ -231,9 +240,17 @@ export default function TimerApp({ sidebarMode = false }) {
   const lastConfettiAtRef = useRef(0)
   const lastTryIncrementKeyRef = useRef("")
   const recentlyCompletedStepIdsRef = useRef(new Set())
+  const lastHandledCompleteRequestRef = useRef("")
+  const lastHandledAutoStartRequestRef = useRef("")
+  const lastHandledFocusRequestRef = useRef("")
+  const focusFallbackArmedRef = useRef("")
 
   // First task is always the "current" active task tied to the timer
   const currentTask = activeTasks[0] ?? null
+  useEffect(() => {
+    publishTimerSnapshot(activeTasks, timerRunning)
+  }, [activeTasks, timerRunning, publishTimerSnapshot])
+
   const activeMainTask =
     mainTasks.find((t) => t.id === activeMainTaskId) || null
   const settingsRef = useRef(settings)
@@ -431,111 +448,112 @@ export default function TimerApp({ sidebarMode = false }) {
     // Note: do NOT setCurrentView here — user may be on settings or another view
   }, [mainTasks, settings.defaultTaskDuration, setActiveTasks])
 
-  // Autostart hook for builder play: if a newly created main task is marked
-  // in localStorage, start the timer as soon as its first synced timer task
-  // is at the head of the queue.
+  // Autostart hook for builder play: start the timer as soon as a requested
+  // main task is the active one and its head queue task is ready.
   useEffect(() => {
-    if (!activeMainTaskId || onBreak) return
-    try {
-      const intentId = window.localStorage.getItem("fst_autostart_main_task")
-      if (!intentId || intentId !== activeMainTaskId) return
-      const head = activeTasks[0]
-      if (!head || head.sourceMainTaskId !== activeMainTaskId) return
-      if (head.remainingSeconds <= 0) return
-      if (!timerRunning) setTimerRunning(true)
-      window.localStorage.removeItem("fst_autostart_main_task")
-    } catch {
-      // no-op
+    const requestId = autoStartMainTaskRequest?.requestId
+    const intentId = autoStartMainTaskRequest?.mainTaskId
+    if (!requestId || !intentId || onBreak) return
+    if (lastHandledAutoStartRequestRef.current === requestId) return
+    if (intentId !== activeMainTaskId) return
+
+    const head = activeTasks[0]
+    if (!head || head.sourceMainTaskId !== activeMainTaskId) return
+    if (head.remainingSeconds <= 0) return
+    if (!timerRunning) setTimerRunning(true)
+    lastHandledAutoStartRequestRef.current = requestId
+  }, [
+    activeMainTaskId,
+    activeTasks,
+    timerRunning,
+    onBreak,
+    setTimerRunning,
+    autoStartMainTaskRequest,
+  ])
+
+  // Consume focus requests from main-task UI and mirror focus/play behavior.
+  useEffect(() => {
+    const requestId = focusMainTaskRequest?.requestId
+    if (!requestId) return
+    if (lastHandledFocusRequestRef.current === requestId) return
+
+    const mainTaskId = focusMainTaskRequest.mainTaskId
+    const stepId = focusMainTaskRequest.stepId || null
+    if (!mainTaskId) {
+      lastHandledFocusRequestRef.current = requestId
+      return
     }
-  }, [activeMainTaskId, activeTasks, timerRunning, onBreak, setTimerRunning])
 
-  // ── Consume fst_focus_request from MainTaskList/MainTaskCard ───────────
-  // MainTaskCard lives outside TimerProvider and cannot call playTask directly.
-  // It writes a focus request to localStorage and this effect mirrors queue focus.
-  useEffect(() => {
-    let cancelled = false
+    if (activeMainTaskId !== mainTaskId) {
+      setActiveMainTaskId(mainTaskId)
+    }
+    if (mainTasks[0]?.id && mainTasks[0].id !== mainTaskId) {
+      reorderMainTask(mainTaskId, mainTasks[0].id)
+    }
 
-    const id = setInterval(() => {
-      if (cancelled) return
-
-      try {
-        const raw = window.localStorage.getItem("fst_focus_request")
-        if (!raw) return
-
-        const payload = JSON.parse(raw)
-        const mainTaskId = payload?.mainTaskId
-        const stepId = payload?.stepId || null
-
-        if (!mainTaskId) {
-          window.localStorage.removeItem("fst_focus_request")
-          return
-        }
-
-        if (activeMainTaskId !== mainTaskId) {
-          setActiveMainTaskId(mainTaskId)
-        }
-        if (mainTasks[0]?.id && mainTasks[0].id !== mainTaskId) {
-          reorderMainTask(mainTaskId, mainTasks[0].id)
-        }
-
-        const exactStepTask = stepId
-          ? activeTasks.find(
-              (task) =>
-                task.sourceMainTaskId === mainTaskId &&
-                task.sourceStepId === stepId,
-            )
-          : null
-
-        const fallbackMainTask = activeTasks.find(
-          (task) => task.sourceMainTaskId === mainTaskId,
+    const exactStepTask = stepId
+      ? activeTasks.find(
+          (task) =>
+            task.sourceMainTaskId === mainTaskId &&
+            task.sourceStepId === stepId,
         )
+      : null
 
-        const targetTask = exactStepTask || fallbackMainTask
+    const fallbackMainTask = activeTasks.find(
+      (task) => task.sourceMainTaskId === mainTaskId,
+    )
 
-        if (targetTask) {
-          playTask(targetTask.id)
-          window.localStorage.removeItem("fst_focus_request")
-          return
-        }
+    const targetTask = exactStepTask || fallbackMainTask
+    if (targetTask) {
+      playTask(targetTask.id)
+      lastHandledFocusRequestRef.current = requestId
+      focusFallbackArmedRef.current = ""
+      return
+    }
 
-        // Queue not synced yet — arm autostart and wait for next tick.
-        window.localStorage.setItem("fst_autostart_main_task", mainTaskId)
-        setCurrentView("timer")
-      } catch {
-        window.localStorage.removeItem("fst_focus_request")
-      }
-    }, 150)
-
-    return () => {
-      cancelled = true
-      clearInterval(id)
+    // Queue may not be synced yet; arm autostart once and keep waiting.
+    if (focusFallbackArmedRef.current !== requestId) {
+      requestAutoStartMainTask(mainTaskId)
+      setCurrentView("timer")
+      focusFallbackArmedRef.current = requestId
     }
   }, [
     activeMainTaskId,
     activeTasks,
+    focusMainTaskRequest,
     mainTasks,
     playTask,
     reorderMainTask,
+    requestAutoStartMainTask,
     setActiveMainTaskId,
     setCurrentView,
   ])
 
-  // ── Consume fst_stop_alarm signal from the builder ───────────────────────
-  // The builder lives outside TimerProvider so it can't call stopAlarm() directly.
-  // It writes "fst_stop_alarm" to localStorage; we poll and consume it here.
+  // ── Consume stop-alarm signal from builder via AppSyncContext ───────────
+  // Builder lives outside TimerProvider; consume global stop signal here.
   useEffect(() => {
-    const id = setInterval(() => {
-      try {
-        if (window.localStorage.getItem("fst_stop_alarm") === "1") {
-          window.localStorage.removeItem("fst_stop_alarm")
-          setAlarmActive(false)
-          clearInterval(alarmIntervalRef.current)
-          alarmIntervalRef.current = null
-        }
-      } catch {}
-    }, 300)
-    return () => clearInterval(id)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!stopAlarmSignal) return
+    setAlarmActive(false)
+    clearInterval(alarmIntervalRef.current)
+    alarmIntervalRef.current = null
+  }, [stopAlarmSignal])
+
+  // Consume global request to complete a linked timer queue step.
+  useEffect(() => {
+    const requestId = completeTimerStepRequest?.requestId
+    if (!requestId) return
+    if (lastHandledCompleteRequestRef.current === requestId) return
+    lastHandledCompleteRequestRef.current = requestId
+
+    const linkedTask = activeTasks.find(
+      (task) =>
+        task.sourceMainTaskId === completeTimerStepRequest.mainTaskId &&
+        task.sourceStepId === completeTimerStepRequest.stepId,
+    )
+    if (linkedTask?.id) {
+      completeTask(linkedTask.id)
+    }
+  }, [activeTasks, completeTimerStepRequest])
 
   // ── Idle prompt: show quick-add after X seconds of timer not running ──────
   useEffect(() => {
@@ -1217,10 +1235,9 @@ export default function TimerApp({ sidebarMode = false }) {
       title: parsed.text || text,
       steps: [{ raw: formatStepRaw(parsed.text || text, mins) }],
     })
-    // Write autostart intent; the existing useEffect consumes it once the
-    // task is synced to activeTasks — avoids setTimerRunning before queue ready.
+    // Request autostart once the task is synced to activeTasks.
     if (created?.id) {
-      window.localStorage.setItem("fst_autostart_main_task", created.id)
+      requestAutoStartMainTask(created.id)
     }
     setIdleInputText("")
   }

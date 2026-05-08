@@ -7,6 +7,18 @@ const T =
         : PolyfillTemporal
 
 const LS_TZ_KEY = "fst_timezone_override"
+export const MIN_TIMER_SECONDS = 60
+export const MAX_TIMER_SECONDS = 3600
+
+export function clampTimerDuration(seconds, { allowZero = true } = {}) {
+    const numericSeconds = Number(seconds)
+    if (!Number.isFinite(numericSeconds)) {
+        return allowZero ? 0 : MIN_TIMER_SECONDS
+    }
+    const roundedSeconds = Math.round(numericSeconds)
+    if (allowZero && roundedSeconds <= 0) return 0
+    return Math.min(MAX_TIMER_SECONDS, Math.max(MIN_TIMER_SECONDS, roundedSeconds))
+}
 
 /**
  * Set a manual timezone override (persisted to localStorage).
@@ -125,6 +137,43 @@ export function fmtTimerDisplay(seconds) {
     const m = Math.floor(seconds / 60)
     const s = seconds % 60
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+}
+
+export function formatTimeDisplay(seconds) {
+    return fmtDuration(seconds)
+}
+
+export function parseTimeInput(input) {
+    const trimmed = String(input || "").trim()
+    if (!trimmed) return 0
+
+    const parts = trimmed.split(":").map((part) => part.trim())
+    if (parts.length < 1 || parts.length > 3) return 0
+    if (parts.some((part) => part === "" || !/^\d+$/.test(part))) return 0
+
+    if (parts.length === 1) {
+        return Math.max(0, Number(parts[0]) * 60)
+    }
+
+    if (parts.length === 2) {
+        const [minutes, secondsPart] = parts.map(Number)
+        return Math.max(0, minutes * 60 + secondsPart)
+    }
+
+    const [hours, minutes, secondsPart] = parts.map(Number)
+    return Math.max(0, hours * 3600 + minutes * 60 + secondsPart)
+}
+
+export function calculateRemaining(durationSeconds, elapsedSeconds) {
+    const duration = Math.max(0, Math.round(Number(durationSeconds) || 0))
+    const elapsed = Math.max(0, Math.round(Number(elapsedSeconds) || 0))
+    return Math.max(0, duration - elapsed)
+}
+
+export function adjustTime(currentSeconds, deltaSeconds) {
+    const current = Math.round(Number(currentSeconds) || 0)
+    const delta = Math.round(Number(deltaSeconds) || 0)
+    return clampTimerDuration(current + delta, { allowZero: false })
 }
 
 /**

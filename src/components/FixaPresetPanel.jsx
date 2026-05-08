@@ -73,7 +73,7 @@ export default function FixaPresetPanel({
               className="fixa-preset-toggle-btn"
               onClick={() => setShowCreate((v) => !v)}
             >
-              {showCreate ? "Cancel" : "+ New preset"}
+              {showCreate ? "Cancel" : "+ New template"}
             </button>
           )}
           {sectionControls && <SectionMoveControls {...sectionControls} />}
@@ -146,7 +146,7 @@ export default function FixaPresetPanel({
 
           {fixaPresets.length === 0 && !showCreate && (
             <p className="fixa-preset-empty">
-              No presets saved yet. Create one above.
+              No templates saved yet. Create one above.
             </p>
           )}
 

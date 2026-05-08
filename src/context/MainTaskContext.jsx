@@ -3,6 +3,7 @@ import { playPowerUpSound, playCompletionSound } from "../utils/soundEffects"
 import confetti from "canvas-confetti"
 import { useLocalStorage } from "../hooks/useLocalStorage"
 import { COLORS } from "../data/seedData"
+import { useAppSync } from "./AppSyncContext"
 import {
   genStepId,
   parseStepBlockTree,
@@ -157,6 +158,7 @@ function maxSiblingOrder(flatSteps, parentId) {
 }
 
 export function MainTaskProvider({ children }) {
+  const { requestCompleteTimerStep } = useAppSync()
   const [mainTasks, setMainTasks] = useLocalStorage(
     "fst_main_tasks",
     [],
@@ -271,6 +273,12 @@ export function MainTaskProvider({ children }) {
 
   function clearDeletedMainTasks() {
     setDeletedMainTasks([])
+  }
+
+  function resetMainTaskData() {
+    setMainTasks([])
+    setDeletedMainTasks([])
+    setSaveSlots([null, null, null, null, null])
   }
 
   function completeMainTask(id) {
@@ -395,18 +403,7 @@ export function MainTaskProvider({ children }) {
     }
 
     if (nextCompleted) {
-      // Signal TimerApp to complete the linked queue item using the same
-      // completeTask path as clicking the timer-card Done button.
-      try {
-        window.localStorage.setItem(
-          "fst_complete_timer_step",
-          JSON.stringify({
-            mainTaskId: taskId,
-            stepId,
-            requestedAt: Date.now(),
-          }),
-        )
-      } catch {}
+      requestCompleteTimerStep(taskId, stepId)
     }
   }
 
@@ -898,6 +895,7 @@ export function MainTaskProvider({ children }) {
     deleteMainTask,
     undoDeleteMainTask,
     clearDeletedMainTasks,
+    resetMainTaskData,
     completeMainTask,
     restoreMainTask,
     reorderMainTask,

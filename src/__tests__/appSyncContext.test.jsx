@@ -66,4 +66,33 @@ describe("AppSyncContext", () => {
       expect(ctxRef.current.stopAlarmSignal).toBe(2)
     })
   })
+
+  it("requestFocusMainTask stores focus request payload", async () => {
+    const ctxRef = renderAppSync()
+
+    act(() => {
+      ctxRef.current.requestFocusMainTask("main-2", "step-9")
+    })
+
+    await waitFor(() => {
+      expect(ctxRef.current.focusMainTaskRequest).toBeTruthy()
+      expect(ctxRef.current.focusMainTaskRequest.mainTaskId).toBe("main-2")
+      expect(ctxRef.current.focusMainTaskRequest.stepId).toBe("step-9")
+      expect(ctxRef.current.focusMainTaskRequest.requestId).toBeTruthy()
+    })
+  })
+
+  it("requestAutoStartMainTask stores autostart request payload", async () => {
+    const ctxRef = renderAppSync()
+
+    act(() => {
+      ctxRef.current.requestAutoStartMainTask("main-3")
+    })
+
+    await waitFor(() => {
+      expect(ctxRef.current.autoStartMainTaskRequest).toBeTruthy()
+      expect(ctxRef.current.autoStartMainTaskRequest.mainTaskId).toBe("main-3")
+      expect(ctxRef.current.autoStartMainTaskRequest.requestId).toBeTruthy()
+    })
+  })
 })

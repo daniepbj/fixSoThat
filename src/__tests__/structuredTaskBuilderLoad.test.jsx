@@ -13,6 +13,7 @@ import {
   useMainTask,
   MainTaskContext,
 } from "../context/MainTaskContext"
+import { AppSyncProvider } from "../context/AppSyncContext"
 import StructuredTaskBuilder from "../components/StructuredTaskBuilder"
 
 // ── Browser-API stubs ─────────────────────────────────────────────────────────
@@ -44,14 +45,16 @@ function ContextReader({ stateRef }) {
 function renderBuilder() {
   const stateRef = { current: [] }
   const result = render(
-    <MainTaskProvider>
-      <ContextReader stateRef={stateRef} />
-      <StructuredTaskBuilder
-        sectionControls={null}
-        sectionCollapsed={false}
-        onToggleSectionCollapsed={() => {}}
-      />
-    </MainTaskProvider>,
+    <AppSyncProvider>
+      <MainTaskProvider>
+        <ContextReader stateRef={stateRef} />
+        <StructuredTaskBuilder
+          sectionControls={null}
+          sectionCollapsed={false}
+          onToggleSectionCollapsed={() => {}}
+        />
+      </MainTaskProvider>
+    </AppSyncProvider>,
   )
   return { ...result, stateRef }
 }
@@ -74,16 +77,18 @@ function ContextOverrider({ override, children }) {
 function renderBuilderWithOverride(override) {
   const stateRef = { current: [] }
   const result = render(
-    <MainTaskProvider>
-      <ContextOverrider override={override}>
-        <ContextReader stateRef={stateRef} />
-        <StructuredTaskBuilder
-          sectionControls={null}
-          sectionCollapsed={false}
-          onToggleSectionCollapsed={() => {}}
-        />
-      </ContextOverrider>
-    </MainTaskProvider>,
+    <AppSyncProvider>
+      <MainTaskProvider>
+        <ContextOverrider override={override}>
+          <ContextReader stateRef={stateRef} />
+          <StructuredTaskBuilder
+            sectionControls={null}
+            sectionCollapsed={false}
+            onToggleSectionCollapsed={() => {}}
+          />
+        </ContextOverrider>
+      </MainTaskProvider>
+    </AppSyncProvider>,
   )
   return { ...result, stateRef }
 }

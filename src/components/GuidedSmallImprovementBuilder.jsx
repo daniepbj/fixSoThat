@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from "react"
 import { useMainTask } from "../context/MainTaskContext"
+import { useAppSync } from "../context/AppSyncContext"
 import { useLocalStorage } from "../hooks/useLocalStorage"
 import SectionMoveControls from "./SectionMoveControls"
 import { genStepId, formatStepRaw } from "../utils/stepUtils"
@@ -186,7 +187,17 @@ function ExampleList({ title, examples }) {
   )
 }
 
-export default function GuidedSmallImprovementBuilder({ sectionControls, sectionCollapsed, onToggleSectionCollapsed }) {
+export default function GuidedSmallImprovementBuilder({
+  sectionControls,
+  sectionCollapsed,
+  onToggleSectionCollapsed,
+}) {
+  const {
+    timerActiveTasks,
+    timerRunning,
+    requestStopAlarm,
+    requestAutoStartMainTask,
+  } = useAppSync()
   const {
     addMainTask,
     addMainTaskAndActivate,
@@ -198,28 +209,8 @@ export default function GuidedSmallImprovementBuilder({ sectionControls, section
     "fst_builder_visual_style",
     "calm",
   )
-
-  // Live timer state — poll localStorage every second so this works even
-  // though the builder lives outside TimerProvider.
-  const [liveTimerTask, setLiveTimerTask] = useState(null)
-  const [liveTimerRunning, setLiveTimerRunning] = useState(false)
-  useEffect(() => {
-    function read() {
-      try {
-        const tasks = JSON.parse(
-          window.localStorage.getItem("fst_active") || "[]",
-        )
-        const running = JSON.parse(
-          window.localStorage.getItem("fst_running") || "false",
-        )
-        setLiveTimerTask(tasks[0] ?? null)
-        setLiveTimerRunning(Boolean(running))
-      } catch {}
-    }
-    read()
-    const id = setInterval(read, 1000)
-    return () => clearInterval(id)
-  }, [])
+  const liveTimerTask = timerActiveTasks[0] ?? null
+  const liveTimerRunning = timerRunning
 
   const [stage, setStage] = useState(0)
   const [areaIndex, setAreaIndex] = useState(0)
@@ -503,7 +494,7 @@ export default function GuidedSmallImprovementBuilder({ sectionControls, section
       priority: "",
     })
     if (createdTask?.id) {
-      window.localStorage.setItem("fst_autostart_main_task", createdTask.id)
+      requestAutoStartMainTask(createdTask.id)
       setBuilderQueueTaskId(createdTask.id)
       setStageStepIds(nextStageStepIds)
       setLastStageStepIds({})
@@ -652,10 +643,7 @@ export default function GuidedSmallImprovementBuilder({ sectionControls, section
     syncStageQueueStep(stage, true)
     // Signal TimerApp to dismiss any active alarm so the user isn't stuck
     // on the alarm screen when pressing Next after a stage timer runs out.
-    // (Builder lives outside TimerProvider so we use a localStorage signal.)
-    try {
-      window.localStorage.setItem("fst_stop_alarm", "1")
-    } catch {}
+    requestStopAlarm()
     // After completing the Order stage for the current area, loop back to
     // Target for the next area if one exists.
     if (stage === 4 && areaIndex < filledAreas.length - 1) {
@@ -723,7 +711,9 @@ export default function GuidedSmallImprovementBuilder({ sectionControls, section
           onClick={onToggleSectionCollapsed}
         >
           Build a small improvement
-          <span className="section-collapse-arrow">{sectionCollapsed ? "▸" : "▾"}</span>
+          <span className="section-collapse-arrow">
+            {sectionCollapsed ? "▸" : "▾"}
+          </span>
         </button>
         <div className="gsi-header__actions">
           {!sectionCollapsed && (
@@ -744,566 +734,597 @@ export default function GuidedSmallImprovementBuilder({ sectionControls, section
 
       {!sectionCollapsed && (
         <>
-
-      <div className="gsi-progress-bar">
-        {STAGES.map((name, i) => (
-          <div
-            key={name}
-            className={`gsi-progress-dot ${i === stage ? "gsi-progress-dot--active" : ""} ${i < stage ? "gsi-progress-dot--done" : ""}`}
-          >
-            <span
-              className={`gsi-progress-num ${i === stage && scopedLiveTimerTask ? "gsi-progress-num--timer" : ""} ${i === stage && liveAlarm ? "gsi-progress-num--alarm" : ""}`}
-            >
-              {i === stage && scopedLiveTimerTask && (
-                <svg
-                  className="gsi-progress-mini-ring"
-                  viewBox="0 0 28 28"
-                  aria-hidden="true"
-                  style={{
-                    transform: "rotate(90deg) scaleX(-1)",
-                    transformOrigin: "center",
-                  }}
+          <div className="gsi-progress-bar">
+            {STAGES.map((name, i) => (
+              <div
+                key={name}
+                className={`gsi-progress-dot ${i === stage ? "gsi-progress-dot--active" : ""} ${i < stage ? "gsi-progress-dot--done" : ""}`}
+              >
+                <span
+                  className={`gsi-progress-num ${i === stage && scopedLiveTimerTask ? "gsi-progress-num--timer" : ""} ${i === stage && liveAlarm ? "gsi-progress-num--alarm" : ""}`}
                 >
-                  <circle
-                    className="gsi-progress-mini-ring__track"
-                    cx="14"
-                    cy="14"
-                    r={liveRingR}
-                  />
-                  <circle
-                    className="gsi-progress-mini-ring__progress"
-                    cx="14"
-                    cy="14"
-                    r={liveRingR}
-                    pathLength={1}
-                    strokeDasharray={`${liveProgress} 1`}
-                    style={{ stroke: scopedLiveTimerTask.color ?? "#6c63ff" }}
-                  />
-                </svg>
-              )}
-              <span className="gsi-progress-num__value">
-                {i === stage && scopedLiveTimerTask
-                  ? fmtTimerDisplay(liveRemaining)
-                  : i + 1}
-              </span>
-            </span>
-            <span className="gsi-progress-label">{name}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="gsi-content">
-        {/* STAGE 0: Area + Time */}
-        {stage === 0 && (
-          <div className="gsi-stage">
-            <div className="gsi-stage-body gcb-cat-list">
-              <div className="gsi-area-stage-head">
-                <span className="gsi-area-stage-head__label">
-                  Areas and max time
-                </span>
-                <span className="gsi-area-stage-head__max">
-                  Max {maxTotal || 0}m
-                </span>
-              </div>
-              {areas.map((a, i) => (
-                <div className="gcb-cat-card" key={a.id}>
-                  <button
-                    type="button"
-                    className="gcb-card-remove"
-                    onClick={() => removeArea(a.id)}
-                    aria-label="Remove area"
-                  >
-                    ×
-                  </button>
-                  <label
-                    className="gcb-cat-prompt"
-                    htmlFor={`gsi-area-${a.id}`}
-                  >
-                    {i === 0
-                      ? "What do I want to work on right now?"
-                      : "Another area?"}
-                  </label>
-                  <span className="gcb-cat-helper">
-                    One area. Small is enough.
-                  </span>
-                  <div className="gsi-area-row">
-                    <input
-                      ref={(el) => {
-                        if (el) areaInputRefs.current[a.id] = el
+                  {i === stage && scopedLiveTimerTask && (
+                    <svg
+                      className="gsi-progress-mini-ring"
+                      viewBox="0 0 28 28"
+                      aria-hidden="true"
+                      style={{
+                        transform: "rotate(90deg) scaleX(-1)",
+                        transformOrigin: "center",
                       }}
-                      id={`gsi-area-${a.id}`}
-                      className="gcb-input gcb-input--name"
-                      value={a.name}
-                      onChange={(e) =>
-                        handleAreaNameChange(a.id, e.target.value)
-                      }
-                      onKeyDown={(e) => handleAreaNameKeyDown(e, i)}
-                      placeholder={`${AREA_PLACEHOLDERS[i % AREA_PLACEHOLDERS.length]} 5`}
-                    />
-                    <div className="gsi-area-inline-time">
-                      <span className="gsi-area-inline-time__label">Max</span>
-                      <input
-                        className="gcb-input gcb-input--mins"
-                        type="number"
-                        min="1"
-                        value={a.minutes}
-                        onChange={(e) =>
-                          updateArea(a.id, {
-                            minutes: e.target.value,
-                            chipValue: "custom",
-                          })
-                        }
-                        placeholder="min"
-                        aria-label={`Time cap for area ${i + 1}`}
+                    >
+                      <circle
+                        className="gsi-progress-mini-ring__track"
+                        cx="14"
+                        cy="14"
+                        r={liveRingR}
                       />
-                      <span className="gsi-area-inline-time__unit">m</span>
+                      <circle
+                        className="gsi-progress-mini-ring__progress"
+                        cx="14"
+                        cy="14"
+                        r={liveRingR}
+                        pathLength={1}
+                        strokeDasharray={`${liveProgress} 1`}
+                        style={{
+                          stroke: scopedLiveTimerTask.color ?? "#6c63ff",
+                        }}
+                      />
+                    </svg>
+                  )}
+                  <span className="gsi-progress-num__value">
+                    {i === stage && scopedLiveTimerTask
+                      ? fmtTimerDisplay(liveRemaining)
+                      : i + 1}
+                  </span>
+                </span>
+                <span className="gsi-progress-label">{name}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="gsi-content">
+            {/* STAGE 0: Area + Time */}
+            {stage === 0 && (
+              <div className="gsi-stage">
+                <div className="gsi-stage-body gcb-cat-list">
+                  <div className="gsi-area-stage-head">
+                    <span className="gsi-area-stage-head__label">
+                      Areas and max time
+                    </span>
+                    <span className="gsi-area-stage-head__max">
+                      Max {maxTotal || 0}m
+                    </span>
+                  </div>
+                  {areas.map((a, i) => (
+                    <div className="gcb-cat-card" key={a.id}>
+                      <button
+                        type="button"
+                        className="gcb-card-remove"
+                        onClick={() => removeArea(a.id)}
+                        aria-label="Remove area"
+                      >
+                        ×
+                      </button>
+                      <label
+                        className="gcb-cat-prompt"
+                        htmlFor={`gsi-area-${a.id}`}
+                      >
+                        {i === 0
+                          ? "What do I want to work on right now?"
+                          : "Another area?"}
+                      </label>
+                      <span className="gcb-cat-helper">
+                        One area. Small is enough.
+                      </span>
+                      <div className="gsi-area-row">
+                        <input
+                          ref={(el) => {
+                            if (el) areaInputRefs.current[a.id] = el
+                          }}
+                          id={`gsi-area-${a.id}`}
+                          className="gcb-input gcb-input--name"
+                          value={a.name}
+                          onChange={(e) =>
+                            handleAreaNameChange(a.id, e.target.value)
+                          }
+                          onKeyDown={(e) => handleAreaNameKeyDown(e, i)}
+                          placeholder={`${AREA_PLACEHOLDERS[i % AREA_PLACEHOLDERS.length]} 5`}
+                        />
+                        <div className="gsi-area-inline-time">
+                          <span className="gsi-area-inline-time__label">
+                            Max
+                          </span>
+                          <input
+                            className="gcb-input gcb-input--mins"
+                            type="number"
+                            min="1"
+                            value={a.minutes}
+                            onChange={(e) =>
+                              updateArea(a.id, {
+                                minutes: e.target.value,
+                                chipValue: "custom",
+                              })
+                            }
+                            placeholder="min"
+                            aria-label={`Time cap for area ${i + 1}`}
+                          />
+                          <span className="gsi-area-inline-time__unit">m</span>
+                        </div>
+                      </div>
+                      <fieldset className="gcb-time-chips">
+                        <legend className="gcb-time-chips-legend">
+                          Time cap
+                        </legend>
+                        {TIME_CHIPS.map((mins) => (
+                          <button
+                            key={mins}
+                            type="button"
+                            className={`gcb-time-chip${a.chipValue === String(mins) ? " gcb-time-chip--selected" : ""}`}
+                            aria-pressed={a.chipValue === String(mins)}
+                            onClick={() =>
+                              updateArea(a.id, {
+                                chipValue: String(mins),
+                                minutes: String(mins),
+                              })
+                            }
+                          >
+                            {mins}m
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className={`gcb-time-chip${a.chipValue === "custom" ? " gcb-time-chip--selected" : ""}`}
+                          aria-pressed={a.chipValue === "custom"}
+                          onClick={() =>
+                            updateArea(a.id, { chipValue: "custom" })
+                          }
+                        >
+                          Custom
+                        </button>
+                        {a.chipValue === "custom" && (
+                          <input
+                            className="gcb-input gcb-input--mins"
+                            type="number"
+                            min="1"
+                            value={a.minutes}
+                            onChange={(e) =>
+                              updateArea(a.id, { minutes: e.target.value })
+                            }
+                            placeholder="min"
+                            aria-label="Custom minutes"
+                          />
+                        )}
+                      </fieldset>
+                    </div>
+                  ))}
+                  {areas.length < MAX_AREAS && (
+                    <button
+                      type="button"
+                      className="gcb-add-btn"
+                      onClick={addArea}
+                    >
+                      + Add another area
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* STAGE 1: Now + Good Enough */}
+            {stage === 1 && (
+              <div className="gsi-stage">
+                <StageSummary
+                  lines={[
+                    { label: "Area", value: areaLabel },
+                    {
+                      label: "Time",
+                      value: `${currentAreaMaxMinutes || 0} min max`,
+                    },
+                  ]}
+                />
+
+                <div className="gsi-stage-body">
+                  <div className="gsi-two-field-pair">
+                    <div>
+                      <label className="gsi-label" htmlFor="gsi-now">
+                        What is the current state of {areaLabel} right now?
+                      </label>
+                      <p className="gsi-hint">
+                        Keep it tied to {areaLabel}, not a different area.
+                      </p>
+                      <textarea
+                        id="gsi-now"
+                        className="gsi-input gsi-textarea"
+                        rows={2}
+                        value={now}
+                        onChange={(e) => setNow(e.target.value)}
+                        placeholder={`What feels stuck about ${areaLabel}?`}
+                      />
+                      <ExampleList
+                        title="Examples"
+                        examples={areaExamples.now}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="gsi-label" htmlFor="gsi-good-enough">
+                        What would be good enough for {areaLabel} right now?
+                      </label>
+                      <p className="gsi-hint">
+                        Not perfect. Just better for {areaLabel}.
+                      </p>
+                      <textarea
+                        id="gsi-good-enough"
+                        className="gsi-input gsi-textarea"
+                        rows={2}
+                        value={goodEnough}
+                        onChange={(e) => setGoodEnough(e.target.value)}
+                        placeholder={`What would make ${areaLabel} feel meaningfully better?`}
+                      />
+                      <ExampleList
+                        title="Examples"
+                        examples={areaExamples.target}
+                      />
                     </div>
                   </div>
-                  <fieldset className="gcb-time-chips">
-                    <legend className="gcb-time-chips-legend">Time cap</legend>
-                    {TIME_CHIPS.map((mins) => (
-                      <button
-                        key={mins}
-                        type="button"
-                        className={`gcb-time-chip${a.chipValue === String(mins) ? " gcb-time-chip--selected" : ""}`}
-                        aria-pressed={a.chipValue === String(mins)}
-                        onClick={() =>
-                          updateArea(a.id, {
-                            chipValue: String(mins),
-                            minutes: String(mins),
-                          })
-                        }
-                      >
-                        {mins}m
-                      </button>
+                </div>
+              </div>
+            )}
+
+            {/* STAGE 2: Proof Checkpoints */}
+            {stage === 2 && (
+              <div className="gsi-stage">
+                <StageSummary
+                  lines={[
+                    { label: "Area", value: areaLabel },
+                    { label: "Now", value: now || "Not filled in yet" },
+                    {
+                      label: "Target",
+                      value: goodEnough || "Not filled in yet",
+                    },
+                  ]}
+                />
+
+                <div className="gsi-stage-body">
+                  <label className="gsi-label" htmlFor="gsi-proof-0">
+                    How will I know {areaLabel} reached good enough?
+                  </label>
+                  <p className="gsi-hint">
+                    Add proof one checkpoint at a time so you can see progress
+                    in {areaLabel}.
+                  </p>
+                  <ExampleList title="Examples" examples={areaExamples.proof} />
+
+                  <div className="gsi-proof-rows">
+                    {proofs.map((proof) => (
+                      <div className="gsi-proof-row" key={proof.id}>
+                        <input
+                          className="gsi-input gsi-proof-input"
+                          type="text"
+                          value={proof.text}
+                          onChange={(e) =>
+                            updateProofText(proof.id, e.target.value)
+                          }
+                          placeholder={`One visible sign that ${areaLabel} moved forward`}
+                        />
+                        <button
+                          type="button"
+                          className="gsi-proof-remove-btn"
+                          onClick={() => removeProof(proof.id)}
+                          title="Remove"
+                        >
+                          ×
+                        </button>
+                      </div>
                     ))}
-                    <button
-                      type="button"
-                      className={`gcb-time-chip${a.chipValue === "custom" ? " gcb-time-chip--selected" : ""}`}
-                      aria-pressed={a.chipValue === "custom"}
-                      onClick={() => updateArea(a.id, { chipValue: "custom" })}
-                    >
-                      Custom
-                    </button>
-                    {a.chipValue === "custom" && (
-                      <input
-                        className="gcb-input gcb-input--mins"
-                        type="number"
-                        min="1"
-                        value={a.minutes}
-                        onChange={(e) =>
-                          updateArea(a.id, { minutes: e.target.value })
-                        }
-                        placeholder="min"
-                        aria-label="Custom minutes"
-                      />
-                    )}
-                  </fieldset>
-                </div>
-              ))}
-              {areas.length < MAX_AREAS && (
-                <button type="button" className="gcb-add-btn" onClick={addArea}>
-                  + Add another area
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* STAGE 1: Now + Good Enough */}
-        {stage === 1 && (
-          <div className="gsi-stage">
-            <StageSummary
-              lines={[
-                { label: "Area", value: areaLabel },
-                {
-                  label: "Time",
-                  value: `${currentAreaMaxMinutes || 0} min max`,
-                },
-              ]}
-            />
-
-            <div className="gsi-stage-body">
-              <div className="gsi-two-field-pair">
-                <div>
-                  <label className="gsi-label" htmlFor="gsi-now">
-                    What is the current state of {areaLabel} right now?
-                  </label>
-                  <p className="gsi-hint">
-                    Keep it tied to {areaLabel}, not a different area.
-                  </p>
-                  <textarea
-                    id="gsi-now"
-                    className="gsi-input gsi-textarea"
-                    rows={2}
-                    value={now}
-                    onChange={(e) => setNow(e.target.value)}
-                    placeholder={`What feels stuck about ${areaLabel}?`}
-                  />
-                  <ExampleList title="Examples" examples={areaExamples.now} />
-                </div>
-
-                <div>
-                  <label className="gsi-label" htmlFor="gsi-good-enough">
-                    What would be good enough for {areaLabel} right now?
-                  </label>
-                  <p className="gsi-hint">
-                    Not perfect. Just better for {areaLabel}.
-                  </p>
-                  <textarea
-                    id="gsi-good-enough"
-                    className="gsi-input gsi-textarea"
-                    rows={2}
-                    value={goodEnough}
-                    onChange={(e) => setGoodEnough(e.target.value)}
-                    placeholder={`What would make ${areaLabel} feel meaningfully better?`}
-                  />
-                  <ExampleList
-                    title="Examples"
-                    examples={areaExamples.target}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STAGE 2: Proof Checkpoints */}
-        {stage === 2 && (
-          <div className="gsi-stage">
-            <StageSummary
-              lines={[
-                { label: "Area", value: areaLabel },
-                { label: "Now", value: now || "Not filled in yet" },
-                { label: "Target", value: goodEnough || "Not filled in yet" },
-              ]}
-            />
-
-            <div className="gsi-stage-body">
-              <label className="gsi-label" htmlFor="gsi-proof-0">
-                How will I know {areaLabel} reached good enough?
-              </label>
-              <p className="gsi-hint">
-                Add proof one checkpoint at a time so you can see progress in{" "}
-                {areaLabel}.
-              </p>
-              <ExampleList title="Examples" examples={areaExamples.proof} />
-
-              <div className="gsi-proof-rows">
-                {proofs.map((proof) => (
-                  <div className="gsi-proof-row" key={proof.id}>
-                    <input
-                      className="gsi-input gsi-proof-input"
-                      type="text"
-                      value={proof.text}
-                      onChange={(e) =>
-                        updateProofText(proof.id, e.target.value)
-                      }
-                      placeholder={`One visible sign that ${areaLabel} moved forward`}
-                    />
-                    <button
-                      type="button"
-                      className="gsi-proof-remove-btn"
-                      onClick={() => removeProof(proof.id)}
-                      title="Remove"
-                    >
-                      ×
-                    </button>
                   </div>
-                ))}
-              </div>
 
-              <button
-                type="button"
-                className="gsi-add-proof-btn"
-                onClick={addProof}
-              >
-                + Add another
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STAGE 3: Brainstorm Steps */}
-        {stage === 3 && (
-          <div className="gsi-stage">
-            <StageSummary
-              lines={[
-                { label: "Area", value: areaLabel },
-                { label: "Now", value: now || "Not filled in yet" },
-                { label: "Target", value: goodEnough || "Not filled in yet" },
-              ]}
-            />
-
-            {validProofs.length > 0 && (
-              <div className="gsi-stage-compact-proof">
-                <strong>Proof:</strong>
-                <ul className="gsi-proof-list">
-                  {validProofs.map((p) => (
-                    <li key={p.id}>{p.text}</li>
-                  ))}
-                </ul>
+                  <button
+                    type="button"
+                    className="gsi-add-proof-btn"
+                    onClick={addProof}
+                  >
+                    + Add another
+                  </button>
+                </div>
               </div>
             )}
 
-            <div className="gsi-stage-body">
-              <label className="gsi-label" htmlFor="gsi-step-0">
-                What tiny steps might help move {areaLabel} forward?
-              </label>
-              <p className="gsi-hint">
-                Brainstorm fast. Keep the steps clearly about {areaLabel}. Order
-                them next.
-              </p>
-              <ExampleList
-                title="Step examples"
-                examples={areaExamples.steps}
-              />
+            {/* STAGE 3: Brainstorm Steps */}
+            {stage === 3 && (
+              <div className="gsi-stage">
+                <StageSummary
+                  lines={[
+                    { label: "Area", value: areaLabel },
+                    { label: "Now", value: now || "Not filled in yet" },
+                    {
+                      label: "Target",
+                      value: goodEnough || "Not filled in yet",
+                    },
+                  ]}
+                />
 
-              <div className="gsi-step-rows gsi-step-rows--brainstorm">
-                {steps.map((step) => (
-                  <div
-                    className="gsi-step-row gsi-step-row--brainstorm"
-                    key={step.id}
-                  >
-                    <input
-                      className="gsi-input gsi-step-input"
-                      type="text"
-                      value={step.text}
-                      onChange={(e) => updateStepText(step.id, e.target.value)}
-                      placeholder={`First small action for ${areaLabel}`}
-                    />
-                    <input
-                      className="gsi-input gsi-step-minutes"
-                      type="number"
-                      min="1"
-                      value={step.minutes || ""}
-                      onChange={(e) =>
-                        updateStepMinutes(step.id, e.target.value)
-                      }
-                      placeholder="2"
-                    />
-                    <button
-                      type="button"
-                      className="gsi-step-btn gsi-step-remove-btn"
-                      onClick={() => removeStep(step.id)}
-                      title="Remove"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                className="gsi-add-step-btn"
-                onClick={addStep}
-              >
-                + Add step
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STAGE 4: Order Steps */}
-        {stage === 4 && (
-          <div className="gsi-stage">
-            <StageSummary
-              lines={[
-                { label: "Area", value: areaLabel },
-                { label: "Now", value: now || "Not filled in yet" },
-                { label: "Target", value: goodEnough || "Not filled in yet" },
-              ]}
-            />
-
-            {validProofs.length > 0 && (
-              <div className="gsi-stage-compact-proof">
-                <strong>Proof:</strong>
-                <ul className="gsi-proof-list">
-                  {validProofs.map((p) => (
-                    <li key={p.id}>{p.text}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="gsi-stage-body">
-              <label className="gsi-label">
-                Put the steps for {areaLabel} in the order you want
-              </label>
-              <p className="gsi-hint">
-                Reorder, adjust, or remove steps until the plan for {areaLabel}{" "}
-                feels realistic.
-              </p>
-
-              <div className="gsi-step-rows gsi-step-rows--order">
-                {steps.map((step, idx) => (
-                  <div
-                    className="gsi-step-row gsi-step-row--order"
-                    key={step.id}
-                  >
-                    <span className="gsi-step-index">{idx + 1}</span>
-                    <input
-                      className="gsi-input gsi-step-input"
-                      type="text"
-                      value={step.text}
-                      onChange={(e) => updateStepText(step.id, e.target.value)}
-                      placeholder={`Step ${idx + 1} for ${areaLabel}`}
-                    />
-                    <input
-                      className="gsi-input gsi-step-minutes"
-                      type="number"
-                      min="1"
-                      value={step.minutes || ""}
-                      onChange={(e) =>
-                        updateStepMinutes(step.id, e.target.value)
-                      }
-                      placeholder="2"
-                    />
-                    <button
-                      type="button"
-                      className="gsi-step-btn gsi-step-up-btn"
-                      onClick={() => moveStepUp(step.id)}
-                      disabled={idx === 0}
-                      title="Move up"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      className="gsi-step-btn gsi-step-down-btn"
-                      onClick={() => moveStepDown(step.id)}
-                      disabled={idx === steps.length - 1}
-                      title="Move down"
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      className="gsi-step-btn gsi-step-remove-btn"
-                      onClick={() => removeStep(step.id)}
-                      title="Remove"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <div
-                className={`gsi-budget-display ${
-                  overBudget
-                    ? "gsi-budget-display--over"
-                    : "gsi-budget-display--ok"
-                }`}
-              >
-                <span className="gsi-budget-label">Planned steps total</span>
-                <strong className="gsi-budget-value">
-                  {plannedTotal} / {currentAreaMaxMinutes || 0} min
-                </strong>
-              </div>
-
-              {overBudget && (
-                <p className="gsi-budget-warning">
-                  This plan is longer than your max time for this area.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* STAGE 5: Save */}
-        {stage === 5 && (
-          <div className="gsi-stage">
-            <StageSummary
-              lines={[
-                { label: "Area", value: areaLabel },
-                { label: "Now", value: now || "Not filled in yet" },
-                { label: "Target", value: goodEnough || "Not filled in yet" },
-              ]}
-            />
-
-            <div className="gsi-stage-body gsi-save-review">
-              <h3 className="gsi-review-title">Ready to save?</h3>
-
-              <div className="gsi-review-box">
-                <div className="gsi-review-item">
-                  <strong>Area</strong>
-                  <p>{trimmedArea || areaLabel}</p>
-                </div>
-                <div className="gsi-review-item">
-                  <strong>Now</strong>
-                  <p>{now}</p>
-                </div>
-                <div className="gsi-review-item">
-                  <strong>Target</strong>
-                  <p>{goodEnough}</p>
-                </div>
                 {validProofs.length > 0 && (
-                  <div className="gsi-review-item">
-                    <strong>Proof</strong>
-                    <ul className="gsi-review-proof-list">
+                  <div className="gsi-stage-compact-proof">
+                    <strong>Proof:</strong>
+                    <ul className="gsi-proof-list">
                       {validProofs.map((p) => (
                         <li key={p.id}>{p.text}</li>
                       ))}
                     </ul>
                   </div>
                 )}
-                <div className="gsi-review-item">
-                  <strong>
-                    Steps ({steps.filter((s) => s.text.trim()).length})
-                  </strong>
-                  <ol className="gsi-review-steps-list">
-                    {steps
-                      .filter((s) => s.text.trim())
-                      .map((s) => (
-                        <li key={s.id}>
-                          {s.text}{" "}
-                          <span className="gsi-review-time">
-                            ({s.minutes}m)
-                          </span>
-                        </li>
-                      ))}
-                  </ol>
+
+                <div className="gsi-stage-body">
+                  <label className="gsi-label" htmlFor="gsi-step-0">
+                    What tiny steps might help move {areaLabel} forward?
+                  </label>
+                  <p className="gsi-hint">
+                    Brainstorm fast. Keep the steps clearly about {areaLabel}.
+                    Order them next.
+                  </p>
+                  <ExampleList
+                    title="Step examples"
+                    examples={areaExamples.steps}
+                  />
+
+                  <div className="gsi-step-rows gsi-step-rows--brainstorm">
+                    {steps.map((step) => (
+                      <div
+                        className="gsi-step-row gsi-step-row--brainstorm"
+                        key={step.id}
+                      >
+                        <input
+                          className="gsi-input gsi-step-input"
+                          type="text"
+                          value={step.text}
+                          onChange={(e) =>
+                            updateStepText(step.id, e.target.value)
+                          }
+                          placeholder={`First small action for ${areaLabel}`}
+                        />
+                        <input
+                          className="gsi-input gsi-step-minutes"
+                          type="number"
+                          min="1"
+                          value={step.minutes || ""}
+                          onChange={(e) =>
+                            updateStepMinutes(step.id, e.target.value)
+                          }
+                          placeholder="2"
+                        />
+                        <button
+                          type="button"
+                          className="gsi-step-btn gsi-step-remove-btn"
+                          onClick={() => removeStep(step.id)}
+                          title="Remove"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="gsi-add-step-btn"
+                    onClick={addStep}
+                  >
+                    + Add step
+                  </button>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* STAGE 4: Order Steps */}
+            {stage === 4 && (
+              <div className="gsi-stage">
+                <StageSummary
+                  lines={[
+                    { label: "Area", value: areaLabel },
+                    { label: "Now", value: now || "Not filled in yet" },
+                    {
+                      label: "Target",
+                      value: goodEnough || "Not filled in yet",
+                    },
+                  ]}
+                />
+
+                {validProofs.length > 0 && (
+                  <div className="gsi-stage-compact-proof">
+                    <strong>Proof:</strong>
+                    <ul className="gsi-proof-list">
+                      {validProofs.map((p) => (
+                        <li key={p.id}>{p.text}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="gsi-stage-body">
+                  <label className="gsi-label">
+                    Put the steps for {areaLabel} in the order you want
+                  </label>
+                  <p className="gsi-hint">
+                    Reorder, adjust, or remove steps until the plan for{" "}
+                    {areaLabel} feels realistic.
+                  </p>
+
+                  <div className="gsi-step-rows gsi-step-rows--order">
+                    {steps.map((step, idx) => (
+                      <div
+                        className="gsi-step-row gsi-step-row--order"
+                        key={step.id}
+                      >
+                        <span className="gsi-step-index">{idx + 1}</span>
+                        <input
+                          className="gsi-input gsi-step-input"
+                          type="text"
+                          value={step.text}
+                          onChange={(e) =>
+                            updateStepText(step.id, e.target.value)
+                          }
+                          placeholder={`Step ${idx + 1} for ${areaLabel}`}
+                        />
+                        <input
+                          className="gsi-input gsi-step-minutes"
+                          type="number"
+                          min="1"
+                          value={step.minutes || ""}
+                          onChange={(e) =>
+                            updateStepMinutes(step.id, e.target.value)
+                          }
+                          placeholder="2"
+                        />
+                        <button
+                          type="button"
+                          className="gsi-step-btn gsi-step-up-btn"
+                          onClick={() => moveStepUp(step.id)}
+                          disabled={idx === 0}
+                          title="Move up"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="gsi-step-btn gsi-step-down-btn"
+                          onClick={() => moveStepDown(step.id)}
+                          disabled={idx === steps.length - 1}
+                          title="Move down"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          className="gsi-step-btn gsi-step-remove-btn"
+                          onClick={() => removeStep(step.id)}
+                          title="Remove"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div
+                    className={`gsi-budget-display ${
+                      overBudget
+                        ? "gsi-budget-display--over"
+                        : "gsi-budget-display--ok"
+                    }`}
+                  >
+                    <span className="gsi-budget-label">
+                      Planned steps total
+                    </span>
+                    <strong className="gsi-budget-value">
+                      {plannedTotal} / {currentAreaMaxMinutes || 0} min
+                    </strong>
+                  </div>
+
+                  {overBudget && (
+                    <p className="gsi-budget-warning">
+                      This plan is longer than your max time for this area.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* STAGE 5: Save */}
+            {stage === 5 && (
+              <div className="gsi-stage">
+                <StageSummary
+                  lines={[
+                    { label: "Area", value: areaLabel },
+                    { label: "Now", value: now || "Not filled in yet" },
+                    {
+                      label: "Target",
+                      value: goodEnough || "Not filled in yet",
+                    },
+                  ]}
+                />
+
+                <div className="gsi-stage-body gsi-save-review">
+                  <h3 className="gsi-review-title">Ready to save?</h3>
+
+                  <div className="gsi-review-box">
+                    <div className="gsi-review-item">
+                      <strong>Area</strong>
+                      <p>{trimmedArea || areaLabel}</p>
+                    </div>
+                    <div className="gsi-review-item">
+                      <strong>Now</strong>
+                      <p>{now}</p>
+                    </div>
+                    <div className="gsi-review-item">
+                      <strong>Target</strong>
+                      <p>{goodEnough}</p>
+                    </div>
+                    {validProofs.length > 0 && (
+                      <div className="gsi-review-item">
+                        <strong>Proof</strong>
+                        <ul className="gsi-review-proof-list">
+                          {validProofs.map((p) => (
+                            <li key={p.id}>{p.text}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <div className="gsi-review-item">
+                      <strong>
+                        Steps ({steps.filter((s) => s.text.trim()).length})
+                      </strong>
+                      <ol className="gsi-review-steps-list">
+                        {steps
+                          .filter((s) => s.text.trim())
+                          .map((s) => (
+                            <li key={s.id}>
+                              {s.text}{" "}
+                              <span className="gsi-review-time">
+                                ({s.minutes}m)
+                              </span>
+                            </li>
+                          ))}
+                      </ol>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {error && <p className="gsi-error">{error}</p>}
+            {message && <p className="gsi-success">{message}</p>}
           </div>
-        )}
 
-        {error && <p className="gsi-error">{error}</p>}
-        {message && <p className="gsi-success">{message}</p>}
-      </div>
+          <div className="gsi-nav">
+            <button
+              type="button"
+              className="gsi-btn gsi-btn--back"
+              onClick={goBack}
+              disabled={stage === 0}
+            >
+              Back
+            </button>
 
-      <div className="gsi-nav">
-        <button
-          type="button"
-          className="gsi-btn gsi-btn--back"
-          onClick={goBack}
-          disabled={stage === 0}
-        >
-          Back
-        </button>
-
-        {stage < STAGES.length - 1 ? (
-          <button
-            type="button"
-            className="gsi-btn gsi-btn--next"
-            onClick={goNext}
-          >
-            Next
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="gsi-btn gsi-btn--save"
-            onClick={handleSaveToList}
-          >
-            Save to list
-          </button>
-        )}
-        </div>
-
+            {stage < STAGES.length - 1 ? (
+              <button
+                type="button"
+                className="gsi-btn gsi-btn--next"
+                onClick={goNext}
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="gsi-btn gsi-btn--save"
+                onClick={handleSaveToList}
+              >
+                Save to list
+              </button>
+            )}
+          </div>
         </>
       )}
     </section>
