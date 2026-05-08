@@ -10,6 +10,14 @@ import {
 } from "../utils/musicStore"
 import JSZip from "jszip"
 
+function safeReload() {
+  // JSDOM does not implement full document navigation/reload.
+  if (import.meta.env.MODE === "test") return
+  try {
+    window.location.reload()
+  } catch {}
+}
+
 function formatSavedAt(iso) {
   if (!iso) return ""
   return fmtLocalDateTime(iso)
@@ -59,8 +67,19 @@ function buildExportJSON() {
   return JSON.stringify(snapshot, null, 2)
 }
 
-export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onToggleSectionCollapsed }) {
-  const { saveSlots, saveSlot, loadSlot, clearSlot, mainTasks, resetMainTaskData } = useMainTask()
+export default function SaveLoadPanel({
+  sectionControls,
+  sectionCollapsed,
+  onToggleSectionCollapsed,
+}) {
+  const {
+    saveSlots,
+    saveSlot,
+    loadSlot,
+    clearSlot,
+    mainTasks,
+    resetMainTaskData,
+  } = useMainTask()
   const [slotNames, setSlotNames] = useState(["", "", "", "", ""])
   const [message, setMessage] = useState("")
   const [musicMsg, setMusicMsg] = useState("")
@@ -75,7 +94,11 @@ export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onTog
   const exportJSON = buildExportJSON()
   const exportBlob = new Blob([exportJSON], { type: "application/json" })
   let exportHref = ""
-  try { exportHref = URL.createObjectURL(exportBlob) } catch { /* not available in test/SSR environments */ }
+  try {
+    exportHref = URL.createObjectURL(exportBlob)
+  } catch {
+    /* not available in test/SSR environments */
+  }
 
   function flash(msg, duration = 3000) {
     clearTimeout(flashTimerRef.current)
@@ -154,7 +177,7 @@ export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onTog
           musicCount++
         }
         flash(`Imported backup and ${musicCount} track(s) — reloading…`)
-        setTimeout(() => window.location.reload(), 800)
+        setTimeout(() => safeReload(), 800)
       } else {
         // Import from JSON
         const text = await file.text()
@@ -168,7 +191,7 @@ export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onTog
           }
         }
         flash(`Imported ${count} keys — reloading…`)
-        setTimeout(() => window.location.reload(), 800)
+        setTimeout(() => safeReload(), 800)
       }
     } catch {
       flash("Invalid backup file.")
@@ -223,7 +246,7 @@ export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onTog
           ? `Cleared ${keys.length} data key(s). Music clear failed — reloading…`
           : `Cleared ${keys.length} data key(s)${clearMusic ? " + music" : ""} — reloading…`,
       )
-      setTimeout(() => { try { window.location.reload() } catch {} }, 350)
+      setTimeout(() => safeReload(), 350)
     } catch {
       flash("Failed to clear all data. Please try again.")
     }
@@ -239,182 +262,205 @@ export default function SaveLoadPanel({ sectionControls, sectionCollapsed, onTog
           onClick={onToggleSectionCollapsed}
         >
           Save / Load
-          <span className="section-collapse-arrow">{sectionCollapsed ? "▸" : "▾"}</span>
+          <span className="section-collapse-arrow">
+            {sectionCollapsed ? "▸" : "▾"}
+          </span>
         </button>
         {sectionControls && <SectionMoveControls {...sectionControls} />}
       </div>
       {!sectionCollapsed && (
         <>
           <p className="save-load-panel__help">
-            Save your current tasks to a slot and reload them any time — like save
-            states in a game.
+            Save your current tasks to a slot and reload them any time — like
+            save states in a game.
           </p>
 
           {message && <p className="save-load-msg">{message}</p>}
 
           <div className="save-load-slots">
-        {saveSlots.map((slot, index) => (
-          <div
-            key={index}
-            className={`save-slot ${slot ? "save-slot--filled" : "save-slot--empty"}`}
-          >
-            <div className="save-slot__top">
-              <span className="save-slot__num">#{index + 1}</span>
-              {slot ? (
-                <span className="save-slot__name">{slot.name}</span>
-              ) : (
-                <span className="save-slot__empty-label">Empty</span>
-              )}
-            </div>
-            {slot && (
-              <div className="save-slot__meta">
-                {slot.tasks?.length ?? 0} task(s) ·{" "}
-                {formatSavedAt(slot.savedAt)}
+            {saveSlots.map((slot, index) => (
+              <div
+                key={index}
+                className={`save-slot ${slot ? "save-slot--filled" : "save-slot--empty"}`}
+              >
+                <div className="save-slot__top">
+                  <span className="save-slot__num">#{index + 1}</span>
+                  {slot ? (
+                    <span className="save-slot__name">{slot.name}</span>
+                  ) : (
+                    <span className="save-slot__empty-label">Empty</span>
+                  )}
+                </div>
+                {slot && (
+                  <div className="save-slot__meta">
+                    {slot.tasks?.length ?? 0} task(s) ·{" "}
+                    {formatSavedAt(slot.savedAt)}
+                  </div>
+                )}
+                {!slot && (
+                  <input
+                    className="save-slot__name-input"
+                    value={slotNames[index]}
+                    onChange={(e) => {
+                      const arr = [...slotNames]
+                      arr[index] = e.target.value
+                      setSlotNames(arr)
+                    }}
+                    placeholder="Optional name…"
+                  />
+                )}
+                <div className="save-slot__actions">
+                  <button
+                    type="button"
+                    className="save-slot-btn save-slot-btn--save"
+                    onClick={() => handleSave(index)}
+                  >
+                    Store here
+                  </button>
+                  {slot && (
+                    <>
+                      <button
+                        type="button"
+                        className="save-slot-btn save-slot-btn--load"
+                        onClick={() => handleLoad(index)}
+                      >
+                        Load
+                      </button>
+                      <button
+                        type="button"
+                        className="save-slot-btn save-slot-btn--clear"
+                        onClick={() => handleClear(index)}
+                      >
+                        ×
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            )}
-            {!slot && (
-              <input
-                className="save-slot__name-input"
-                value={slotNames[index]}
-                onChange={(e) => {
-                  const arr = [...slotNames]
-                  arr[index] = e.target.value
-                  setSlotNames(arr)
-                }}
-                placeholder="Optional name…"
-              />
-            )}
-            <div className="save-slot__actions">
+            ))}
+          </div>
+
+          <div className="export-import-section">
+            <h3 className="export-import-title">Export / Import</h3>
+            <p className="save-load-panel__help">
+              Download all tasks, settings, and music as a single zip file, or
+              use the fallback for privacy browsers.
+            </p>
+            <div className="export-import-actions">
               <button
                 type="button"
                 className="save-slot-btn save-slot-btn--save"
-                onClick={() => handleSave(index)}
+                onClick={handleExportZip}
               >
-                Store here
+                Export Everything (.zip)
               </button>
-              {slot && (
-                <>
+              <label
+                style={{
+                  marginLeft: 12,
+                  fontSize: "0.98em",
+                  userSelect: "none",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={includeMusic}
+                  onChange={(e) => setIncludeMusic(e.target.checked)}
+                  style={{ marginRight: 4 }}
+                />
+                Include music
+              </label>
+              <a
+                href={exportHref}
+                download={exportFileName}
+                className="save-slot-btn save-slot-btn--load"
+                style={{ marginLeft: 12 }}
+              >
+                Privacy Browser Export (.json)
+              </a>
+            </div>
+            <div className="export-import-actions" style={{ marginTop: 8 }}>
+              <button
+                type="button"
+                className="save-slot-btn save-slot-btn--load"
+                onClick={() => importRef.current?.click()}
+              >
+                Import (.zip or .json)
+              </button>
+              <input
+                ref={importRef}
+                type="file"
+                accept=".zip,.json"
+                style={{ display: "none" }}
+                onChange={handleImportFile}
+              />
+            </div>
+            {musicMsg && <p className="save-load-msg">{musicMsg}</p>}
+          </div>
+
+          <div className="save-load-danger-zone">
+            <h3 className="export-import-title">Danger Zone</h3>
+            <p className="save-load-panel__help">
+              Use this before trying a new version to avoid legacy-data bugs.
+              This action is permanent.
+            </p>
+            <div className="export-import-actions" style={{ marginTop: 8 }}>
+              <label
+                style={{
+                  marginRight: 12,
+                  fontSize: "0.98em",
+                  userSelect: "none",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={clearMusic}
+                  onChange={(e) => setClearMusic(e.target.checked)}
+                  style={{ marginRight: 4 }}
+                />
+                Also clear saved music
+              </label>
+              {showClearConfirm ? (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    gap: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "0.9em",
+                      color: "var(--ta-danger, #c0392b)",
+                    }}
+                  >
+                    Permanently delete all app data?
+                  </span>
                   <button
                     type="button"
-                    className="save-slot-btn save-slot-btn--load"
-                    onClick={() => handleLoad(index)}
+                    className="save-slot-btn save-slot-btn--danger"
+                    onClick={handleClearAllData}
                   >
-                    Load
+                    Yes, delete all data
                   </button>
                   <button
                     type="button"
-                    className="save-slot-btn save-slot-btn--clear"
-                    onClick={() => handleClear(index)}
+                    className="save-slot-btn"
+                    onClick={() => setShowClearConfirm(false)}
                   >
-                    ×
+                    Cancel
                   </button>
-                </>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="save-slot-btn save-slot-btn--danger"
+                  onClick={() => setShowClearConfirm(true)}
+                >
+                  Clear All Data
+                </button>
               )}
             </div>
           </div>
-        ))}
-        </div>
-
-      <div className="export-import-section">
-        <h3 className="export-import-title">Export / Import</h3>
-        <p className="save-load-panel__help">
-          Download all tasks, settings, and music as a single zip file, or use
-          the fallback for privacy browsers.
-        </p>
-        <div className="export-import-actions">
-          <button
-            type="button"
-            className="save-slot-btn save-slot-btn--save"
-            onClick={handleExportZip}
-          >
-            Export Everything (.zip)
-          </button>
-          <label
-            style={{ marginLeft: 12, fontSize: "0.98em", userSelect: "none" }}
-          >
-            <input
-              type="checkbox"
-              checked={includeMusic}
-              onChange={(e) => setIncludeMusic(e.target.checked)}
-              style={{ marginRight: 4 }}
-            />
-            Include music
-          </label>
-          <a
-            href={exportHref}
-            download={exportFileName}
-            className="save-slot-btn save-slot-btn--load"
-            style={{ marginLeft: 12 }}
-          >
-            Privacy Browser Export (.json)
-          </a>
-        </div>
-        <div className="export-import-actions" style={{ marginTop: 8 }}>
-          <button
-            type="button"
-            className="save-slot-btn save-slot-btn--load"
-            onClick={() => importRef.current?.click()}
-          >
-            Import (.zip or .json)
-          </button>
-          <input
-            ref={importRef}
-            type="file"
-            accept=".zip,.json"
-            style={{ display: "none" }}
-            onChange={handleImportFile}
-          />
-        </div>
-        {musicMsg && <p className="save-load-msg">{musicMsg}</p>}
-      </div>
-
-      <div className="save-load-danger-zone">
-        <h3 className="export-import-title">Danger Zone</h3>
-        <p className="save-load-panel__help">
-          Use this before trying a new version to avoid legacy-data bugs. This
-          action is permanent.
-        </p>
-        <div className="export-import-actions" style={{ marginTop: 8 }}>
-          <label
-            style={{ marginRight: 12, fontSize: "0.98em", userSelect: "none" }}
-          >
-            <input
-              type="checkbox"
-              checked={clearMusic}
-              onChange={(e) => setClearMusic(e.target.checked)}
-              style={{ marginRight: 4 }}
-            />
-            Also clear saved music
-          </label>
-          {showClearConfirm ? (
-            <div style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
-              <span style={{ fontSize: "0.9em", color: "var(--ta-danger, #c0392b)" }}>Permanently delete all app data?</span>
-              <button
-                type="button"
-                className="save-slot-btn save-slot-btn--danger"
-                onClick={handleClearAllData}
-              >
-                Yes, delete all data
-              </button>
-              <button
-                type="button"
-                className="save-slot-btn"
-                onClick={() => setShowClearConfirm(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="save-slot-btn save-slot-btn--danger"
-              onClick={() => setShowClearConfirm(true)}
-            >
-              Clear All Data
-            </button>
-          )}
-        </div>
-      </div>
         </>
       )}
     </section>

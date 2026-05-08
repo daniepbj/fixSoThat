@@ -248,7 +248,20 @@ export default function MainTaskCard({ task }) {
     moveStepNextTo(task.id, sourceId, targetId, zone)
   }
 
-  function saveTitle() {
+  function beginTitleEdit(e) {
+    if (e) e.stopPropagation()
+    setTitleDraft(task.title)
+    setEditingTitle(true)
+  }
+
+  function cancelTitleEdit(e) {
+    if (e) e.stopPropagation()
+    setTitleDraft(task.title)
+    setEditingTitle(false)
+  }
+
+  function saveTitle(e) {
+    if (e) e.stopPropagation()
     updateMainTask(task.id, { title: titleDraft.trim() })
     setEditingTitle(false)
   }
@@ -533,11 +546,44 @@ export default function MainTaskCard({ task }) {
           >
             {expanded ? "▾" : "▸"}
           </button>
-          <span className="mtask-card__title">
-            {isCompleted && <span className="mtask-card__done-mark">✓ </span>}
-            <span className="mtask-card__title-prefix">Fixa så att jag </span>
-            <span>{task.title || "(no title)"}</span>
-          </span>
+          {editingTitle ? (
+            <div
+              className="mtask-inline-edit mtask-inline-edit--header"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input
+                className="mtask-edit-input"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveTitle(e)
+                  if (e.key === "Escape") cancelTitleEdit(e)
+                }}
+                aria-label="Edit task title"
+                autoFocus
+              />
+              <button className="mtask-edit-btn" onClick={saveTitle}>
+                Save
+              </button>
+              <button
+                className="mtask-edit-btn mtask-edit-btn--cancel"
+                onClick={cancelTitleEdit}
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="mtask-card__title mtask-card__title-button"
+              aria-label={task.title || "(no title)"}
+              onClick={beginTitleEdit}
+            >
+              {isCompleted && <span className="mtask-card__done-mark">✓ </span>}
+              <span className="mtask-card__title-prefix">Fixa så att jag </span>
+              <span>{task.title || "(no title)"}</span>
+            </button>
+          )}
         </div>
         <div className="mtask-card__header-meta">
           {taskHeadQueueItem && (
@@ -605,35 +651,11 @@ export default function MainTaskCard({ task }) {
           <div className="mtask-card__field">
             <span className="mtask-field-label">Goal</span>
             {editingTitle ? (
-              <div className="mtask-inline-edit">
-                <input
-                  className="mtask-edit-input"
-                  value={titleDraft}
-                  onChange={(e) => setTitleDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") saveTitle()
-                    if (e.key === "Escape") setEditingTitle(false)
-                  }}
-                  autoFocus
-                />
-                <button className="mtask-edit-btn" onClick={saveTitle}>
-                  Save
-                </button>
-                <button
-                  className="mtask-edit-btn mtask-edit-btn--cancel"
-                  onClick={() => setEditingTitle(false)}
-                >
-                  ×
-                </button>
-              </div>
+              <span className="mtask-field-value mtask-field-value--editing">
+                Editing title above
+              </span>
             ) : (
-              <span
-                className="mtask-field-value"
-                onClick={() => {
-                  setTitleDraft(task.title)
-                  setEditingTitle(true)
-                }}
-              >
+              <span className="mtask-field-value" onClick={beginTitleEdit}>
                 {task.title || <em className="mtask-empty">click to set</em>}
               </span>
             )}

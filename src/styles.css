@@ -986,6 +986,22 @@ body {
   word-break: break-word;
 }
 
+.mtask-card__title-button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+
+.mtask-card__title-button:focus-visible {
+  outline: 2px solid rgba(173, 255, 209, 0.6);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 .mtask-card__done-mark {
   color: #8effb3;
 }
@@ -1077,6 +1093,19 @@ body {
 .mtask-inline-edit {
   display: flex;
   gap: 6px;
+}
+
+.mtask-inline-edit--header {
+  flex: 1;
+  min-width: 0;
+}
+
+.mtask-inline-edit--header .mtask-edit-input {
+  min-width: 0;
+}
+
+.mtask-field-value--editing {
+  opacity: 0.78;
 }
 
 .mtask-edit-input {

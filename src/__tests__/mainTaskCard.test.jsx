@@ -1,6 +1,6 @@
 import React from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { act, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import MainTaskCard from "../components/MainTaskCard"
 import { MainTaskProvider, useMainTask } from "../context/MainTaskContext"
@@ -249,6 +249,37 @@ describe("MainTaskCard", () => {
         expect(mainTasksRef.current[0].title).toBe("Updated Task")
       })
     })
+
+    it("can cancel task title editing without saving", async () => {
+      const { mainTasksRef } = renderCardWithContext()
+
+      await waitFor(() => {
+        expect(screen.getByText("Test Task")).toBeInTheDocument()
+      })
+
+      const titleBtn = screen.getByRole("button", { name: "Test Task" })
+      await userEvent.click(titleBtn)
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue("Test Task")).toBeInTheDocument()
+      })
+
+      const input = screen.getByDisplayValue("Test Task")
+      await userEvent.clear(input)
+      await userEvent.type(input, "Discarded Title")
+      await userEvent.keyboard("{Escape}")
+
+      await waitFor(() => {
+        expect(mainTasksRef.current[0].title).toBe("Test Task")
+      })
+
+      const reopenTitleBtn = screen.getByRole("button", { name: "Test Task" })
+      await userEvent.click(reopenTitleBtn)
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue("Test Task")).toBeInTheDocument()
+      })
+    })
   })
 
   describe("proof editing", () => {
@@ -336,7 +367,9 @@ describe("MainTaskCard", () => {
         sourceStepId: "s1",
       }
 
-      appSyncRef.current.publishTimerSnapshot([linkedTask], false)
+      await act(async () => {
+        appSyncRef.current.publishTimerSnapshot([linkedTask], false)
+      })
 
       await waitFor(() => {
         const card = screen.getByText("Linked Task").closest(".mtask-card")
